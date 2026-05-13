@@ -1,3 +1,7 @@
 <resources>
-    <string name="app_name">click</string>
+    <string name="app_name">连点器</string>
+    <string name="accessibility_service_description">连点器无障碍服务用于在无 root 权限下执行自动触控操作。</string>
+    <string name="status_enabled">无障碍服务：已开启</string>
+    <string name="status_disabled">无障碍服务：未开启</string>
+    <string name="open_accessibility_settings">打开无障碍设置</string>
 </resources>
