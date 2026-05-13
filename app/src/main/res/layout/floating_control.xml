@@ -9,13 +9,347 @@
     android:elevation="4dp">
 
     <LinearLayout
+        android:id="@+id/expandedControls"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/dragHandle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingEnd="12dp"
+                android:text="@string/floating_control_label"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                android:maxEms="6"
+                android:ellipsize="end"
+                android:maxLines="1" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="24dp"
+                android:background="#33FFFFFF" />
+
+            <TextView
+                android:id="@+id/startButton"
+                android:layout_width="44dp"
+                android:layout_height="36dp"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="@string/start_action"
+                android:textColor="@android:color/white"
+                android:textSize="13sp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="24dp"
+                android:background="#33FFFFFF" />
+
+            <TextView
+                android:id="@+id/addButton"
+                android:layout_width="44dp"
+                android:layout_height="36dp"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="@string/add_action"
+                android:textColor="@android:color/white"
+                android:textSize="13sp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="24dp"
+                android:background="#33FFFFFF" />
+
+            <TextView
+                android:id="@+id/listButton"
+                android:layout_width="44dp"
+                android:layout_height="36dp"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="@string/list_action"
+                android:textColor="@android:color/white"
+                android:textSize="13sp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="24dp"
+                android:background="#33FFFFFF" />
+
+            <TextView
+                android:id="@+id/saveButton"
+                android:layout_width="44dp"
+                android:layout_height="36dp"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="@string/save_action"
+                android:textColor="@android:color/white"
+                android:textSize="13sp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="24dp"
+                android:background="#33FFFFFF" />
+
+            <TextView
+                android:id="@+id/positionButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:text="@string/position_show"
+                android:textColor="@android:color/white"
+                android:textSize="13sp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="24dp"
+                android:background="#33FFFFFF" />
+
+            <TextView
+                android:id="@+id/closeButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:text="@string/close_button"
+                android:textColor="@android:color/white"
+                android:textSize="13sp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="24dp"
+                android:background="#33FFFFFF" />
+
+            <TextView
+                android:id="@+id/foldButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:text="@string/fold"
+                android:textColor="@android:color/white"
+                android:textSize="13sp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/addMenu"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="4dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tapOption"
+                    android:layout_width="44dp"
+                    android:layout_height="36dp"
+                    android:background="@android:color/transparent"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="@string/tap_action"
+                    android:textColor="@android:color/white"
+                    android:textSize="13sp" />
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="24dp"
+                    android:background="#33FFFFFF" />
+
+                <TextView
+                    android:id="@+id/swipeOption"
+                    android:layout_width="44dp"
+                    android:layout_height="36dp"
+                    android:background="@android:color/transparent"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="@string/swipe_action"
+                    android:textColor="@android:color/white"
+                    android:textSize="13sp" />
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="24dp"
+                    android:background="#33FFFFFF" />
+
+                <TextView
+                    android:id="@+id/waitOption"
+                    android:layout_width="44dp"
+                    android:layout_height="36dp"
+                    android:background="@android:color/transparent"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="@string/wait_action"
+                    android:textColor="@android:color/white"
+                    android:textSize="13sp" />
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="24dp"
+                    android:background="#33FFFFFF" />
+
+                <TextView
+                    android:id="@+id/clearOption"
+                    android:layout_width="44dp"
+                    android:layout_height="36dp"
+                    android:background="@android:color/transparent"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="@string/clear_action"
+                    android:textColor="#FF8888"
+                    android:textSize="13sp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/actionListPanel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="4dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/actionListHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/action_list_empty"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                android:layout_marginBottom="4dp" />
+
+            <LinearLayout
+                android:id="@+id/actionListContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/saveConfirmPanel"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="4dp"
+            android:visibility="gone"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/confirm_save"
+                android:textColor="@android:color/white"
+                android:textSize="13sp"
+                android:layout_marginBottom="4dp" />
+
+            <EditText
+                android:id="@+id/saveNameInput"
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:textColor="@android:color/white"
+                android:textColorHint="#AAAAAA"
+                android:textSize="13sp"
+                android:background="#333333"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:maxLines="1"
+                android:inputType="text"
+                android:layout_marginBottom="4dp" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center">
+
+                <TextView
+                    android:id="@+id/saveConfirmYes"
+                    android:layout_width="56dp"
+                    android:layout_height="34dp"
+                    android:background="@android:color/transparent"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="@string/yes"
+                    android:textColor="#FF4CAF50"
+                    android:textSize="13sp" />
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="20dp"
+                    android:background="#33FFFFFF" />
+
+                <TextView
+                    android:id="@+id/saveConfirmNo"
+                    android:layout_width="56dp"
+                    android:layout_height="34dp"
+                    android:background="@android:color/transparent"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="@string/no"
+                    android:textColor="#FFFF8888"
+                    android:textSize="13sp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/collapsedControls"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:gravity="center_vertical"
+        android:visibility="gone">
 
         <TextView
-            android:id="@+id/dragHandle"
+            android:id="@+id/collapsedTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -24,7 +358,9 @@
             android:paddingEnd="12dp"
             android:text="@string/floating_control_label"
             android:textColor="@android:color/white"
-            android:textSize="14sp" />
+            android:textSize="14sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
 
         <View
             android:layout_width="1dp"
@@ -32,7 +368,7 @@
             android:background="#33FFFFFF" />
 
         <TextView
-            android:id="@+id/startButton"
+            android:id="@+id/collapsedStartButton"
             android:layout_width="44dp"
             android:layout_height="36dp"
             android:background="@android:color/transparent"
@@ -49,58 +385,7 @@
             android:background="#33FFFFFF" />
 
         <TextView
-            android:id="@+id/addButton"
-            android:layout_width="44dp"
-            android:layout_height="36dp"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/add_action"
-            android:textColor="@android:color/white"
-            android:textSize="13sp" />
-
-        <View
-            android:layout_width="1dp"
-            android:layout_height="24dp"
-            android:background="#33FFFFFF" />
-
-        <TextView
-            android:id="@+id/listButton"
-            android:layout_width="44dp"
-            android:layout_height="36dp"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/list_action"
-            android:textColor="@android:color/white"
-            android:textSize="13sp" />
-
-        <View
-            android:layout_width="1dp"
-            android:layout_height="24dp"
-            android:background="#33FFFFFF" />
-
-        <TextView
-            android:id="@+id/saveButton"
-            android:layout_width="44dp"
-            android:layout_height="36dp"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/save_action"
-            android:textColor="@android:color/white"
-            android:textSize="13sp" />
-
-        <View
-            android:layout_width="1dp"
-            android:layout_height="24dp"
-            android:background="#33FFFFFF" />
-
-        <TextView
-            android:id="@+id/positionButton"
+            android:id="@+id/collapsedCloseButton"
             android:layout_width="wrap_content"
             android:layout_height="36dp"
             android:background="@android:color/transparent"
@@ -109,7 +394,7 @@
             android:gravity="center"
             android:paddingStart="6dp"
             android:paddingEnd="6dp"
-            android:text="@string/position_show"
+            android:text="@string/close_button"
             android:textColor="@android:color/white"
             android:textSize="13sp" />
 
@@ -119,257 +404,18 @@
             android:background="#33FFFFFF" />
 
         <TextView
-            android:id="@+id/closeButton"
-            android:layout_width="36dp"
+            android:id="@+id/collapsedExpandButton"
+            android:layout_width="wrap_content"
             android:layout_height="36dp"
             android:background="@android:color/transparent"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
-            android:text="✕"
-            android:textColor="@android:color/white"
-            android:textSize="14sp" />
-
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/addMenu"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginTop="4dp"
-        android:visibility="gone">
-
-        <View
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <TextView
-            android:id="@+id/tapOption"
-            android:layout_width="44dp"
-            android:layout_height="36dp"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/tap_action"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:text="@string/expand"
             android:textColor="@android:color/white"
             android:textSize="13sp" />
-
-        <View
-            android:layout_width="1dp"
-            android:layout_height="24dp"
-            android:background="#33FFFFFF" />
-
-        <TextView
-            android:id="@+id/swipeOption"
-            android:layout_width="44dp"
-            android:layout_height="36dp"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/swipe_action"
-            android:textColor="@android:color/white"
-            android:textSize="13sp" />
-
-        <View
-            android:layout_width="1dp"
-            android:layout_height="24dp"
-            android:background="#33FFFFFF" />
-
-        <TextView
-            android:id="@+id/waitOption"
-            android:layout_width="44dp"
-            android:layout_height="36dp"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/wait_action"
-            android:textColor="@android:color/white"
-            android:textSize="13sp" />
-
-        <View
-            android:layout_width="1dp"
-            android:layout_height="24dp"
-            android:background="#33FFFFFF" />
-
-        <TextView
-            android:id="@+id/clearOption"
-            android:layout_width="44dp"
-            android:layout_height="36dp"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/clear_action"
-            android:textColor="#FF8888"
-            android:textSize="13sp" />
-
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/actionListPanel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="4dp"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/actionListHeader"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/action_list_empty"
-            android:textColor="@android:color/white"
-            android:textSize="12sp"
-            android:layout_marginBottom="4dp" />
-
-        <LinearLayout
-            android:id="@+id/actionListContainer"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="vertical" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#33FFFFFF"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="4dp" />
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <TextView
-                android:id="@+id/listAddTap"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:background="@android:color/transparent"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:text="@string/action_list_add_tap"
-                android:textColor="@android:color/white"
-                android:textSize="12sp" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="24dp"
-                android:background="#33FFFFFF" />
-
-            <TextView
-                android:id="@+id/listAddSwipe"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:background="@android:color/transparent"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:text="@string/action_list_add_swipe"
-                android:textColor="@android:color/white"
-                android:textSize="12sp" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="24dp"
-                android:background="#33FFFFFF" />
-
-            <TextView
-                android:id="@+id/listAddWait"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:background="@android:color/transparent"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:text="@string/action_list_add_wait"
-                android:textColor="@android:color/white"
-                android:textSize="12sp" />
-
-        </LinearLayout>
-
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/saveConfirmPanel"
-        android:layout_width="200dp"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="4dp"
-        android:visibility="gone"
-        android:gravity="center">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/confirm_save"
-            android:textColor="@android:color/white"
-            android:textSize="13sp"
-            android:layout_marginBottom="4dp" />
-
-        <EditText
-            android:id="@+id/saveNameInput"
-            android:layout_width="match_parent"
-            android:layout_height="36dp"
-            android:textColor="@android:color/white"
-            android:textColorHint="#AAAAAA"
-            android:textSize="13sp"
-            android:background="#333333"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:maxLines="1"
-            android:inputType="text"
-            android:layout_marginBottom="4dp" />
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center">
-
-            <TextView
-                android:id="@+id/saveConfirmYes"
-                android:layout_width="56dp"
-                android:layout_height="34dp"
-                android:background="@android:color/transparent"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:text="@string/yes"
-                android:textColor="#FF4CAF50"
-                android:textSize="13sp" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="20dp"
-                android:background="#33FFFFFF" />
-
-            <TextView
-                android:id="@+id/saveConfirmNo"
-                android:layout_width="56dp"
-                android:layout_height="34dp"
-                android:background="@android:color/transparent"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:text="@string/no"
-                android:textColor="#FFFF8888"
-                android:textSize="13sp" />
-
-        </LinearLayout>
 
     </LinearLayout>
 

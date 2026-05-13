@@ -12,6 +12,8 @@ data class ActionStep(
     val endX: Int? = null,
     val endY: Int? = null,
     val durationMs: Long? = null,
+    val delayBeforeMs: Long? = null,
+    val stepGapMs: Long? = null,
     val markerX: Int? = null,
     val markerY: Int? = null
 ) {
@@ -21,12 +23,14 @@ data class ActionStep(
             TYPE_TAP -> {
                 put("x", x)
                 put("y", y)
+                durationMs?.let { put("durationMs", it) }
             }
             TYPE_SWIPE -> {
                 put("startX", startX)
                 put("startY", startY)
                 put("endX", endX)
                 put("endY", endY)
+                durationMs?.let { put("durationMs", it) }
             }
             TYPE_WAIT -> {
                 put("durationMs", durationMs)
@@ -34,6 +38,8 @@ data class ActionStep(
                 markerY?.let { put("markerY", it) }
             }
         }
+        delayBeforeMs?.let { put("delayBeforeMs", it) }
+        stepGapMs?.let { put("stepGapMs", it) }
     }
 
     companion object {
@@ -43,22 +49,32 @@ data class ActionStep(
 
         fun fromJson(json: JSONObject): ActionStep {
             val type = json.getString("type")
+            val delayBeforeMs = if (json.has("delayBeforeMs")) json.getLong("delayBeforeMs") else null
+            val stepGapMs = if (json.has("stepGapMs")) json.getLong("stepGapMs") else null
             return when (type) {
                 TYPE_TAP -> ActionStep(
                     type = TYPE_TAP,
                     x = json.getInt("x"),
-                    y = json.getInt("y")
+                    y = json.getInt("y"),
+                    durationMs = if (json.has("durationMs")) json.getLong("durationMs") else null,
+                    delayBeforeMs = delayBeforeMs,
+                    stepGapMs = stepGapMs
                 )
                 TYPE_SWIPE -> ActionStep(
                     type = TYPE_SWIPE,
                     startX = json.getInt("startX"),
                     startY = json.getInt("startY"),
                     endX = json.getInt("endX"),
-                    endY = json.getInt("endY")
+                    endY = json.getInt("endY"),
+                    durationMs = if (json.has("durationMs")) json.getLong("durationMs") else null,
+                    delayBeforeMs = delayBeforeMs,
+                    stepGapMs = stepGapMs
                 )
                 TYPE_WAIT -> ActionStep(
                     type = TYPE_WAIT,
                     durationMs = json.getLong("durationMs"),
+                    delayBeforeMs = delayBeforeMs,
+                    stepGapMs = stepGapMs,
                     markerX = if (json.has("markerX")) json.getInt("markerX") else null,
                     markerY = if (json.has("markerY")) json.getInt("markerY") else null
                 )

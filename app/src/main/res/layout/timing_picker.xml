@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="240dp"
+    android:layout_height="wrap_content"
+    android:background="@drawable/floating_control_bg"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/settingsTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_title"
+        android:textColor="@android:color/white"
+        android:textSize="14sp"
+        android:layout_marginBottom="12dp"
+        android:layout_gravity="center" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_duration"
+        android:textColor="#CCCCCC"
+        android:textSize="12sp"
+        android:layout_marginBottom="4dp" />
+
+    <EditText
+        android:id="@+id/durationInput"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:textColor="@android:color/black"
+        android:textColorHint="#888888"
+        android:hint="1"
+        android:textSize="14sp"
+        android:background="#FFFFFF"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:inputType="number"
+        android:maxLength="8"
+        android:layout_marginBottom="10dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_delay_before"
+        android:textColor="#CCCCCC"
+        android:textSize="12sp"
+        android:layout_marginBottom="4dp" />
+
+    <EditText
+        android:id="@+id/delayBeforeInput"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:textColor="@android:color/black"
+        android:textColorHint="#888888"
+        android:hint="1"
+        android:textSize="14sp"
+        android:background="#FFFFFF"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:inputType="number"
+        android:maxLength="8"
+        android:layout_marginBottom="10dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_step_gap"
+        android:textColor="#CCCCCC"
+        android:textSize="12sp"
+        android:layout_marginBottom="4dp" />
+
+    <EditText
+        android:id="@+id/stepGapInput"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:textColor="@android:color/black"
+        android:textColorHint="#888888"
+        android:hint="1"
+        android:textSize="14sp"
+        android:background="#FFFFFF"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:inputType="number"
+        android:maxLength="8"
+        android:layout_marginBottom="12dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/settingsCancelButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="@string/cancel"
+            android:textColor="#FFFF8888"
+            android:textSize="14sp" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="24dp"
+            android:background="#33FFFFFF" />
+
+        <TextView
+            android:id="@+id/settingsSaveButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="@string/save"
+            android:textColor="#FF4CAF50"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+</LinearLayout>

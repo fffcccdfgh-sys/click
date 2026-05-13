@@ -33,7 +33,7 @@
     <string name="current_action_none">暂未添加动作</string>
     <string name="clear_action">清除</string>
     <string name="sequence_cleared">动作序列已清除</string>
-    <string name="sequence_executing_step">正在执行第 %1$d/%2$d 步</string>
+
     <string name="sequence_done">序列执行完毕</string>
     <string name="sequence_list_header">动作序列（%1$d 步）：</string>
     <string name="sequence_list_tap">%1$d. 点击 (%2$d, %3$d)</string>
@@ -93,4 +93,18 @@
     <string name="script_name_exists">脚本名称已存在</string>
     <string name="rename_script_title">重命名脚本</string>
     <string name="rename_script_hint">输入新名称</string>
+    <string name="settings_title">动作设置</string>
+    <string name="settings_duration">动作持续时间 (ms)</string>
+    <string name="settings_delay_before">执行前等待时间 (ms)</string>
+    <string name="settings_step_gap">执行速度 (ms)</string>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="settings_action_button">设置</string>
+    <string name="execution_already_running">正在运行</string>
+    <string name="insert_before">前</string>
+    <string name="insert_after">后</string>
+    <string name="insert_action_type">选择插入类型</string>
+    <string name="close_button">关闭</string>
+    <string name="fold">折叠</string>
+    <string name="expand">展开</string>
 </resources>

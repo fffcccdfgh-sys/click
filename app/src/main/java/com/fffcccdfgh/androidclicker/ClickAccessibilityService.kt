@@ -40,13 +40,17 @@ class ClickAccessibilityService : AccessibilityService() {
     }
 
     fun performTap(x: Int, y: Int): Boolean {
-        return performTap(x, y, null)
+        return performTap(x, y, 1, null)
     }
 
     fun performTap(x: Int, y: Int, callback: GestureResultCallback?): Boolean {
-        Log.i(TAG, "Dispatching tap gesture at ($x, $y)")
+        return performTap(x, y, 1, callback)
+    }
+
+    fun performTap(x: Int, y: Int, durationMs: Long, callback: GestureResultCallback?): Boolean {
+        Log.i(TAG, "Dispatching tap gesture at ($x, $y) duration=${durationMs}ms")
         val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
-        val stroke = GestureDescription.StrokeDescription(path, 0, 1)
+        val stroke = GestureDescription.StrokeDescription(path, 0, durationMs)
         val gesture = GestureDescription.Builder()
             .addStroke(stroke)
             .build()
