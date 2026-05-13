@@ -11,6 +11,7 @@ import android.app.Service
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -38,6 +39,18 @@ class FloatingControlService : Service() {
     private var pendingStartX = 0
     private var pendingStartY = 0
     private var actionListVisible = false
+    private val positionMarkerViews = mutableListOf<View>()
+    private val markerBindings = mutableMapOf<View, MarkerBinding>()
+    private var positionVisible = false
+    private var dragStartRawX = 0f
+    private var dragStartRawY = 0f
+    private var dragStartParamX = 0
+    private var dragStartParamY = 0
+    private var screenWidthPx = 0
+    private var screenHeightPx = 0
+
+    private enum class MarkerPointType { TAP, SWIPE_START, SWIPE_END, WAIT }
+    private data class MarkerBinding(val actionIndex: Int, val pointType: MarkerPointType)
 
     override fun onCreate() {
         super.onCreate()
@@ -59,6 +72,7 @@ class FloatingControlService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        hidePositionMarkers()
         hidePickerOverlay()
         hideFloatingControl()
         isRunning = false
@@ -140,6 +154,7 @@ class FloatingControlService : Service() {
         }
 
         view.findViewById<View>(R.id.startButton).setOnClickListener {
+            hidePositionMarkersForExecution()
             executeSequence()
         }
 
@@ -149,6 +164,10 @@ class FloatingControlService : Service() {
 
         view.findViewById<View>(R.id.listButton).setOnClickListener {
             toggleActionList()
+        }
+
+        view.findViewById<View>(R.id.positionButton).setOnClickListener {
+            togglePositionMarkers()
         }
 
         val addMenu = view.findViewById<View>(R.id.addMenu)
@@ -310,6 +329,7 @@ class FloatingControlService : Service() {
         sequence.removeAt(index)
         saveSequence(sequence)
         renderActionList()
+        refreshMarkers()
     }
 
     private fun showPickerOverlay(mode: Int) {
@@ -402,6 +422,276 @@ class FloatingControlService : Service() {
         pickerView = null
     }
 
+    private fun togglePositionMarkers() {
+        positionVisible = !positionVisible
+        if (positionVisible) {
+            showPositionMarkers()
+        } else {
+            hidePositionMarkers()
+        }
+        updatePositionButton()
+    }
+
+    private fun showPositionMarkers() {
+        val wm = windowManager ?: return
+        if (positionMarkerViews.isNotEmpty()) return
+
+        val sequence = loadSequence()
+        val density = resources.displayMetrics.density
+        val markerSizePx = (48 * density).toInt()
+        val labelHeightPx = (18 * density).toInt()
+        val strokePx = (2.5f * density).toInt()
+        screenWidthPx = resources.displayMetrics.widthPixels
+        screenHeightPx = resources.displayMetrics.heightPixels
+
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+
+        val winHeight = markerSizePx + labelHeightPx
+        var waitCount = 0
+
+        for ((i, action) in sequence.withIndex()) {
+            val stepNum = i + 1
+            when (action.type) {
+                ActionStep.TYPE_TAP -> {
+                    val x = action.x ?: continue
+                    val y = action.y ?: continue
+                    val circle = createCircleContent(markerSizePx, strokePx,
+                        0x664CAF50.toInt(), 0xFF4CAF50.toInt(),
+                        getString(R.string.tap_action), null)
+                    val marker = createMarkerView(circle, stepNum, labelHeightPx)
+                    val params = createMarkerParams(type, markerSizePx, winHeight, x, y,
+                        screenWidthPx, screenHeightPx)
+                    markerBindings[marker] = MarkerBinding(i, MarkerPointType.TAP)
+                    marker.setOnTouchListener { v, event -> handleMarkerDrag(v, event, markerSizePx) }
+                    wm.addView(marker, params)
+                    positionMarkerViews.add(marker)
+                }
+                ActionStep.TYPE_SWIPE -> {
+                    val sx = action.startX ?: continue
+                    val sy = action.startY ?: continue
+                    val ex = action.endX ?: continue
+                    val ey = action.endY ?: continue
+
+                    // Start marker (blue, "滑动" + "始")
+                    val startCircle = createCircleContent(markerSizePx, strokePx,
+                        0x662196F3.toInt(), 0xFF2196F3.toInt(),
+                        getString(R.string.swipe_action), "始")
+                    val startMarker = createMarkerView(startCircle, stepNum, labelHeightPx)
+                    val startParams = createMarkerParams(type, markerSizePx, winHeight, sx, sy,
+                        screenWidthPx, screenHeightPx)
+                    markerBindings[startMarker] = MarkerBinding(i, MarkerPointType.SWIPE_START)
+                    startMarker.setOnTouchListener { v, event -> handleMarkerDrag(v, event, markerSizePx) }
+                    wm.addView(startMarker, startParams)
+                    positionMarkerViews.add(startMarker)
+
+                    // End marker (orange, "滑动" + "末")
+                    val endCircle = createCircleContent(markerSizePx, strokePx,
+                        0x66FF9800.toInt(), 0xFFFF9800.toInt(),
+                        getString(R.string.swipe_action), "末")
+                    val endMarker = createMarkerView(endCircle, stepNum, labelHeightPx)
+                    val endParams = createMarkerParams(type, markerSizePx, winHeight, ex, ey,
+                        screenWidthPx, screenHeightPx)
+                    markerBindings[endMarker] = MarkerBinding(i, MarkerPointType.SWIPE_END)
+                    endMarker.setOnTouchListener { v, event -> handleMarkerDrag(v, event, markerSizePx) }
+                    wm.addView(endMarker, endParams)
+                    positionMarkerViews.add(endMarker)
+                }
+                ActionStep.TYPE_WAIT -> {
+                    val waitX = action.markerX ?: ((16 * density).toInt())
+                    val waitY = action.markerY
+                        ?: ((80 * density).toInt() + waitCount * (56 * density).toInt())
+                    val circle = createCircleContent(markerSizePx, strokePx,
+                        0x669E9E9E.toInt(), 0xFF9E9E9E.toInt(),
+                        getString(R.string.marker_blank), null)
+                    val marker = createMarkerView(circle, stepNum, labelHeightPx)
+                    val params = createMarkerParams(type, markerSizePx, winHeight, waitX, waitY,
+                        screenWidthPx, screenHeightPx)
+                    markerBindings[marker] = MarkerBinding(i, MarkerPointType.WAIT)
+                    marker.setOnTouchListener { v, event -> handleMarkerDrag(v, event, markerSizePx) }
+                    wm.addView(marker, params)
+                    positionMarkerViews.add(marker)
+                    waitCount++
+                }
+            }
+        }
+    }
+
+    private fun createCircleContent(
+        circleSizePx: Int, strokePx: Int,
+        fillColor: Int, strokeColor: Int,
+        line1: String, line2: String?
+    ): View {
+        val bg = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(fillColor)
+            setStroke(strokePx, strokeColor)
+        }
+        if (line2 == null) {
+            return TextView(this).apply {
+                text = line1
+                textSize = 11f
+                gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                background = bg
+                layoutParams = LinearLayout.LayoutParams(circleSizePx, circleSizePx)
+            }
+        }
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            background = bg
+            layoutParams = LinearLayout.LayoutParams(circleSizePx, circleSizePx)
+        }
+        container.addView(TextView(this).apply {
+            text = line1
+            textSize = 10f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        })
+        container.addView(TextView(this).apply {
+            text = line2
+            textSize = 8f
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#CCCCCC"))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        })
+        return container
+    }
+
+    private fun createMarkerView(
+        circleView: View, stepNum: Int, labelHeightPx: Int
+    ): View {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+        container.addView(circleView)
+        val label = TextView(this).apply {
+            text = "第${stepNum}步"
+            textSize = 9f
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#CCCCCC"))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                labelHeightPx
+            )
+        }
+        container.addView(label)
+        return container
+    }
+
+    private fun createMarkerParams(
+        type: Int, widthPx: Int, heightPx: Int,
+        coordX: Int, coordY: Int,
+        screenW: Int, screenH: Int
+    ): WindowManager.LayoutParams {
+        return WindowManager.LayoutParams(
+            widthPx, heightPx, type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = (coordX - widthPx / 2).coerceIn(0, screenW - widthPx)
+            y = (coordY - widthPx / 2).coerceIn(0, screenH - heightPx)
+        }
+    }
+
+    private fun hidePositionMarkers() {
+        val wm = windowManager ?: return
+        for (view in positionMarkerViews) {
+            try {
+                wm.removeView(view)
+            } catch (_: Exception) {
+            }
+        }
+        positionMarkerViews.clear()
+        markerBindings.clear()
+    }
+
+    private fun refreshMarkers() {
+        if (!positionVisible) return
+        hidePositionMarkers()
+        showPositionMarkers()
+    }
+
+    private fun handleMarkerDrag(view: View, event: MotionEvent, circleSizePx: Int): Boolean {
+        val binding = markerBindings[view] ?: return false
+        val wm = windowManager ?: return false
+        val params = (view.layoutParams as? WindowManager.LayoutParams) ?: return false
+
+        return when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                dragStartRawX = event.rawX
+                dragStartRawY = event.rawY
+                dragStartParamX = params.x
+                dragStartParamY = params.y
+                true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val dx = (event.rawX - dragStartRawX).toInt()
+                val dy = (event.rawY - dragStartRawY).toInt()
+                params.x = (dragStartParamX + dx).coerceIn(0, screenWidthPx - params.width)
+                params.y = (dragStartParamY + dy).coerceIn(0, screenHeightPx - params.height)
+                wm.updateViewLayout(view, params)
+                true
+            }
+            MotionEvent.ACTION_UP -> {
+                val newCenterX = params.x + params.width / 2
+                val newCenterY = params.y + circleSizePx / 2
+                updateActionCoordinate(binding, newCenterX, newCenterY)
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun updateActionCoordinate(binding: MarkerBinding, newX: Int, newY: Int) {
+        val sequence = loadSequence().toMutableList()
+        if (binding.actionIndex >= sequence.size) return
+
+        val oldAction = sequence[binding.actionIndex]
+        val updatedAction = when (binding.pointType) {
+            MarkerPointType.TAP -> oldAction.copy(x = newX, y = newY)
+            MarkerPointType.SWIPE_START -> oldAction.copy(startX = newX, startY = newY)
+            MarkerPointType.SWIPE_END -> oldAction.copy(endX = newX, endY = newY)
+            MarkerPointType.WAIT -> oldAction.copy(markerX = newX, markerY = newY)
+        }
+        sequence[binding.actionIndex] = updatedAction
+        saveSequence(sequence)
+        if (actionListVisible) renderActionList()
+    }
+
+    private fun updatePositionButton() {
+        val view = floatingView ?: return
+        val btn = view.findViewById<TextView>(R.id.positionButton)
+        if (positionVisible) {
+            btn.text = getString(R.string.position_hide)
+            btn.setTextColor(0xFF4CAF50.toInt())
+        } else {
+            btn.text = getString(R.string.position_show)
+            btn.setTextColor(Color.WHITE)
+        }
+    }
+
+    private fun hidePositionMarkersForExecution() {
+        if (!positionVisible) return
+        hidePositionMarkers()
+        positionVisible = false
+        updatePositionButton()
+    }
+
     private fun showWaitDurationPicker() {
         val view = floatingView ?: return
         val wm = windowManager ?: return
@@ -477,6 +767,7 @@ class FloatingControlService : Service() {
         if (actionListVisible) {
             renderActionList()
         }
+        refreshMarkers()
     }
 
     private fun appendToSequence(action: ActionStep) {
@@ -486,6 +777,7 @@ class FloatingControlService : Service() {
         if (actionListVisible) {
             renderActionList()
         }
+        refreshMarkers()
     }
 
     private fun executeSequence() {

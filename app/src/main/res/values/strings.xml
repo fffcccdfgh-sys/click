@@ -56,4 +56,7 @@
     <string name="wait_duration_1s">1 秒</string>
     <string name="wait_duration_2s">2 秒</string>
     <string name="wait_duration_5s">5 秒</string>
+    <string name="position_show">显示</string>
+    <string name="position_hide">隐藏</string>
+    <string name="marker_blank">空白</string>
 </resources>

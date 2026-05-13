@@ -11,7 +11,9 @@ data class ActionStep(
     val startY: Int? = null,
     val endX: Int? = null,
     val endY: Int? = null,
-    val durationMs: Long? = null
+    val durationMs: Long? = null,
+    val markerX: Int? = null,
+    val markerY: Int? = null
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("type", type)
@@ -28,6 +30,8 @@ data class ActionStep(
             }
             TYPE_WAIT -> {
                 put("durationMs", durationMs)
+                markerX?.let { put("markerX", it) }
+                markerY?.let { put("markerY", it) }
             }
         }
     }
@@ -54,7 +58,9 @@ data class ActionStep(
                 )
                 TYPE_WAIT -> ActionStep(
                     type = TYPE_WAIT,
-                    durationMs = json.getLong("durationMs")
+                    durationMs = json.getLong("durationMs"),
+                    markerX = if (json.has("markerX")) json.getInt("markerX") else null,
+                    markerY = if (json.has("markerY")) json.getInt("markerY") else null
                 )
                 else -> throw IllegalArgumentException("Unknown action type: $type")
             }
