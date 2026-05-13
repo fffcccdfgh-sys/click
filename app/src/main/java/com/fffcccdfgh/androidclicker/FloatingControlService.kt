@@ -163,6 +163,11 @@ class FloatingControlService : Service() {
             showPickerOverlay(PICKER_SWIPE_START)
         }
 
+        view.findViewById<View>(R.id.waitOption).setOnClickListener {
+            addMenu.visibility = View.GONE
+            showWaitDurationPicker()
+        }
+
         view.findViewById<View>(R.id.clearOption).setOnClickListener {
             addMenu.visibility = View.GONE
             clearSequence()
@@ -175,6 +180,10 @@ class FloatingControlService : Service() {
 
         view.findViewById<View>(R.id.listAddSwipe).setOnClickListener {
             showPickerOverlay(PICKER_SWIPE_START)
+        }
+
+        view.findViewById<View>(R.id.listAddWait).setOnClickListener {
+            showWaitDurationPicker()
         }
 
         view.findViewById<View>(R.id.closeButton).setOnClickListener {
@@ -260,6 +269,10 @@ class FloatingControlService : Service() {
                     ActionStep.TYPE_SWIPE -> getString(
                         R.string.action_list_swipe_short,
                         i + 1, action.startX!!, action.startY!!, action.endX!!, action.endY!!
+                    )
+                    ActionStep.TYPE_WAIT -> getString(
+                        R.string.action_list_wait_short,
+                        i + 1, (action.durationMs ?: 0L) / 1000.0
                     )
                     else -> ""
                 }
@@ -389,6 +402,61 @@ class FloatingControlService : Service() {
         pickerView = null
     }
 
+    private fun showWaitDurationPicker() {
+        val view = floatingView ?: return
+        val wm = windowManager ?: return
+        if (pickerView != null) return
+
+        val inflater = LayoutInflater.from(this)
+        val picker = inflater.inflate(R.layout.duration_picker, null)
+        pickerView = picker
+
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.CENTER
+        }
+
+        val durations = listOf(500L to R.string.wait_duration_05s, 1000L to R.string.wait_duration_1s, 2000L to R.string.wait_duration_2s, 5000L to R.string.wait_duration_5s)
+        val container = picker.findViewById<LinearLayout>(R.id.durationContainer)
+
+        for ((durationMs, labelRes) in durations) {
+            val option = TextView(this).apply {
+                text = getString(labelRes)
+                setTextColor(Color.WHITE)
+                textSize = 14f
+                gravity = Gravity.CENTER
+                setPadding(32, 16, 32, 16)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    val action = ActionStep(type = ActionStep.TYPE_WAIT, durationMs = durationMs)
+                    appendToSequence(action)
+                    Toast.makeText(
+                        this@FloatingControlService,
+                        getString(R.string.action_added_wait, durationMs / 1000.0),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    hidePickerOverlay()
+                }
+            }
+            container.addView(option)
+        }
+
+        wm.addView(picker, params)
+    }
+
     private fun loadSequence(): List<ActionStep> {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val json = prefs.getString(KEY_ACTION_SEQUENCE, null) ?: return emptyList()
@@ -446,6 +514,15 @@ class FloatingControlService : Service() {
         }
 
         val action = sequence[index]
+
+        if (action.type == ActionStep.TYPE_WAIT) {
+            val durationMs = action.durationMs ?: 1000L
+            Handler(Looper.getMainLooper()).postDelayed({
+                executeStep(sequence, index + 1, service)
+            }, durationMs)
+            return
+        }
+
         val callback = object : GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) {
                 scheduleNextStep(sequence, index + 1, service)

@@ -10,7 +10,8 @@ data class ActionStep(
     val startX: Int? = null,
     val startY: Int? = null,
     val endX: Int? = null,
-    val endY: Int? = null
+    val endY: Int? = null,
+    val durationMs: Long? = null
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("type", type)
@@ -25,12 +26,16 @@ data class ActionStep(
                 put("endX", endX)
                 put("endY", endY)
             }
+            TYPE_WAIT -> {
+                put("durationMs", durationMs)
+            }
         }
     }
 
     companion object {
         const val TYPE_TAP = "tap"
         const val TYPE_SWIPE = "swipe"
+        const val TYPE_WAIT = "wait"
 
         fun fromJson(json: JSONObject): ActionStep {
             val type = json.getString("type")
@@ -46,6 +51,10 @@ data class ActionStep(
                     startY = json.getInt("startY"),
                     endX = json.getInt("endX"),
                     endY = json.getInt("endY")
+                )
+                TYPE_WAIT -> ActionStep(
+                    type = TYPE_WAIT,
+                    durationMs = json.getLong("durationMs")
                 )
                 else -> throw IllegalArgumentException("Unknown action type: $type")
             }

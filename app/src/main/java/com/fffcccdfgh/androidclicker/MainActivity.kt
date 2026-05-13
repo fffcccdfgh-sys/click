@@ -121,6 +121,10 @@ class MainActivity : AppCompatActivity() {
                     R.string.sequence_list_swipe,
                     i + 1, action.startX!!, action.startY!!, action.endX!!, action.endY!!
                 )
+                ActionStep.TYPE_WAIT -> getString(
+                    R.string.sequence_list_wait,
+                    i + 1, (action.durationMs ?: 0L) / 1000.0
+                )
                 else -> continue
             }
             sb.appendLine(line)

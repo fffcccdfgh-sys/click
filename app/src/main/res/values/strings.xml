@@ -38,6 +38,7 @@
     <string name="sequence_list_header">动作序列（%1$d 步）：</string>
     <string name="sequence_list_tap">%1$d. 点击 (%2$d, %3$d)</string>
     <string name="sequence_list_swipe">%1$d. 滑动 (%2$d, %3$d) → (%4$d, %5$d)</string>
+    <string name="sequence_list_wait">%1$d. 等待 %2$.1f 秒</string>
     <string name="list_action">列表</string>
     <string name="action_list_empty">暂无动作</string>
     <string name="action_list_title">动作列表（%1$d）</string>
@@ -46,4 +47,13 @@
     <string name="delete_action">删除</string>
     <string name="action_list_tap_short">第%1$d步：点(%2$d,%3$d)</string>
     <string name="action_list_swipe_short">第%1$d步：滑(%2$d,%3$d)→(%4$d,%5$d)</string>
+    <string name="action_list_wait_short">第%1$d步：等待 %2$.1f 秒</string>
+    <string name="wait_action">等待</string>
+    <string name="action_added_wait">等待动作已添加：%1$.1f 秒</string>
+    <string name="action_list_add_wait">添加等待</string>
+    <string name="pick_wait_duration">选择等待时长</string>
+    <string name="wait_duration_05s">0.5 秒</string>
+    <string name="wait_duration_1s">1 秒</string>
+    <string name="wait_duration_2s">2 秒</string>
+    <string name="wait_duration_5s">5 秒</string>
 </resources>
