@@ -94,31 +94,38 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateCurrentActionDisplay() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val actionType = prefs.getInt(KEY_ACTION_TYPE, ACTION_TYPE_NONE)
+        val json = prefs.getString(KEY_ACTION_SEQUENCE, null)
 
-        currentActionText.text = when (actionType) {
-            ACTION_TYPE_TAP -> {
-                val x = prefs.getInt(KEY_TAP_X, NO_COORDINATE)
-                val y = prefs.getInt(KEY_TAP_Y, NO_COORDINATE)
-                if (x != NO_COORDINATE && y != NO_COORDINATE) {
-                    getString(R.string.current_action_tap, x, y)
-                } else {
-                    getString(R.string.current_action_none)
-                }
-            }
-            ACTION_TYPE_SWIPE -> {
-                val sx = prefs.getInt(KEY_SWIPE_START_X, NO_COORDINATE)
-                val sy = prefs.getInt(KEY_SWIPE_START_Y, NO_COORDINATE)
-                val ex = prefs.getInt(KEY_SWIPE_END_X, NO_COORDINATE)
-                val ey = prefs.getInt(KEY_SWIPE_END_Y, NO_COORDINATE)
-                if (sx != NO_COORDINATE && sy != NO_COORDINATE && ex != NO_COORDINATE && ey != NO_COORDINATE) {
-                    getString(R.string.current_action_swipe, sx, sy, ex, ey)
-                } else {
-                    getString(R.string.current_action_none)
-                }
-            }
-            else -> getString(R.string.current_action_none)
+        if (json == null) {
+            currentActionText.text = getString(R.string.current_action_none)
+            return
         }
+
+        val sequence = try {
+            ActionStep.listFromJson(json)
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+        if (sequence.isEmpty()) {
+            currentActionText.text = getString(R.string.current_action_none)
+            return
+        }
+
+        val sb = StringBuilder()
+        sb.appendLine(getString(R.string.sequence_list_header, sequence.size))
+        for ((i, action) in sequence.withIndex()) {
+            val line = when (action.type) {
+                ActionStep.TYPE_TAP -> getString(R.string.sequence_list_tap, i + 1, action.x!!, action.y!!)
+                ActionStep.TYPE_SWIPE -> getString(
+                    R.string.sequence_list_swipe,
+                    i + 1, action.startX!!, action.startY!!, action.endX!!, action.endY!!
+                )
+                else -> continue
+            }
+            sb.appendLine(line)
+        }
+        currentActionText.text = sb.toString().trimEnd()
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
@@ -177,16 +184,6 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val PREFS_NAME = "tap_config"
-        const val KEY_ACTION_TYPE = "action_type"
-        const val ACTION_TYPE_NONE = 0
-        const val ACTION_TYPE_TAP = 1
-        const val ACTION_TYPE_SWIPE = 2
-        const val KEY_TAP_X = "tap_x"
-        const val KEY_TAP_Y = "tap_y"
-        const val KEY_SWIPE_START_X = "swipe_start_x"
-        const val KEY_SWIPE_START_Y = "swipe_start_y"
-        const val KEY_SWIPE_END_X = "swipe_end_x"
-        const val KEY_SWIPE_END_Y = "swipe_end_y"
-        const val NO_COORDINATE = -1
+        private const val KEY_ACTION_SEQUENCE = "action_sequence"
     }
 }

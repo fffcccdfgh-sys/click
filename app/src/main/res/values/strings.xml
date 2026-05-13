@@ -30,7 +30,20 @@
     <string name="tap_service_disabled">请先开启无障碍服务</string>
     <string name="tap_error">点击执行失败</string>
     <string name="swipe_error">滑动执行失败</string>
-    <string name="current_action_none">当前动作：未设置</string>
-    <string name="current_action_tap">当前动作：点击 (%1$d, %2$d)</string>
-    <string name="current_action_swipe">当前动作：滑动 (%1$d, %2$d) → (%3$d, %4$d)</string>
+    <string name="current_action_none">暂未添加动作</string>
+    <string name="clear_action">清除</string>
+    <string name="sequence_cleared">动作序列已清除</string>
+    <string name="sequence_executing_step">正在执行第 %1$d/%2$d 步</string>
+    <string name="sequence_done">序列执行完毕</string>
+    <string name="sequence_list_header">动作序列（%1$d 步）：</string>
+    <string name="sequence_list_tap">%1$d. 点击 (%2$d, %3$d)</string>
+    <string name="sequence_list_swipe">%1$d. 滑动 (%2$d, %3$d) → (%4$d, %5$d)</string>
+    <string name="list_action">列表</string>
+    <string name="action_list_empty">暂无动作</string>
+    <string name="action_list_title">动作列表（%1$d）</string>
+    <string name="action_list_add_tap">添加点击</string>
+    <string name="action_list_add_swipe">添加滑动</string>
+    <string name="delete_action">删除</string>
+    <string name="action_list_tap_short">第%1$d步：点(%2$d,%3$d)</string>
+    <string name="action_list_swipe_short">第%1$d步：滑(%2$d,%3$d)→(%4$d,%5$d)</string>
 </resources>

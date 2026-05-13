@@ -40,16 +40,24 @@ class ClickAccessibilityService : AccessibilityService() {
     }
 
     fun performTap(x: Int, y: Int): Boolean {
+        return performTap(x, y, null)
+    }
+
+    fun performTap(x: Int, y: Int, callback: GestureResultCallback?): Boolean {
         Log.i(TAG, "Dispatching tap gesture at ($x, $y)")
         val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
         val stroke = GestureDescription.StrokeDescription(path, 0, 1)
         val gesture = GestureDescription.Builder()
             .addStroke(stroke)
             .build()
-        return dispatchGesture(gesture, null, null)
+        return dispatchGesture(gesture, callback, null)
     }
 
     fun performSwipe(startX: Int, startY: Int, endX: Int, endY: Int, durationMs: Long = 300): Boolean {
+        return performSwipe(startX, startY, endX, endY, durationMs, null)
+    }
+
+    fun performSwipe(startX: Int, startY: Int, endX: Int, endY: Int, durationMs: Long = 300, callback: GestureResultCallback?): Boolean {
         Log.i(TAG, "Dispatching swipe from ($startX, $startY) to ($endX, $endY) over ${durationMs}ms")
         val path = Path().apply {
             moveTo(startX.toFloat(), startY.toFloat())
@@ -59,6 +67,6 @@ class ClickAccessibilityService : AccessibilityService() {
         val gesture = GestureDescription.Builder()
             .addStroke(stroke)
             .build()
-        return dispatchGesture(gesture, null, null)
+        return dispatchGesture(gesture, callback, null)
     }
 }

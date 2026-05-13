@@ -1,5 +1,7 @@
 package com.fffcccdfgh.androidclicker
 
+import android.accessibilityservice.GestureDescription
+import android.accessibilityservice.AccessibilityService.GestureResultCallback
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
@@ -7,14 +9,18 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 
@@ -31,6 +37,7 @@ class FloatingControlService : Service() {
     private var initialTouchY = 0f
     private var pendingStartX = 0
     private var pendingStartY = 0
+    private var actionListVisible = false
 
     override fun onCreate() {
         super.onCreate()
@@ -133,11 +140,15 @@ class FloatingControlService : Service() {
         }
 
         view.findViewById<View>(R.id.startButton).setOnClickListener {
-            executeCurrentAction()
+            executeSequence()
         }
 
         view.findViewById<View>(R.id.addButton).setOnClickListener {
             toggleAddMenu()
+        }
+
+        view.findViewById<View>(R.id.listButton).setOnClickListener {
+            toggleActionList()
         }
 
         val addMenu = view.findViewById<View>(R.id.addMenu)
@@ -149,6 +160,20 @@ class FloatingControlService : Service() {
 
         view.findViewById<View>(R.id.swipeOption).setOnClickListener {
             addMenu.visibility = View.GONE
+            showPickerOverlay(PICKER_SWIPE_START)
+        }
+
+        view.findViewById<View>(R.id.clearOption).setOnClickListener {
+            addMenu.visibility = View.GONE
+            clearSequence()
+            Toast.makeText(this, getString(R.string.sequence_cleared), Toast.LENGTH_SHORT).show()
+        }
+
+        view.findViewById<View>(R.id.listAddTap).setOnClickListener {
+            showPickerOverlay(PICKER_TAP_POINT)
+        }
+
+        view.findViewById<View>(R.id.listAddSwipe).setOnClickListener {
             showPickerOverlay(PICKER_SWIPE_START)
         }
 
@@ -176,6 +201,102 @@ class FloatingControlService : Service() {
         val view = floatingView ?: return
         val menu = view.findViewById<View>(R.id.addMenu)
         menu.visibility = if (menu.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+    }
+
+    private fun toggleActionList() {
+        if (actionListVisible) {
+            hideActionList()
+        } else {
+            val view = floatingView ?: return
+            view.findViewById<View>(R.id.addMenu).visibility = View.GONE
+            showActionList()
+        }
+    }
+
+    private fun showActionList() {
+        val view = floatingView ?: return
+        val panel = view.findViewById<View>(R.id.actionListPanel)
+        panel.visibility = View.VISIBLE
+        actionListVisible = true
+        renderActionList()
+    }
+
+    private fun hideActionList() {
+        val view = floatingView ?: return
+        val panel = view.findViewById<View>(R.id.actionListPanel)
+        panel.visibility = View.GONE
+        actionListVisible = false
+    }
+
+    private fun renderActionList() {
+        val view = floatingView ?: return
+        val sequence = loadSequence()
+        val container = view.findViewById<LinearLayout>(R.id.actionListContainer)
+        container.removeAllViews()
+
+        val header = view.findViewById<TextView>(R.id.actionListHeader)
+
+        if (sequence.isEmpty()) {
+            header.text = getString(R.string.action_list_empty)
+            return
+        }
+
+        header.text = getString(R.string.action_list_title, sequence.size)
+
+        for ((i, action) in sequence.withIndex()) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                setPadding(0, 4, 0, 4)
+                gravity = Gravity.CENTER_VERTICAL
+            }
+
+            val desc = TextView(this).apply {
+                text = when (action.type) {
+                    ActionStep.TYPE_TAP -> getString(R.string.action_list_tap_short, i + 1, action.x!!, action.y!!)
+                    ActionStep.TYPE_SWIPE -> getString(
+                        R.string.action_list_swipe_short,
+                        i + 1, action.startX!!, action.startY!!, action.endX!!, action.endY!!
+                    )
+                    else -> ""
+                }
+                setTextColor(Color.WHITE)
+                textSize = 12f
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+            }
+
+            val stepIndex = i
+            val deleteBtn = TextView(this).apply {
+                text = getString(R.string.delete_action)
+                setTextColor(0xFFFF8888.toInt())
+                textSize = 12f
+                setPadding(12, 4, 4, 4)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    deleteActionAt(stepIndex)
+                }
+            }
+
+            row.addView(desc)
+            row.addView(deleteBtn)
+            container.addView(row)
+        }
+    }
+
+    private fun deleteActionAt(index: Int) {
+        val sequence = loadSequence().toMutableList()
+        if (index < 0 || index >= sequence.size) return
+        sequence.removeAt(index)
+        saveSequence(sequence)
+        renderActionList()
     }
 
     private fun showPickerOverlay(mode: Int) {
@@ -215,14 +336,12 @@ class FloatingControlService : Service() {
             if (event.action == MotionEvent.ACTION_UP) {
                 val x = event.rawX.toInt()
                 val y = event.rawY.toInt()
-                val editor = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
                 val message: String
 
                 when (pickerMode) {
                     PICKER_TAP_POINT -> {
-                        editor.putInt(KEY_ACTION_TYPE, ACTION_TYPE_TAP)
-                            .putInt(KEY_TAP_X, x)
-                            .putInt(KEY_TAP_Y, y)
+                        val action = ActionStep(type = ActionStep.TYPE_TAP, x = x, y = y)
+                        appendToSequence(action)
                         message = getString(R.string.action_added_tap, x, y)
                     }
                     PICKER_SWIPE_START -> {
@@ -234,11 +353,14 @@ class FloatingControlService : Service() {
                         return@setOnTouchListener true
                     }
                     PICKER_SWIPE_END -> {
-                        editor.putInt(KEY_ACTION_TYPE, ACTION_TYPE_SWIPE)
-                            .putInt(KEY_SWIPE_START_X, pendingStartX)
-                            .putInt(KEY_SWIPE_START_Y, pendingStartY)
-                            .putInt(KEY_SWIPE_END_X, x)
-                            .putInt(KEY_SWIPE_END_Y, y)
+                        val action = ActionStep(
+                            type = ActionStep.TYPE_SWIPE,
+                            startX = pendingStartX,
+                            startY = pendingStartY,
+                            endX = x,
+                            endY = y
+                        )
+                        appendToSequence(action)
                         message = getString(R.string.action_added_swipe)
                     }
                     else -> {
@@ -246,7 +368,6 @@ class FloatingControlService : Service() {
                         return@setOnTouchListener true
                     }
                 }
-                editor.apply()
                 hidePickerOverlay()
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                 true
@@ -268,11 +389,40 @@ class FloatingControlService : Service() {
         pickerView = null
     }
 
-    private fun executeCurrentAction() {
+    private fun loadSequence(): List<ActionStep> {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val actionType = prefs.getInt(KEY_ACTION_TYPE, ACTION_TYPE_NONE)
+        val json = prefs.getString(KEY_ACTION_SEQUENCE, null) ?: return emptyList()
+        return try {
+            ActionStep.listFromJson(json)
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
 
-        if (actionType == ACTION_TYPE_NONE) {
+    private fun saveSequence(sequence: List<ActionStep>) {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        prefs.edit().putString(KEY_ACTION_SEQUENCE, ActionStep.listToJson(sequence)).apply()
+    }
+
+    private fun clearSequence() {
+        saveSequence(emptyList())
+        if (actionListVisible) {
+            renderActionList()
+        }
+    }
+
+    private fun appendToSequence(action: ActionStep) {
+        val sequence = loadSequence().toMutableList()
+        sequence.add(action)
+        saveSequence(sequence)
+        if (actionListVisible) {
+            renderActionList()
+        }
+    }
+
+    private fun executeSequence() {
+        val sequence = loadSequence()
+        if (sequence.isEmpty()) {
             Toast.makeText(this, getString(R.string.no_action_set), Toast.LENGTH_SHORT).show()
             return
         }
@@ -283,38 +433,49 @@ class FloatingControlService : Service() {
             return
         }
 
-        when (actionType) {
-            ACTION_TYPE_TAP -> {
-                val x = prefs.getInt(KEY_TAP_X, NO_COORDINATE)
-                val y = prefs.getInt(KEY_TAP_Y, NO_COORDINATE)
-                if (x == NO_COORDINATE || y == NO_COORDINATE) {
-                    Toast.makeText(this, getString(R.string.no_action_set), Toast.LENGTH_SHORT).show()
-                    return
-                }
-                val success = service.performTap(x, y)
-                if (success) {
-                    Toast.makeText(this, getString(R.string.tap_executed, x, y), Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this, getString(R.string.tap_error), Toast.LENGTH_SHORT).show()
-                }
+        Toast.makeText(this, getString(R.string.sequence_executing_step, 1, sequence.size), Toast.LENGTH_SHORT).show()
+        executeStep(sequence, 0, service)
+    }
+
+    private fun executeStep(sequence: List<ActionStep>, index: Int, service: ClickAccessibilityService) {
+        if (index >= sequence.size) {
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(this, getString(R.string.sequence_done), Toast.LENGTH_SHORT).show()
             }
-            ACTION_TYPE_SWIPE -> {
-                val startX = prefs.getInt(KEY_SWIPE_START_X, NO_COORDINATE)
-                val startY = prefs.getInt(KEY_SWIPE_START_Y, NO_COORDINATE)
-                val endX = prefs.getInt(KEY_SWIPE_END_X, NO_COORDINATE)
-                val endY = prefs.getInt(KEY_SWIPE_END_Y, NO_COORDINATE)
-                if (startX == NO_COORDINATE || startY == NO_COORDINATE || endX == NO_COORDINATE || endY == NO_COORDINATE) {
-                    Toast.makeText(this, getString(R.string.no_action_set), Toast.LENGTH_SHORT).show()
-                    return
-                }
-                val success = service.performSwipe(startX, startY, endX, endY)
-                if (success) {
-                    Toast.makeText(this, getString(R.string.swipe_executed, startX, startY, endX, endY), Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this, getString(R.string.swipe_error), Toast.LENGTH_SHORT).show()
-                }
+            return
+        }
+
+        val action = sequence[index]
+        val callback = object : GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                scheduleNextStep(sequence, index + 1, service)
+            }
+
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                scheduleNextStep(sequence, index + 1, service)
             }
         }
+
+        val dispatched = when (action.type) {
+            ActionStep.TYPE_TAP -> service.performTap(action.x!!, action.y!!, callback)
+            ActionStep.TYPE_SWIPE -> service.performSwipe(
+                action.startX!!, action.startY!!, action.endX!!, action.endY!!, 300, callback
+            )
+            else -> false
+        }
+
+        if (!dispatched) {
+            scheduleNextStep(sequence, index + 1, service)
+        }
+    }
+
+    private fun scheduleNextStep(sequence: List<ActionStep>, nextIndex: Int, service: ClickAccessibilityService) {
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (nextIndex < sequence.size) {
+                Toast.makeText(this, getString(R.string.sequence_executing_step, nextIndex + 1, sequence.size), Toast.LENGTH_SHORT).show()
+            }
+            executeStep(sequence, nextIndex, service)
+        }, STEP_GAP_MS)
     }
 
     companion object {
@@ -323,18 +484,9 @@ class FloatingControlService : Service() {
         var isRunning = false
             private set
 
-        private const val PREFS_NAME = "tap_config"
-        const val KEY_ACTION_TYPE = "action_type"
-        const val ACTION_TYPE_NONE = 0
-        const val ACTION_TYPE_TAP = 1
-        const val ACTION_TYPE_SWIPE = 2
-        const val KEY_TAP_X = "tap_x"
-        const val KEY_TAP_Y = "tap_y"
-        const val KEY_SWIPE_START_X = "swipe_start_x"
-        const val KEY_SWIPE_START_Y = "swipe_start_y"
-        const val KEY_SWIPE_END_X = "swipe_end_x"
-        const val KEY_SWIPE_END_Y = "swipe_end_y"
-        const val NO_COORDINATE = -1
+        const val PREFS_NAME = "tap_config"
+        const val KEY_ACTION_SEQUENCE = "action_sequence"
+        private const val STEP_GAP_MS = 500L
 
         private const val PICKER_TAP_POINT = 0
         private const val PICKER_SWIPE_START = 1
