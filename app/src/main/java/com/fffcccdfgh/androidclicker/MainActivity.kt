@@ -19,7 +19,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var openSettingsButton: Button
     private lateinit var openOverlaySettingsButton: Button
     private lateinit var toggleFloatingButton: Button
-    private lateinit var currentCoordinateText: TextView
+    private lateinit var currentActionText: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,7 +36,7 @@ class MainActivity : AppCompatActivity() {
         openSettingsButton = findViewById(R.id.openSettingsButton)
         openOverlaySettingsButton = findViewById(R.id.openOverlaySettingsButton)
         toggleFloatingButton = findViewById(R.id.toggleFloatingButton)
-        currentCoordinateText = findViewById(R.id.currentCoordinateText)
+        currentActionText = findViewById(R.id.currentActionText)
 
         openSettingsButton.setOnClickListener {
             openAccessibilitySettings()
@@ -60,7 +60,7 @@ class MainActivity : AppCompatActivity() {
         updateAccessibilityStatus()
         updateOverlayStatus()
         updateFloatingButton()
-        updateCoordinateDisplay()
+        updateCurrentActionDisplay()
     }
 
     private fun updateAccessibilityStatus() {
@@ -92,15 +92,32 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateCoordinateDisplay() {
+    private fun updateCurrentActionDisplay() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val x = prefs.getInt(KEY_TAP_X, NO_COORDINATE)
-        val y = prefs.getInt(KEY_TAP_Y, NO_COORDINATE)
+        val actionType = prefs.getInt(KEY_ACTION_TYPE, ACTION_TYPE_NONE)
 
-        if (x == NO_COORDINATE || y == NO_COORDINATE) {
-            currentCoordinateText.text = getString(R.string.no_coordinate_set)
-        } else {
-            currentCoordinateText.text = getString(R.string.current_coordinate, x, y)
+        currentActionText.text = when (actionType) {
+            ACTION_TYPE_TAP -> {
+                val x = prefs.getInt(KEY_TAP_X, NO_COORDINATE)
+                val y = prefs.getInt(KEY_TAP_Y, NO_COORDINATE)
+                if (x != NO_COORDINATE && y != NO_COORDINATE) {
+                    getString(R.string.current_action_tap, x, y)
+                } else {
+                    getString(R.string.current_action_none)
+                }
+            }
+            ACTION_TYPE_SWIPE -> {
+                val sx = prefs.getInt(KEY_SWIPE_START_X, NO_COORDINATE)
+                val sy = prefs.getInt(KEY_SWIPE_START_Y, NO_COORDINATE)
+                val ex = prefs.getInt(KEY_SWIPE_END_X, NO_COORDINATE)
+                val ey = prefs.getInt(KEY_SWIPE_END_Y, NO_COORDINATE)
+                if (sx != NO_COORDINATE && sy != NO_COORDINATE && ex != NO_COORDINATE && ey != NO_COORDINATE) {
+                    getString(R.string.current_action_swipe, sx, sy, ex, ey)
+                } else {
+                    getString(R.string.current_action_none)
+                }
+            }
+            else -> getString(R.string.current_action_none)
         }
     }
 
@@ -160,8 +177,16 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val PREFS_NAME = "tap_config"
+        const val KEY_ACTION_TYPE = "action_type"
+        const val ACTION_TYPE_NONE = 0
+        const val ACTION_TYPE_TAP = 1
+        const val ACTION_TYPE_SWIPE = 2
         const val KEY_TAP_X = "tap_x"
         const val KEY_TAP_Y = "tap_y"
+        const val KEY_SWIPE_START_X = "swipe_start_x"
+        const val KEY_SWIPE_START_Y = "swipe_start_y"
+        const val KEY_SWIPE_END_X = "swipe_end_x"
+        const val KEY_SWIPE_END_Y = "swipe_end_y"
         const val NO_COORDINATE = -1
     }
 }

@@ -48,4 +48,17 @@ class ClickAccessibilityService : AccessibilityService() {
             .build()
         return dispatchGesture(gesture, null, null)
     }
+
+    fun performSwipe(startX: Int, startY: Int, endX: Int, endY: Int, durationMs: Long = 300): Boolean {
+        Log.i(TAG, "Dispatching swipe from ($startX, $startY) to ($endX, $endY) over ${durationMs}ms")
+        val path = Path().apply {
+            moveTo(startX.toFloat(), startY.toFloat())
+            lineTo(endX.toFloat(), endY.toFloat())
+        }
+        val stroke = GestureDescription.StrokeDescription(path, 0, durationMs)
+        val gesture = GestureDescription.Builder()
+            .addStroke(stroke)
+            .build()
+        return dispatchGesture(gesture, null, null)
+    }
 }

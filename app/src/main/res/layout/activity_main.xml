@@ -47,16 +47,16 @@
         android:layout_height="wrap_content"
         android:text="@string/open_overlay_settings"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@+id/currentCoordinateText"
+        app:layout_constraintBottom_toTopOf="@+id/currentActionText"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/openSettingsButton" />
 
     <TextView
-        android:id="@+id/currentCoordinateText"
+        android:id="@+id/currentActionText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/no_coordinate_set"
+        android:text="@string/current_action_none"
         android:textSize="14sp"
         android:layout_marginTop="16dp"
         app:layout_constraintBottom_toTopOf="@+id/toggleFloatingButton"
@@ -73,6 +73,6 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/currentCoordinateText" />
+        app:layout_constraintTop_toBottomOf="@+id/currentActionText" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

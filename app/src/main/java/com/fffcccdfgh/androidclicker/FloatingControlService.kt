@@ -15,6 +15,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.TextView
 import android.widget.Toast
 
 class FloatingControlService : Service() {
@@ -23,10 +24,13 @@ class FloatingControlService : Service() {
     private var floatingView: View? = null
     private var floatingParams: WindowManager.LayoutParams? = null
     private var pickerView: View? = null
+    private var pickerMode: Int = PICKER_TAP_POINT
     private var initialX = 0
     private var initialY = 0
     private var initialTouchX = 0f
     private var initialTouchY = 0f
+    private var pendingStartX = 0
+    private var pendingStartY = 0
 
     override fun onCreate() {
         super.onCreate()
@@ -128,12 +132,24 @@ class FloatingControlService : Service() {
             }
         }
 
-        view.findViewById<View>(R.id.pickPointButton).setOnClickListener {
-            showPickerOverlay()
+        view.findViewById<View>(R.id.startButton).setOnClickListener {
+            executeCurrentAction()
         }
 
-        view.findViewById<View>(R.id.tapButton).setOnClickListener {
-            executeConfiguredTap()
+        view.findViewById<View>(R.id.addButton).setOnClickListener {
+            toggleAddMenu()
+        }
+
+        val addMenu = view.findViewById<View>(R.id.addMenu)
+
+        view.findViewById<View>(R.id.tapOption).setOnClickListener {
+            addMenu.visibility = View.GONE
+            showPickerOverlay(PICKER_TAP_POINT)
+        }
+
+        view.findViewById<View>(R.id.swipeOption).setOnClickListener {
+            addMenu.visibility = View.GONE
+            showPickerOverlay(PICKER_SWIPE_START)
         }
 
         view.findViewById<View>(R.id.closeButton).setOnClickListener {
@@ -156,9 +172,17 @@ class FloatingControlService : Service() {
         windowManager = null
     }
 
-    private fun showPickerOverlay() {
+    private fun toggleAddMenu() {
+        val view = floatingView ?: return
+        val menu = view.findViewById<View>(R.id.addMenu)
+        menu.visibility = if (menu.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+    }
+
+    private fun showPickerOverlay(mode: Int) {
         val wm = windowManager ?: return
         if (pickerView != null) return
+
+        pickerMode = mode
 
         val inflater = LayoutInflater.from(this)
         val view = inflater.inflate(R.layout.activity_position_picker, null)
@@ -179,17 +203,52 @@ class FloatingControlService : Service() {
             PixelFormat.TRANSLUCENT
         )
 
+        val instructionRes = when (mode) {
+            PICKER_TAP_POINT -> R.string.pick_position_instruction
+            PICKER_SWIPE_START -> R.string.pick_swipe_start_instruction
+            PICKER_SWIPE_END -> R.string.pick_swipe_end_instruction
+            else -> R.string.pick_position_instruction
+        }
+        view.findViewById<TextView>(R.id.pickerInstruction).setText(instructionRes)
+
         view.setOnTouchListener { _, event ->
             if (event.action == MotionEvent.ACTION_UP) {
                 val x = event.rawX.toInt()
                 val y = event.rawY.toInt()
-                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                    .edit()
-                    .putInt(KEY_TAP_X, x)
-                    .putInt(KEY_TAP_Y, y)
-                    .apply()
+                val editor = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+                val message: String
+
+                when (pickerMode) {
+                    PICKER_TAP_POINT -> {
+                        editor.putInt(KEY_ACTION_TYPE, ACTION_TYPE_TAP)
+                            .putInt(KEY_TAP_X, x)
+                            .putInt(KEY_TAP_Y, y)
+                        message = getString(R.string.action_added_tap, x, y)
+                    }
+                    PICKER_SWIPE_START -> {
+                        pendingStartX = x
+                        pendingStartY = y
+                        hidePickerOverlay()
+                        Toast.makeText(this, getString(R.string.swipe_start_set, x, y), Toast.LENGTH_SHORT).show()
+                        showPickerOverlay(PICKER_SWIPE_END)
+                        return@setOnTouchListener true
+                    }
+                    PICKER_SWIPE_END -> {
+                        editor.putInt(KEY_ACTION_TYPE, ACTION_TYPE_SWIPE)
+                            .putInt(KEY_SWIPE_START_X, pendingStartX)
+                            .putInt(KEY_SWIPE_START_Y, pendingStartY)
+                            .putInt(KEY_SWIPE_END_X, x)
+                            .putInt(KEY_SWIPE_END_Y, y)
+                        message = getString(R.string.action_added_swipe)
+                    }
+                    else -> {
+                        hidePickerOverlay()
+                        return@setOnTouchListener true
+                    }
+                }
+                editor.apply()
                 hidePickerOverlay()
-                Toast.makeText(this, getString(R.string.pick_point_set, x, y), Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                 true
             } else {
                 false
@@ -209,13 +268,12 @@ class FloatingControlService : Service() {
         pickerView = null
     }
 
-    private fun executeConfiguredTap() {
+    private fun executeCurrentAction() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val x = prefs.getInt(KEY_TAP_X, NO_COORDINATE)
-        val y = prefs.getInt(KEY_TAP_Y, NO_COORDINATE)
+        val actionType = prefs.getInt(KEY_ACTION_TYPE, ACTION_TYPE_NONE)
 
-        if (x == NO_COORDINATE || y == NO_COORDINATE) {
-            Toast.makeText(this, getString(R.string.tap_no_coordinate), Toast.LENGTH_SHORT).show()
+        if (actionType == ACTION_TYPE_NONE) {
+            Toast.makeText(this, getString(R.string.no_action_set), Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -225,11 +283,37 @@ class FloatingControlService : Service() {
             return
         }
 
-        val success = service.performTap(x, y)
-        if (success) {
-            Toast.makeText(this, getString(R.string.tap_executed, x, y), Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, getString(R.string.tap_error), Toast.LENGTH_SHORT).show()
+        when (actionType) {
+            ACTION_TYPE_TAP -> {
+                val x = prefs.getInt(KEY_TAP_X, NO_COORDINATE)
+                val y = prefs.getInt(KEY_TAP_Y, NO_COORDINATE)
+                if (x == NO_COORDINATE || y == NO_COORDINATE) {
+                    Toast.makeText(this, getString(R.string.no_action_set), Toast.LENGTH_SHORT).show()
+                    return
+                }
+                val success = service.performTap(x, y)
+                if (success) {
+                    Toast.makeText(this, getString(R.string.tap_executed, x, y), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, getString(R.string.tap_error), Toast.LENGTH_SHORT).show()
+                }
+            }
+            ACTION_TYPE_SWIPE -> {
+                val startX = prefs.getInt(KEY_SWIPE_START_X, NO_COORDINATE)
+                val startY = prefs.getInt(KEY_SWIPE_START_Y, NO_COORDINATE)
+                val endX = prefs.getInt(KEY_SWIPE_END_X, NO_COORDINATE)
+                val endY = prefs.getInt(KEY_SWIPE_END_Y, NO_COORDINATE)
+                if (startX == NO_COORDINATE || startY == NO_COORDINATE || endX == NO_COORDINATE || endY == NO_COORDINATE) {
+                    Toast.makeText(this, getString(R.string.no_action_set), Toast.LENGTH_SHORT).show()
+                    return
+                }
+                val success = service.performSwipe(startX, startY, endX, endY)
+                if (success) {
+                    Toast.makeText(this, getString(R.string.swipe_executed, startX, startY, endX, endY), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, getString(R.string.swipe_error), Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
@@ -238,9 +322,22 @@ class FloatingControlService : Service() {
         const val NOTIFICATION_ID = 1
         var isRunning = false
             private set
+
         private const val PREFS_NAME = "tap_config"
+        const val KEY_ACTION_TYPE = "action_type"
+        const val ACTION_TYPE_NONE = 0
+        const val ACTION_TYPE_TAP = 1
+        const val ACTION_TYPE_SWIPE = 2
         const val KEY_TAP_X = "tap_x"
         const val KEY_TAP_Y = "tap_y"
+        const val KEY_SWIPE_START_X = "swipe_start_x"
+        const val KEY_SWIPE_START_Y = "swipe_start_y"
+        const val KEY_SWIPE_END_X = "swipe_end_x"
+        const val KEY_SWIPE_END_Y = "swipe_end_y"
         const val NO_COORDINATE = -1
+
+        private const val PICKER_TAP_POINT = 0
+        private const val PICKER_SWIPE_START = 1
+        private const val PICKER_SWIPE_END = 2
     }
 }
