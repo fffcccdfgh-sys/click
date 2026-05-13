@@ -14,4 +14,14 @@
     <string name="floating_notification_channel">悬浮窗服务</string>
     <string name="floating_notification_title">连点器悬浮控制</string>
     <string name="floating_notification_text">悬浮控制正在运行</string>
+    <string name="no_coordinate_set">点击点：未设置</string>
+    <string name="current_coordinate">点击点：(%1$d, %2$d)</string>
+    <string name="tap_action">点击</string>
+    <string name="pick_point_action">取点</string>
+    <string name="tap_executed">已在 (%1$d, %2$d) 执行点击</string>
+    <string name="tap_no_coordinate">请先设置点击坐标</string>
+    <string name="tap_service_disabled">请先开启无障碍服务</string>
+    <string name="tap_error">点击执行失败</string>
+    <string name="pick_position_instruction">点击屏幕任意位置设置点击点</string>
+    <string name="pick_point_set">点击点已设置：(%1$d, %2$d)</string>
 </resources>

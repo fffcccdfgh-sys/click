@@ -19,16 +19,10 @@ import android.widget.Toast
 
 class FloatingControlService : Service() {
 
-    companion object {
-        const val CHANNEL_ID = "floating_control_channel"
-        const val NOTIFICATION_ID = 1
-        var isRunning = false
-            private set
-    }
-
     private var windowManager: WindowManager? = null
     private var floatingView: View? = null
-    private var layoutParams: WindowManager.LayoutParams? = null
+    private var floatingParams: WindowManager.LayoutParams? = null
+    private var pickerView: View? = null
     private var initialX = 0
     private var initialY = 0
     private var initialTouchX = 0f
@@ -54,6 +48,7 @@ class FloatingControlService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        hidePickerOverlay()
         hideFloatingControl()
         isRunning = false
     }
@@ -100,7 +95,7 @@ class FloatingControlService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
-        layoutParams = WindowManager.LayoutParams(
+        floatingParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             type,
@@ -115,14 +110,14 @@ class FloatingControlService : Service() {
         view.findViewById<View>(R.id.dragHandle).setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    initialX = layoutParams?.x ?: 0
-                    initialY = layoutParams?.y ?: 0
+                    initialX = floatingParams?.x ?: 0
+                    initialY = floatingParams?.y ?: 0
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    layoutParams?.let { lp ->
+                    floatingParams?.let { lp ->
                         lp.x = initialX + (event.rawX - initialTouchX).toInt()
                         lp.y = initialY + (event.rawY - initialTouchY).toInt()
                         windowManager?.updateViewLayout(view, lp)
@@ -133,12 +128,20 @@ class FloatingControlService : Service() {
             }
         }
 
+        view.findViewById<View>(R.id.pickPointButton).setOnClickListener {
+            showPickerOverlay()
+        }
+
+        view.findViewById<View>(R.id.tapButton).setOnClickListener {
+            executeConfiguredTap()
+        }
+
         view.findViewById<View>(R.id.closeButton).setOnClickListener {
             stopSelf()
             Toast.makeText(this, getString(R.string.floating_stopped), Toast.LENGTH_SHORT).show()
         }
 
-        wm.addView(view, layoutParams)
+        wm.addView(view, floatingParams)
     }
 
     private fun hideFloatingControl() {
@@ -149,6 +152,95 @@ class FloatingControlService : Service() {
         } catch (_: Exception) {
         }
         floatingView = null
+        floatingParams = null
         windowManager = null
+    }
+
+    private fun showPickerOverlay() {
+        val wm = windowManager ?: return
+        if (pickerView != null) return
+
+        val inflater = LayoutInflater.from(this)
+        val view = inflater.inflate(R.layout.activity_position_picker, null)
+        pickerView = view
+
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        )
+
+        view.setOnTouchListener { _, event ->
+            if (event.action == MotionEvent.ACTION_UP) {
+                val x = event.rawX.toInt()
+                val y = event.rawY.toInt()
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    .edit()
+                    .putInt(KEY_TAP_X, x)
+                    .putInt(KEY_TAP_Y, y)
+                    .apply()
+                hidePickerOverlay()
+                Toast.makeText(this, getString(R.string.pick_point_set, x, y), Toast.LENGTH_SHORT).show()
+                true
+            } else {
+                false
+            }
+        }
+
+        wm.addView(view, params)
+    }
+
+    private fun hidePickerOverlay() {
+        val wm = windowManager
+        val view = pickerView ?: return
+        try {
+            wm?.removeView(view)
+        } catch (_: Exception) {
+        }
+        pickerView = null
+    }
+
+    private fun executeConfiguredTap() {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val x = prefs.getInt(KEY_TAP_X, NO_COORDINATE)
+        val y = prefs.getInt(KEY_TAP_Y, NO_COORDINATE)
+
+        if (x == NO_COORDINATE || y == NO_COORDINATE) {
+            Toast.makeText(this, getString(R.string.tap_no_coordinate), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val service = ClickAccessibilityService.instance
+        if (service == null || !ClickAccessibilityService.isRunning) {
+            Toast.makeText(this, getString(R.string.tap_service_disabled), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val success = service.performTap(x, y)
+        if (success) {
+            Toast.makeText(this, getString(R.string.tap_executed, x, y), Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, getString(R.string.tap_error), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    companion object {
+        const val CHANNEL_ID = "floating_control_channel"
+        const val NOTIFICATION_ID = 1
+        var isRunning = false
+            private set
+        private const val PREFS_NAME = "tap_config"
+        const val KEY_TAP_X = "tap_x"
+        const val KEY_TAP_Y = "tap_y"
+        const val NO_COORDINATE = -1
     }
 }

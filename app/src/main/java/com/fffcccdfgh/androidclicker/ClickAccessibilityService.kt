@@ -1,6 +1,8 @@
 package com.fffcccdfgh.androidclicker
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
+import android.graphics.Path
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 
@@ -10,10 +12,13 @@ class ClickAccessibilityService : AccessibilityService() {
         private const val TAG = "ClickA11yService"
         var isRunning = false
             private set
+        var instance: ClickAccessibilityService? = null
+            private set
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        instance = this
         isRunning = true
         Log.i(TAG, "Accessibility service connected")
     }
@@ -29,7 +34,18 @@ class ClickAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        instance = null
         isRunning = false
         Log.i(TAG, "Accessibility service destroyed")
+    }
+
+    fun performTap(x: Int, y: Int): Boolean {
+        Log.i(TAG, "Dispatching tap gesture at ($x, $y)")
+        val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
+        val stroke = GestureDescription.StrokeDescription(path, 0, 1)
+        val gesture = GestureDescription.Builder()
+            .addStroke(stroke)
+            .build()
+        return dispatchGesture(gesture, null, null)
     }
 }

@@ -26,6 +26,40 @@
         android:background="#33FFFFFF" />
 
     <TextView
+        android:id="@+id/pickPointButton"
+        android:layout_width="40dp"
+        android:layout_height="36dp"
+        android:background="@android:color/transparent"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:text="@string/pick_point_action"
+        android:textColor="@android:color/white"
+        android:textSize="14sp" />
+
+    <View
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:background="#33FFFFFF" />
+
+    <TextView
+        android:id="@+id/tapButton"
+        android:layout_width="40dp"
+        android:layout_height="36dp"
+        android:background="@android:color/transparent"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:text="@string/tap_action"
+        android:textColor="@android:color/white"
+        android:textSize="14sp" />
+
+    <View
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:background="#33FFFFFF" />
+
+    <TextView
         android:id="@+id/closeButton"
         android:layout_width="36dp"
         android:layout_height="36dp"

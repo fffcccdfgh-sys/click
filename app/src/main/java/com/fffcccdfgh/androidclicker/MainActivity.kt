@@ -19,6 +19,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var openSettingsButton: Button
     private lateinit var openOverlaySettingsButton: Button
     private lateinit var toggleFloatingButton: Button
+    private lateinit var currentCoordinateText: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,6 +36,7 @@ class MainActivity : AppCompatActivity() {
         openSettingsButton = findViewById(R.id.openSettingsButton)
         openOverlaySettingsButton = findViewById(R.id.openOverlaySettingsButton)
         toggleFloatingButton = findViewById(R.id.toggleFloatingButton)
+        currentCoordinateText = findViewById(R.id.currentCoordinateText)
 
         openSettingsButton.setOnClickListener {
             openAccessibilitySettings()
@@ -58,6 +60,7 @@ class MainActivity : AppCompatActivity() {
         updateAccessibilityStatus()
         updateOverlayStatus()
         updateFloatingButton()
+        updateCoordinateDisplay()
     }
 
     private fun updateAccessibilityStatus() {
@@ -86,6 +89,18 @@ class MainActivity : AppCompatActivity() {
             getString(R.string.stop_floating_control)
         } else {
             getString(R.string.start_floating_control)
+        }
+    }
+
+    private fun updateCoordinateDisplay() {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val x = prefs.getInt(KEY_TAP_X, NO_COORDINATE)
+        val y = prefs.getInt(KEY_TAP_Y, NO_COORDINATE)
+
+        if (x == NO_COORDINATE || y == NO_COORDINATE) {
+            currentCoordinateText.text = getString(R.string.no_coordinate_set)
+        } else {
+            currentCoordinateText.text = getString(R.string.current_coordinate, x, y)
         }
     }
 
@@ -141,5 +156,12 @@ class MainActivity : AppCompatActivity() {
         val intent = Intent(this, FloatingControlService::class.java)
         stopService(intent)
         toggleFloatingButton.text = getString(R.string.start_floating_control)
+    }
+
+    companion object {
+        private const val PREFS_NAME = "tap_config"
+        const val KEY_TAP_X = "tap_x"
+        const val KEY_TAP_Y = "tap_y"
+        const val NO_COORDINATE = -1
     }
 }
