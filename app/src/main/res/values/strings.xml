@@ -4,4 +4,14 @@
     <string name="status_enabled">无障碍服务：已开启</string>
     <string name="status_disabled">无障碍服务：未开启</string>
     <string name="open_accessibility_settings">打开无障碍设置</string>
+    <string name="overlay_status_granted">悬浮窗权限：已授予</string>
+    <string name="overlay_status_denied">悬浮窗权限：未授予</string>
+    <string name="start_floating_control">启动悬浮控制</string>
+    <string name="stop_floating_control">关闭悬浮控制</string>
+    <string name="open_overlay_settings">授予悬浮窗权限</string>
+    <string name="floating_control_label">连点器</string>
+    <string name="floating_stopped">悬浮控制已关闭</string>
+    <string name="floating_notification_channel">悬浮窗服务</string>
+    <string name="floating_notification_title">连点器悬浮控制</string>
+    <string name="floating_notification_text">悬浮控制正在运行</string>
 </resources>

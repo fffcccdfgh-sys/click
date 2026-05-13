@@ -1,6 +1,8 @@
 package com.fffcccdfgh.androidclicker
 
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
@@ -13,6 +15,10 @@ import androidx.core.view.WindowInsetsCompat
 class MainActivity : AppCompatActivity() {
 
     private lateinit var statusText: TextView
+    private lateinit var overlayStatusText: TextView
+    private lateinit var openSettingsButton: Button
+    private lateinit var openOverlaySettingsButton: Button
+    private lateinit var toggleFloatingButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,22 +31,61 @@ class MainActivity : AppCompatActivity() {
         }
 
         statusText = findViewById(R.id.statusText)
-        findViewById<Button>(R.id.openSettingsButton).setOnClickListener {
+        overlayStatusText = findViewById(R.id.overlayStatusText)
+        openSettingsButton = findViewById(R.id.openSettingsButton)
+        openOverlaySettingsButton = findViewById(R.id.openOverlaySettingsButton)
+        toggleFloatingButton = findViewById(R.id.toggleFloatingButton)
+
+        openSettingsButton.setOnClickListener {
             openAccessibilitySettings()
+        }
+
+        openOverlaySettingsButton.setOnClickListener {
+            openOverlaySettings()
+        }
+
+        toggleFloatingButton.setOnClickListener {
+            toggleFloatingControl()
         }
     }
 
     override fun onResume() {
         super.onResume()
-        updateServiceStatus()
+        updateUI()
     }
 
-    private fun updateServiceStatus() {
+    private fun updateUI() {
+        updateAccessibilityStatus()
+        updateOverlayStatus()
+        updateFloatingButton()
+    }
+
+    private fun updateAccessibilityStatus() {
         val enabled = isAccessibilityServiceEnabled()
-        if (enabled) {
-            statusText.text = getString(R.string.status_enabled)
+        statusText.text = if (enabled) {
+            getString(R.string.status_enabled)
         } else {
-            statusText.text = getString(R.string.status_disabled)
+            getString(R.string.status_disabled)
+        }
+    }
+
+    private fun updateOverlayStatus() {
+        val granted = isOverlayPermissionGranted()
+        overlayStatusText.text = if (granted) {
+            getString(R.string.overlay_status_granted)
+        } else {
+            getString(R.string.overlay_status_denied)
+        }
+        openOverlaySettingsButton.visibility = if (granted) android.view.View.GONE else android.view.View.VISIBLE
+    }
+
+    private fun updateFloatingButton() {
+        val serviceRunning = FloatingControlService.isRunning
+        toggleFloatingButton.isEnabled = isOverlayPermissionGranted()
+        toggleFloatingButton.text = if (serviceRunning) {
+            getString(R.string.stop_floating_control)
+        } else {
+            getString(R.string.start_floating_control)
         }
     }
 
@@ -53,8 +98,48 @@ class MainActivity : AppCompatActivity() {
         return enabledServices.split(':').any { it.equals(expectedComponent, ignoreCase = true) }
     }
 
+    private fun isOverlayPermissionGranted(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Settings.canDrawOverlays(this)
+        } else {
+            true
+        }
+    }
+
     private fun openAccessibilitySettings() {
         val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
         startActivity(intent)
+    }
+
+    private fun openOverlaySettings() {
+        val intent = Intent(
+            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            Uri.parse("package:$packageName")
+        )
+        startActivity(intent)
+    }
+
+    private fun toggleFloatingControl() {
+        if (FloatingControlService.isRunning) {
+            stopFloatingService()
+        } else {
+            startFloatingService()
+        }
+    }
+
+    private fun startFloatingService() {
+        val intent = Intent(this, FloatingControlService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+        toggleFloatingButton.text = getString(R.string.stop_floating_control)
+    }
+
+    private fun stopFloatingService() {
+        val intent = Intent(this, FloatingControlService::class.java)
+        stopService(intent)
+        toggleFloatingButton.text = getString(R.string.start_floating_control)
     }
 }
