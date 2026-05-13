@@ -19,7 +19,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var openSettingsButton: Button
     private lateinit var openOverlaySettingsButton: Button
     private lateinit var toggleFloatingButton: Button
-    private lateinit var currentActionText: TextView
+    private lateinit var myScriptsButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,7 +36,7 @@ class MainActivity : AppCompatActivity() {
         openSettingsButton = findViewById(R.id.openSettingsButton)
         openOverlaySettingsButton = findViewById(R.id.openOverlaySettingsButton)
         toggleFloatingButton = findViewById(R.id.toggleFloatingButton)
-        currentActionText = findViewById(R.id.currentActionText)
+        myScriptsButton = findViewById(R.id.myScriptsButton)
 
         openSettingsButton.setOnClickListener {
             openAccessibilitySettings()
@@ -49,6 +49,10 @@ class MainActivity : AppCompatActivity() {
         toggleFloatingButton.setOnClickListener {
             toggleFloatingControl()
         }
+
+        myScriptsButton.setOnClickListener {
+            startActivity(Intent(this, ScriptListActivity::class.java))
+        }
     }
 
     override fun onResume() {
@@ -60,7 +64,6 @@ class MainActivity : AppCompatActivity() {
         updateAccessibilityStatus()
         updateOverlayStatus()
         updateFloatingButton()
-        updateCurrentActionDisplay()
     }
 
     private fun updateAccessibilityStatus() {
@@ -90,46 +93,6 @@ class MainActivity : AppCompatActivity() {
         } else {
             getString(R.string.start_floating_control)
         }
-    }
-
-    private fun updateCurrentActionDisplay() {
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val json = prefs.getString(KEY_ACTION_SEQUENCE, null)
-
-        if (json == null) {
-            currentActionText.text = getString(R.string.current_action_none)
-            return
-        }
-
-        val sequence = try {
-            ActionStep.listFromJson(json)
-        } catch (_: Exception) {
-            emptyList()
-        }
-
-        if (sequence.isEmpty()) {
-            currentActionText.text = getString(R.string.current_action_none)
-            return
-        }
-
-        val sb = StringBuilder()
-        sb.appendLine(getString(R.string.sequence_list_header, sequence.size))
-        for ((i, action) in sequence.withIndex()) {
-            val line = when (action.type) {
-                ActionStep.TYPE_TAP -> getString(R.string.sequence_list_tap, i + 1, action.x!!, action.y!!)
-                ActionStep.TYPE_SWIPE -> getString(
-                    R.string.sequence_list_swipe,
-                    i + 1, action.startX!!, action.startY!!, action.endX!!, action.endY!!
-                )
-                ActionStep.TYPE_WAIT -> getString(
-                    R.string.sequence_list_wait,
-                    i + 1, (action.durationMs ?: 0L) / 1000.0
-                )
-                else -> continue
-            }
-            sb.appendLine(line)
-        }
-        currentActionText.text = sb.toString().trimEnd()
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
@@ -171,6 +134,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startFloatingService() {
+        stopService(Intent(this, FloatingControlService::class.java))
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        prefs.edit()
+            .putString("action_sequence", ActionStep.listToJson(emptyList()))
+            .remove("current_editing_script_name")
+            .apply()
         val intent = Intent(this, FloatingControlService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
@@ -188,6 +157,5 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val PREFS_NAME = "tap_config"
-        private const val KEY_ACTION_SEQUENCE = "action_sequence"
     }
 }

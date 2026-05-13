@@ -1,7 +1,5 @@
 package com.fffcccdfgh.androidclicker
 
-import android.accessibilityservice.GestureDescription
-import android.accessibilityservice.AccessibilityService.GestureResultCallback
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
@@ -13,14 +11,13 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -62,6 +59,13 @@ class FloatingControlService : Service() {
         startForeground(NOTIFICATION_ID, notification)
 
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        floatingView?.let { view ->
+            try { windowManager?.removeView(view) } catch (_: Exception) {}
+        }
+        floatingView = null
+        floatingParams = null
+        hidePositionMarkers()
+        hidePickerOverlay()
         showFloatingControl()
         isRunning = true
 
@@ -205,6 +209,51 @@ class FloatingControlService : Service() {
             showWaitDurationPicker()
         }
 
+        view.findViewById<View>(R.id.saveButton).setOnClickListener {
+            val sequence = loadSequence()
+            if (sequence.isEmpty()) {
+                Toast.makeText(this, getString(R.string.no_action_to_save), Toast.LENGTH_SHORT).show()
+            } else {
+                val confirmPanel = view.findViewById<View>(R.id.saveConfirmPanel)
+                val nameInput = view.findViewById<EditText>(R.id.saveNameInput)
+                val editingName = getEditingScriptName()
+                nameInput.setText(editingName ?: ScriptStorage.nextAutoName(this))
+                confirmPanel.visibility = View.VISIBLE
+                enableOverlayFocus()
+            }
+        }
+
+        view.findViewById<View>(R.id.saveConfirmYes).setOnClickListener {
+            val nameInput = view.findViewById<EditText>(R.id.saveNameInput)
+            val name = nameInput.text.toString().trim()
+            if (name.isEmpty()) {
+                Toast.makeText(this, getString(R.string.script_name_empty), Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val editingName = getEditingScriptName()
+            if (name != editingName && ScriptStorage.getScript(this, name) != null) {
+                Toast.makeText(this, getString(R.string.script_name_exists), Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val sequence = loadSequence()
+            ScriptStorage.saveNamedScript(this, name, sequence)
+            setEditingScriptName(name)
+            val msg = when {
+                editingName != null && name == editingName -> getString(R.string.script_updated)
+                editingName != null -> getString(R.string.script_saved_as)
+                else -> getString(R.string.script_saved)
+            }
+            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+            sendBroadcast(Intent(ScriptStorage.ACTION_SCRIPTS_CHANGED))
+            view.findViewById<View>(R.id.saveConfirmPanel).visibility = View.GONE
+            disableOverlayFocus()
+        }
+
+        view.findViewById<View>(R.id.saveConfirmNo).setOnClickListener {
+            view.findViewById<View>(R.id.saveConfirmPanel).visibility = View.GONE
+            disableOverlayFocus()
+        }
+
         view.findViewById<View>(R.id.closeButton).setOnClickListener {
             stopSelf()
             Toast.makeText(this, getString(R.string.floating_stopped), Toast.LENGTH_SHORT).show()
@@ -213,16 +262,31 @@ class FloatingControlService : Service() {
         wm.addView(view, floatingParams)
     }
 
+    private fun enableOverlayFocus() {
+        floatingParams?.let {
+            it.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+            windowManager?.updateViewLayout(floatingView, it)
+        }
+    }
+
+    private fun disableOverlayFocus() {
+        floatingParams?.let {
+            it.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+            windowManager?.updateViewLayout(floatingView, it)
+        }
+    }
+
     private fun hideFloatingControl() {
-        val view = floatingView ?: return
-        val wm = windowManager ?: return
-        try {
-            wm.removeView(view)
-        } catch (_: Exception) {
+        val view = floatingView
+        val wm = windowManager
+        if (view != null && wm != null) {
+            try {
+                wm.removeView(view)
+            } catch (_: Exception) {
+            }
         }
         floatingView = null
         floatingParams = null
-        windowManager = null
     }
 
     private fun toggleAddMenu() {
@@ -782,69 +846,21 @@ class FloatingControlService : Service() {
 
     private fun executeSequence() {
         val sequence = loadSequence()
-        if (sequence.isEmpty()) {
-            Toast.makeText(this, getString(R.string.no_action_set), Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val service = ClickAccessibilityService.instance
-        if (service == null || !ClickAccessibilityService.isRunning) {
-            Toast.makeText(this, getString(R.string.tap_service_disabled), Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        Toast.makeText(this, getString(R.string.sequence_executing_step, 1, sequence.size), Toast.LENGTH_SHORT).show()
-        executeStep(sequence, 0, service)
+        ActionSequenceExecutor.execute(this, sequence)
     }
 
-    private fun executeStep(sequence: List<ActionStep>, index: Int, service: ClickAccessibilityService) {
-        if (index >= sequence.size) {
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(this, getString(R.string.sequence_done), Toast.LENGTH_SHORT).show()
-            }
-            return
-        }
-
-        val action = sequence[index]
-
-        if (action.type == ActionStep.TYPE_WAIT) {
-            val durationMs = action.durationMs ?: 1000L
-            Handler(Looper.getMainLooper()).postDelayed({
-                executeStep(sequence, index + 1, service)
-            }, durationMs)
-            return
-        }
-
-        val callback = object : GestureResultCallback() {
-            override fun onCompleted(gestureDescription: GestureDescription?) {
-                scheduleNextStep(sequence, index + 1, service)
-            }
-
-            override fun onCancelled(gestureDescription: GestureDescription?) {
-                scheduleNextStep(sequence, index + 1, service)
-            }
-        }
-
-        val dispatched = when (action.type) {
-            ActionStep.TYPE_TAP -> service.performTap(action.x!!, action.y!!, callback)
-            ActionStep.TYPE_SWIPE -> service.performSwipe(
-                action.startX!!, action.startY!!, action.endX!!, action.endY!!, 300, callback
-            )
-            else -> false
-        }
-
-        if (!dispatched) {
-            scheduleNextStep(sequence, index + 1, service)
-        }
+    private fun getEditingScriptName(): String? {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        return prefs.getString(KEY_EDITING_SCRIPT_NAME, null)
     }
 
-    private fun scheduleNextStep(sequence: List<ActionStep>, nextIndex: Int, service: ClickAccessibilityService) {
-        Handler(Looper.getMainLooper()).postDelayed({
-            if (nextIndex < sequence.size) {
-                Toast.makeText(this, getString(R.string.sequence_executing_step, nextIndex + 1, sequence.size), Toast.LENGTH_SHORT).show()
-            }
-            executeStep(sequence, nextIndex, service)
-        }, STEP_GAP_MS)
+    private fun setEditingScriptName(name: String?) {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        if (name != null) {
+            prefs.edit().putString(KEY_EDITING_SCRIPT_NAME, name).apply()
+        } else {
+            prefs.edit().remove(KEY_EDITING_SCRIPT_NAME).apply()
+        }
     }
 
     companion object {
@@ -855,7 +871,7 @@ class FloatingControlService : Service() {
 
         const val PREFS_NAME = "tap_config"
         const val KEY_ACTION_SEQUENCE = "action_sequence"
-        private const val STEP_GAP_MS = 500L
+        const val KEY_EDITING_SCRIPT_NAME = "current_editing_script_name"
 
         private const val PICKER_TAP_POINT = 0
         private const val PICKER_SWIPE_START = 1

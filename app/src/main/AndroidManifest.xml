@@ -27,6 +27,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ScriptListActivity"
+            android:exported="false" />
+
         <service
             android:name=".ClickAccessibilityService"
             android:exported="true"
@@ -46,6 +50,15 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="floating_overlay_window" />
+        </service>
+
+        <service
+            android:name=".RunFloatingControlService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="run_floating_overlay_window" />
         </service>
     </application>
 

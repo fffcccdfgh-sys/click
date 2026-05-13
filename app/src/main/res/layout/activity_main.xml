@@ -47,22 +47,10 @@
         android:layout_height="wrap_content"
         android:text="@string/open_overlay_settings"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@+id/currentActionText"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/openSettingsButton" />
-
-    <TextView
-        android:id="@+id/currentActionText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/current_action_none"
-        android:textSize="14sp"
-        android:layout_marginTop="16dp"
         app:layout_constraintBottom_toTopOf="@+id/toggleFloatingButton"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/openOverlaySettingsButton" />
+        app:layout_constraintTop_toBottomOf="@+id/openSettingsButton" />
 
     <Button
         android:id="@+id/toggleFloatingButton"
@@ -70,9 +58,20 @@
         android:layout_height="wrap_content"
         android:text="@string/start_floating_control"
         android:enabled="false"
+        app:layout_constraintBottom_toTopOf="@+id/myScriptsButton"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/openOverlaySettingsButton" />
+
+    <Button
+        android:id="@+id/myScriptsButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/my_scripts"
+        android:layout_marginTop="12dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/currentActionText" />
+        app:layout_constraintTop_toBottomOf="@+id/toggleFloatingButton" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
