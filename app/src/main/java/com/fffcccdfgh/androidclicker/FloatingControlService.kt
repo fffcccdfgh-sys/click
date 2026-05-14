@@ -1244,16 +1244,21 @@ class FloatingControlService : Service() {
 
         val durationInput = picker.findViewById<EditText>(R.id.durationInput)
         val delayBeforeInput = picker.findViewById<EditText>(R.id.delayBeforeInput)
-        val stepGapInput = picker.findViewById<EditText>(R.id.stepGapInput)
+        val repeatCountInput = picker.findViewById<EditText>(R.id.repeatCountInput)
 
         durationInput.setText((action.durationMs ?: 1L).toString())
         delayBeforeInput.setText((action.delayBeforeMs ?: 1L).toString())
-        stepGapInput.setText((action.stepGapMs ?: 1L).toString())
+        repeatCountInput.setText((action.repeatCount ?: 1).toString())
 
         picker.findViewById<View>(R.id.settingsSaveButton).setOnClickListener {
             val durationMs = parseMsInput(durationInput.text.toString())
             val delayBeforeMs = parseMsInput(delayBeforeInput.text.toString())
-            val stepGapMs = parseMsInput(stepGapInput.text.toString())
+            val repeatCount = parseRepeatCount(repeatCountInput.text.toString())
+
+            if (repeatCount < 0) {
+                Toast.makeText(this, getString(R.string.loop_count_negative), Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
 
             val updatedSequence = loadSequence().toMutableList()
             if (settingsActionIndex in updatedSequence.indices) {
@@ -1261,7 +1266,7 @@ class FloatingControlService : Service() {
                 updatedSequence[settingsActionIndex] = oldAction.copy(
                     durationMs = durationMs,
                     delayBeforeMs = delayBeforeMs,
-                    stepGapMs = stepGapMs
+                    repeatCount = repeatCount
                 )
                 saveSequence(updatedSequence)
                 if (actionListVisible) renderActionList()
@@ -1286,6 +1291,16 @@ class FloatingControlService : Service() {
             trimmed.toLong().coerceAtLeast(1L)
         } catch (_: NumberFormatException) {
             1L
+        }
+    }
+
+    private fun parseRepeatCount(input: String): Int {
+        val trimmed = input.trim()
+        if (trimmed.isEmpty()) return 1
+        return try {
+            trimmed.toInt().coerceAtLeast(0)
+        } catch (_: NumberFormatException) {
+            1
         }
     }
 

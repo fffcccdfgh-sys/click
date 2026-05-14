@@ -13,7 +13,7 @@ data class ActionStep(
     val endY: Int? = null,
     val durationMs: Long? = null,
     val delayBeforeMs: Long? = null,
-    val stepGapMs: Long? = null,
+    val repeatCount: Int? = null,
     val markerX: Int? = null,
     val markerY: Int? = null
 ) {
@@ -39,7 +39,7 @@ data class ActionStep(
             }
         }
         delayBeforeMs?.let { put("delayBeforeMs", it) }
-        stepGapMs?.let { put("stepGapMs", it) }
+        repeatCount?.let { put("repeatCount", it) }
     }
 
     companion object {
@@ -50,7 +50,7 @@ data class ActionStep(
         fun fromJson(json: JSONObject): ActionStep {
             val type = json.getString("type")
             val delayBeforeMs = if (json.has("delayBeforeMs")) json.getLong("delayBeforeMs") else null
-            val stepGapMs = if (json.has("stepGapMs")) json.getLong("stepGapMs") else null
+            val repeatCount = if (json.has("repeatCount")) json.getInt("repeatCount").coerceAtLeast(0) else null
             return when (type) {
                 TYPE_TAP -> ActionStep(
                     type = TYPE_TAP,
@@ -58,7 +58,7 @@ data class ActionStep(
                     y = json.getInt("y"),
                     durationMs = if (json.has("durationMs")) json.getLong("durationMs") else null,
                     delayBeforeMs = delayBeforeMs,
-                    stepGapMs = stepGapMs
+                    repeatCount = repeatCount
                 )
                 TYPE_SWIPE -> ActionStep(
                     type = TYPE_SWIPE,
@@ -68,13 +68,13 @@ data class ActionStep(
                     endY = json.getInt("endY"),
                     durationMs = if (json.has("durationMs")) json.getLong("durationMs") else null,
                     delayBeforeMs = delayBeforeMs,
-                    stepGapMs = stepGapMs
+                    repeatCount = repeatCount
                 )
                 TYPE_WAIT -> ActionStep(
                     type = TYPE_WAIT,
                     durationMs = json.getLong("durationMs"),
                     delayBeforeMs = delayBeforeMs,
-                    stepGapMs = stepGapMs,
+                    repeatCount = repeatCount,
                     markerX = if (json.has("markerX")) json.getInt("markerX") else null,
                     markerY = if (json.has("markerY")) json.getInt("markerY") else null
                 )

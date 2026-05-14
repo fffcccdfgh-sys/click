@@ -65,18 +65,18 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/settings_step_gap"
+        android:text="@string/settings_repeat_count"
         android:textColor="#CCCCCC"
         android:textSize="12sp"
         android:layout_marginBottom="4dp" />
 
     <EditText
-        android:id="@+id/stepGapInput"
+        android:id="@+id/repeatCountInput"
         android:layout_width="match_parent"
         android:layout_height="40dp"
         android:textColor="@android:color/black"
         android:textColorHint="#888888"
-        android:hint="1"
+        android:hint="@string/settings_repeat_count_hint"
         android:textSize="14sp"
         android:background="#FFFFFF"
         android:paddingStart="8dp"

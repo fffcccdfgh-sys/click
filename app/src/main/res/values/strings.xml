@@ -96,7 +96,6 @@
     <string name="settings_title">动作设置</string>
     <string name="settings_duration">动作持续时间 (ms)</string>
     <string name="settings_delay_before">执行前等待时间 (ms)</string>
-    <string name="settings_step_gap">执行速度 (ms)</string>
     <string name="save">保存</string>
     <string name="cancel">取消</string>
     <string name="settings_action_button">设置</string>
@@ -119,5 +118,7 @@
     <string name="loop_settings_saved">循环设置已保存</string>
     <string name="notification_stop">停止执行</string>
     <string name="action_overlaps_control_zone">动作位置与悬浮窗重叠，请移动悬浮窗或动作位置</string>
+    <string name="settings_repeat_count">执行次数</string>
+    <string name="settings_repeat_count_hint">0=无限</string>
     <string name="action_overlaps_control_stopped">动作位置与悬浮窗重叠，已停止</string>
 </resources>
