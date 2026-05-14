@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/areaPickerRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.fffcccdfgh.androidclicker.AreaSelectionView
+        android:id="@+id/areaSelectionView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <TextView
+        android:id="@+id/areaPickerInstruction"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal|top"
+        android:layout_marginTop="40dp"
+        android:text="@string/area_picker_instruction"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:background="#66000000"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp" />
+
+</FrameLayout>

@@ -11,6 +11,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.IBinder
@@ -22,6 +23,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.PopupWindow
 import android.widget.TextView
 import android.widget.Toast
 
@@ -51,6 +53,14 @@ class FloatingControlService : Service() {
     private var screenHeightPx = 0
     private var settingsActionIndex = -1
     private var pendingInsertIndex: Int? = null
+    private var condEditType: String? = null
+    private var condEditInvert: Boolean = false
+    private var condEditText: String? = null
+    private var condEditUseArea: Boolean = false
+    private var condEditLeft: Int? = null
+    private var condEditTop: Int? = null
+    private var condEditRight: Int? = null
+    private var condEditBottom: Int? = null
 
     private enum class MarkerPointType { TAP, SWIPE_START, SWIPE_END, WAIT }
     private data class MarkerBinding(val actionIndex: Int, val pointType: MarkerPointType)
@@ -532,23 +542,34 @@ class FloatingControlService : Service() {
                 setPadding(0, 4, 0, 4)
             }
 
-            val desc = TextView(this).apply {
-                text = when (action.type) {
-                    ActionStep.TYPE_TAP -> getString(R.string.action_list_tap_short, i + 1, action.x!!, action.y!!)
-                    ActionStep.TYPE_SWIPE -> getString(
-                        R.string.action_list_swipe_short,
-                        i + 1, action.startX!!, action.startY!!, action.endX!!, action.endY!!
-                    )
-                    ActionStep.TYPE_WAIT -> getString(
-                        R.string.action_list_wait_short,
-                        i + 1, (action.durationMs ?: 0L) / 1000.0
-                    )
-                    ActionStep.TYPE_PROGRAM -> getString(
-                        R.string.action_list_program_short,
-                        i + 1
-                    )
-                    else -> ""
+            val baseText = when (action.type) {
+                ActionStep.TYPE_TAP -> getString(R.string.action_list_tap_short, i + 1, action.x!!, action.y!!)
+                ActionStep.TYPE_SWIPE -> getString(
+                    R.string.action_list_swipe_short,
+                    i + 1, action.startX!!, action.startY!!, action.endX!!, action.endY!!
+                )
+                ActionStep.TYPE_WAIT -> getString(
+                    R.string.action_list_wait_short,
+                    i + 1, (action.durationMs ?: 0L) / 1000.0
+                )
+                ActionStep.TYPE_PROGRAM -> getString(
+                    R.string.action_list_program_short,
+                    i + 1
+                )
+                else -> ""
+            }
+            val descText = if (action.conditionType != null) {
+                val condSuffix = if (action.conditionUseArea == true) {
+                    getString(R.string.action_list_has_condition_area)
+                } else {
+                    getString(R.string.action_list_has_condition)
                 }
+                "$baseText  $condSuffix"
+            } else {
+                baseText
+            }
+            val desc = TextView(this).apply {
+                text = descText
                 setTextColor(Color.WHITE)
                 textSize = 12f
             }
@@ -1409,7 +1430,373 @@ class FloatingControlService : Service() {
             settingsActionIndex = -1
         }
 
+        val condBtn = TextView(this).apply {
+            text = getString(R.string.condition_button)
+            setTextColor(0xFFFFC107.toInt())
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setPadding(0, 12, 0, 0)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                loadConditionEditState()
+                hidePickerOverlay()
+                showConditionPicker()
+            }
+        }
+        (picker as LinearLayout).addView(condBtn)
+
         wm.addView(picker, params)
+    }
+
+    private fun loadConditionEditState() {
+        val sequence = loadSequence()
+        if (settingsActionIndex in sequence.indices) {
+            val action = sequence[settingsActionIndex]
+            when (action.conditionType) {
+                ActionStep.CONDITION_TEXT_NOT_CONTAINS -> {
+                    condEditType = ActionStep.CONDITION_TEXT_CONTAINS
+                    condEditInvert = true
+                }
+                else -> {
+                    condEditType = action.conditionType
+                    condEditInvert = false
+                }
+            }
+            condEditText = action.conditionText
+            condEditUseArea = action.conditionUseArea == true
+            condEditLeft = action.conditionLeft
+            condEditTop = action.conditionTop
+            condEditRight = action.conditionRight
+            condEditBottom = action.conditionBottom
+        }
+    }
+
+    private fun showConditionPicker() {
+        val wm = windowManager ?: return
+        if (pickerView != null) hidePickerOverlay()
+
+        val inflater = LayoutInflater.from(this)
+        val picker = inflater.inflate(R.layout.condition_picker, null)
+        pickerView = picker
+
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+
+        val conditionWindowWidth = (560 * resources.displayMetrics.density).toInt()
+            .coerceAtMost(resources.displayMetrics.widthPixels - (32 * resources.displayMetrics.density).toInt())
+
+        val params = WindowManager.LayoutParams(
+            conditionWindowWidth,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.CENTER
+        }
+
+        picker.findViewById<View>(R.id.conditionTitle).setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    initialX = params.x
+                    initialY = params.y
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    params.x = initialX + (event.rawX - initialTouchX).toInt()
+                    params.y = initialY + (event.rawY - initialTouchY).toInt()
+                    wm.updateViewLayout(picker, params)
+                    true
+                }
+                else -> false
+            }
+        }
+
+        val textInput = picker.findViewById<EditText>(R.id.conditionTextInput)
+        val textLabel = picker.findViewById<TextView>(R.id.conditionTextLabel)
+        val condTypeDropdown = picker.findViewById<TextView>(R.id.condTypeDropdown)
+        val invertBtn = picker.findViewById<TextView>(R.id.condInvertBtn)
+        val areaLabel = picker.findViewById<TextView>(R.id.conditionAreaLabel)
+        val areaButtons = picker.findViewById<View>(R.id.condAreaButtons)
+        val areaFullscreenBtn = picker.findViewById<TextView>(R.id.condAreaFullscreenBtn)
+        val areaCustomBtn = picker.findViewById<TextView>(R.id.condAreaCustomBtn)
+        val areaControls = picker.findViewById<View>(R.id.condAreaControls)
+        val areaRangeText = picker.findViewById<TextView>(R.id.condAreaRangeText)
+        val selectAreaBtn = picker.findViewById<TextView>(R.id.condSelectAreaBtn)
+        val clearAreaBtn = picker.findViewById<TextView>(R.id.condClearAreaBtn)
+
+        fun condTypeToLabel(type: String?): String = when (type) {
+            ActionStep.CONDITION_TEXT_CONTAINS -> getString(R.string.condition_type_text_contains)
+            else -> getString(R.string.condition_type_none)
+        }
+
+        fun updateAreaUI() {
+            if (condEditUseArea) {
+                areaFullscreenBtn.setTextColor(0xFFCCCCCC.toInt())
+                areaCustomBtn.setTextColor(0xFF4CAF50.toInt())
+                areaRangeText.visibility = View.VISIBLE
+                areaControls.visibility = View.VISIBLE
+                renderConditionAreaRange(areaRangeText)
+            } else {
+                areaFullscreenBtn.setTextColor(0xFF4CAF50.toInt())
+                areaCustomBtn.setTextColor(0xFFCCCCCC.toInt())
+                areaRangeText.visibility = View.GONE
+                areaControls.visibility = View.GONE
+            }
+        }
+
+        fun updateInvertUI() {
+            val hasType = condEditType != null
+            invertBtn.isEnabled = hasType
+            if (condEditInvert) {
+                invertBtn.setTextColor(0xFF4CAF50.toInt())
+            } else {
+                invertBtn.setTextColor(if (hasType) 0xFFCCCCCC.toInt() else 0xFF666666.toInt())
+            }
+        }
+
+        fun updateConditionFormUI() {
+            val hasCondition = condEditType != null
+            val visible = if (hasCondition) View.VISIBLE else View.GONE
+            textLabel.visibility = visible
+            textInput.visibility = visible
+            areaLabel.visibility = visible
+            areaButtons.visibility = visible
+            if (!hasCondition) {
+                areaRangeText.visibility = View.GONE
+                areaControls.visibility = View.GONE
+            } else {
+                updateAreaUI()
+            }
+            updateInvertUI()
+        }
+
+        fun updateCondTypeDropdown() {
+            condTypeDropdown.text = condTypeToLabel(condEditType)
+        }
+
+        fun onCondTypeSelected(index: Int) {
+            condEditType = if (index == 1) ActionStep.CONDITION_TEXT_CONTAINS else null
+            if (condEditType == null) {
+                condEditInvert = false
+                condEditUseArea = false
+                condEditLeft = null
+                condEditTop = null
+                condEditRight = null
+                condEditBottom = null
+            }
+            updateCondTypeDropdown()
+            updateConditionFormUI()
+        }
+
+        fun showCondTypePopup() {
+            val popupContent = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(0xFF3A3A3A.toInt())
+                setPadding(2, 2, 2, 2)
+            }
+
+            val options = listOf(
+                getString(R.string.condition_type_none),
+                getString(R.string.condition_type_text_contains)
+            )
+
+            val popup = PopupWindow(
+                popupContent,
+                condTypeDropdown.width,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                true
+            )
+            popup.setBackgroundDrawable(ColorDrawable(0xFF3A3A3A.toInt()))
+            popup.elevation = 12f
+
+            for ((index, option) in options.withIndex()) {
+                val item = TextView(this).apply {
+                    text = option
+                    textSize = 15f
+                    setTextColor(Color.WHITE)
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(14, 12, 14, 12)
+                    setBackgroundColor(Color.TRANSPARENT)
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener {
+                        onCondTypeSelected(index)
+                        popup.dismiss()
+                    }
+                }
+                popupContent.addView(item)
+
+                if (index < options.size - 1) {
+                    val divider = View(this).apply {
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, 1)
+                        setBackgroundColor(0x33FFFFFF.toInt())
+                    }
+                    popupContent.addView(divider)
+                }
+            }
+
+            popup.showAsDropDown(condTypeDropdown, 0, 4)
+        }
+
+        textInput.setText(condEditText ?: "")
+        updateCondTypeDropdown()
+        updateConditionFormUI()
+
+        condTypeDropdown.setOnClickListener {
+            showCondTypePopup()
+        }
+
+        invertBtn.setOnClickListener {
+            condEditInvert = !condEditInvert
+            updateInvertUI()
+        }
+
+        areaFullscreenBtn.setOnClickListener {
+            condEditUseArea = false
+            updateAreaUI()
+        }
+
+        areaCustomBtn.setOnClickListener {
+            condEditUseArea = true
+            updateAreaUI()
+        }
+
+        selectAreaBtn.setOnClickListener {
+            hidePickerOverlay()
+            showAreaPicker()
+        }
+
+        clearAreaBtn.setOnClickListener {
+            condEditLeft = null
+            condEditTop = null
+            condEditRight = null
+            condEditBottom = null
+            renderConditionAreaRange(areaRangeText)
+        }
+
+        picker.findViewById<View>(R.id.condSaveBtn).setOnClickListener {
+            val text = textInput.text.toString()
+            condEditText = text
+
+            if (condEditType != null) {
+                if (text.isEmpty()) {
+                    Toast.makeText(this, getString(R.string.condition_text_empty), Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+            }
+
+            if (condEditUseArea && condEditType != null) {
+                val l = condEditLeft
+                val t = condEditTop
+                val r = condEditRight
+                val b = condEditBottom
+                if (l == null || t == null || r == null || b == null || r <= l || b <= t) {
+                    Toast.makeText(this, getString(R.string.condition_area_invalid), Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+            }
+
+            val savedType = when {
+                condEditType == null -> null
+                condEditInvert -> ActionStep.CONDITION_TEXT_NOT_CONTAINS
+                else -> ActionStep.CONDITION_TEXT_CONTAINS
+            }
+
+            val sequence = loadSequence().toMutableList()
+            if (settingsActionIndex in sequence.indices) {
+                val oldAction = sequence[settingsActionIndex]
+                sequence[settingsActionIndex] = oldAction.copy(
+                    conditionType = savedType,
+                    conditionText = if (savedType != null) condEditText else null,
+                    conditionUseArea = if (savedType != null) condEditUseArea else null,
+                    conditionLeft = if (condEditUseArea && savedType != null) condEditLeft else null,
+                    conditionTop = if (condEditUseArea && savedType != null) condEditTop else null,
+                    conditionRight = if (condEditUseArea && savedType != null) condEditRight else null,
+                    conditionBottom = if (condEditUseArea && savedType != null) condEditBottom else null
+                )
+                saveSequence(sequence)
+                if (actionListVisible) renderActionList()
+                refreshMarkers()
+            }
+            hidePickerOverlay()
+            settingsActionIndex = -1
+            Toast.makeText(this, getString(R.string.condition_saved), Toast.LENGTH_SHORT).show()
+        }
+
+        picker.findViewById<View>(R.id.condCancelBtn).setOnClickListener {
+            hidePickerOverlay()
+            settingsActionIndex = -1
+        }
+
+        wm.addView(picker, params)
+    }
+
+    private fun renderConditionAreaRange(rangeText: TextView) {
+        val l = condEditLeft
+        val t = condEditTop
+        val r = condEditRight
+        val b = condEditBottom
+        if (l != null && t != null && r != null && b != null) {
+            rangeText.text = getString(R.string.condition_area_range, l, t, r, b)
+            rangeText.setTextColor(0xFF4CAF50.toInt())
+        } else {
+            rangeText.text = getString(R.string.condition_area_none)
+            rangeText.setTextColor(0xFFAAAAAA.toInt())
+        }
+    }
+
+    private fun showAreaPicker() {
+        val wm = windowManager ?: return
+
+        val inflater = LayoutInflater.from(this)
+        val view = inflater.inflate(R.layout.area_picker, null)
+        pickerView = view
+
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        )
+
+        val selectionView = view.findViewById<AreaSelectionView>(R.id.areaSelectionView)
+        selectionView.onSelectionComplete = { left, top, right, bottom ->
+            if (left < 0) {
+                wm.removeView(view)
+                pickerView = null
+                Toast.makeText(this, getString(R.string.condition_area_too_small), Toast.LENGTH_SHORT).show()
+                showConditionPicker()
+            } else {
+                condEditLeft = left
+                condEditTop = top
+                condEditRight = right
+                condEditBottom = bottom
+                wm.removeView(view)
+                pickerView = null
+                showConditionPicker()
+            }
+        }
+
+        wm.addView(view, params)
     }
 
     private fun parseMsInput(input: String): Long {

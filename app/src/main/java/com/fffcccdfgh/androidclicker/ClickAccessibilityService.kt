@@ -3,8 +3,10 @@ package com.fffcccdfgh.androidclicker
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
+import android.graphics.Rect
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 
@@ -16,6 +18,103 @@ class ClickAccessibilityService : AccessibilityService() {
             private set
         var instance: ClickAccessibilityService? = null
             private set
+    }
+
+    fun checkCondition(action: ActionStep): Boolean {
+        val conditionType = action.conditionType ?: return true
+        val conditionText = action.conditionText
+        if (conditionText.isNullOrEmpty()) return true
+
+        val useArea = action.conditionUseArea == true
+        val areaRect: Rect? = if (useArea) {
+            val l = action.conditionLeft ?: return false
+            val t = action.conditionTop ?: return false
+            val r = action.conditionRight ?: return false
+            val b = action.conditionBottom ?: return false
+            Rect(l, t, r, b)
+        } else {
+            null
+        }
+
+        val found = findConditionText(conditionText, areaRect)
+
+        return when (conditionType) {
+            ActionStep.CONDITION_TEXT_CONTAINS -> found
+            ActionStep.CONDITION_TEXT_NOT_CONTAINS -> !found
+            else -> true
+        }
+    }
+
+    private fun findConditionText(text: String, area: Rect?): Boolean {
+        var checkedExternalWindow = false
+
+        for (window in windows) {
+            val root = window.root ?: continue
+            try {
+                if (root.packageName?.toString() == packageName) {
+                    continue
+                }
+
+                checkedExternalWindow = true
+                if (findTextInTree(root, text, area)) {
+                    return true
+                }
+            } finally {
+                root.recycle()
+            }
+        }
+
+        if (checkedExternalWindow) {
+            return false
+        }
+
+        val root = rootInActiveWindow ?: return false
+        return try {
+            if (root.packageName?.toString() == packageName) {
+                false
+            } else {
+                findTextInTree(root, text, area)
+            }
+        } finally {
+            root.recycle()
+        }
+    }
+
+    private fun findTextInTree(
+        node: AccessibilityNodeInfo,
+        text: String,
+        area: Rect?
+    ): Boolean {
+        val matchesArea = if (area != null) {
+            val nodeRect = Rect()
+            node.getBoundsInScreen(nodeRect)
+            if (nodeRect.isEmpty) {
+                false
+            } else {
+                Rect.intersects(nodeRect, area)
+            }
+        } else {
+            true
+        }
+
+        if (matchesArea) {
+            val nodeText = node.text?.toString().orEmpty()
+            val nodeDesc = node.contentDescription?.toString().orEmpty()
+            if (nodeText.contains(text) || nodeDesc.contains(text)) {
+                return true
+            }
+        }
+
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            if (findTextInTree(child, text, area)) {
+                child.recycle()
+                return true
+            }
+            child.recycle()
+        }
+
+        return false
     }
 
     override fun onServiceConnected() {

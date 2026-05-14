@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 
 object ActionSequenceExecutor {
     private const val TAG = "ActionSeqExecutor"
+    private const val CONDITION_RETRY_DELAY_MS = 100L
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -115,7 +116,10 @@ object ActionSequenceExecutor {
                 if (repeatCount == 0) {
                     // Infinite repeat until stopped
                     while (coroutineContext.isActive) {
-                        executeSingleAction(service, action)
+                        val executed = executeSingleAction(service, action)
+                        if (!executed) {
+                            delay(CONDITION_RETRY_DELAY_MS)
+                        }
                     }
                     return
                 }
@@ -141,11 +145,15 @@ object ActionSequenceExecutor {
     private suspend fun executeSingleAction(
         service: ClickAccessibilityService,
         action: ActionStep
-    ) {
+    ): Boolean {
+        if (!service.checkCondition(action)) {
+            return false
+        }
+
         val delayBefore = action.delayBeforeMs ?: 1L
         if (delayBefore > 0) {
             delay(delayBefore)
-            if (!coroutineContext.isActive) return
+            if (!coroutineContext.isActive) return false
         }
 
         when (action.type) {
@@ -171,10 +179,11 @@ object ActionSequenceExecutor {
                 if (guard != null && !guard(action)) {
                     withContext(Dispatchers.Main) { onBlocked?.invoke() }
                     stop()
-                    return
+                    return true
                 }
                 service.dispatchGestureAwait(action)
             }
         }
+        return true
     }
 }
