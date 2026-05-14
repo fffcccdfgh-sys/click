@@ -166,6 +166,9 @@ class ScriptListActivity : AppCompatActivity() {
         prefs.edit()
             .putString("action_sequence", ActionStep.listToJson(script.actions))
             .putString("current_editing_script_name", script.name)
+            .putInt("loop_count", script.loopCount)
+            .putLong("loop_gap_ms", script.loopGapMs)
+            .putBoolean("loop_settings_saved", true)
             .apply()
         val intent = Intent(this, FloatingControlService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -198,7 +201,7 @@ class ScriptListActivity : AppCompatActivity() {
                     return@setPositiveButton
                 }
                 ScriptStorage.deleteScript(this, script.name)
-                ScriptStorage.saveNamedScript(this, newName, script.actions)
+                ScriptStorage.saveNamedScript(this, newName, script.actions, script.loopCount, script.loopGapMs)
                 val prefs = getSharedPreferences("tap_config", MODE_PRIVATE)
                 if (prefs.getString("current_editing_script_name", null) == script.name) {
                     prefs.edit().putString("current_editing_script_name", newName).apply()
@@ -213,6 +216,8 @@ class ScriptListActivity : AppCompatActivity() {
         val intent = Intent(this, RunFloatingControlService::class.java).apply {
             putExtra(RunFloatingControlService.EXTRA_SCRIPT_JSON, ActionStep.listToJson(script.actions))
             putExtra(RunFloatingControlService.EXTRA_SCRIPT_NAME, script.name)
+            putExtra(RunFloatingControlService.EXTRA_LOOP_COUNT, script.loopCount)
+            putExtra(RunFloatingControlService.EXTRA_LOOP_GAP_MS, script.loopGapMs)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)

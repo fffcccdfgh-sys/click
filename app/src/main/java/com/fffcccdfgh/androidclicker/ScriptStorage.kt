@@ -9,7 +9,12 @@ object ScriptStorage {
     private const val PREFS_NAME = "script_storage"
     private const val KEY_SCRIPTS = "saved_scripts"
 
-    data class SavedScript(val name: String, val actions: List<ActionStep>)
+    data class SavedScript(
+        val name: String,
+        val actions: List<ActionStep>,
+        val loopCount: Int = 1,
+        val loopGapMs: Long = 0L
+    )
 
     fun nextAutoName(context: Context): String {
         val existingNames = loadAllScripts(context).map { it.name }.toSet()
@@ -22,10 +27,15 @@ object ScriptStorage {
         return name
     }
 
-    fun saveAutoNamedScript(context: Context, actions: List<ActionStep>): String {
+    fun saveAutoNamedScript(
+        context: Context,
+        actions: List<ActionStep>,
+        loopCount: Int = 1,
+        loopGapMs: Long = 0L
+    ): String {
         val name = nextAutoName(context)
         val scripts = loadAllScripts(context).toMutableList()
-        scripts.add(SavedScript(name, actions))
+        scripts.add(SavedScript(name, actions, loopCount, loopGapMs))
         saveAllScripts(context, scripts)
         return name
     }
@@ -49,6 +59,8 @@ object ScriptStorage {
         val root = org.json.JSONObject()
         root.put("name", script.name)
         root.put("actions", arr)
+        root.put("loopCount", script.loopCount)
+        root.put("loopGapMs", script.loopGapMs)
         return root.toString(2)
     }
 
@@ -60,18 +72,26 @@ object ScriptStorage {
             actions.add(ActionStep.fromJson(actionsJson.getJSONObject(i)))
         }
         val name = if (root.has("name")) root.getString("name") else null
+        val loopCount = if (root.has("loopCount")) root.getInt("loopCount").coerceAtLeast(0) else 1
+        val loopGapMs = if (root.has("loopGapMs")) root.getLong("loopGapMs").coerceAtLeast(0L) else 0L
         return if (name != null) {
-            saveNamedScript(context, name, actions)
+            saveNamedScript(context, name, actions, loopCount, loopGapMs)
             name
         } else {
-            saveAutoNamedScript(context, actions)
+            saveAutoNamedScript(context, actions, loopCount, loopGapMs)
         }
     }
 
-    fun saveNamedScript(context: Context, name: String, actions: List<ActionStep>) {
+    fun saveNamedScript(
+        context: Context,
+        name: String,
+        actions: List<ActionStep>,
+        loopCount: Int = 1,
+        loopGapMs: Long = 0L
+    ) {
         val scripts = loadAllScripts(context).toMutableList()
         scripts.removeAll { it.name == name }
-        scripts.add(SavedScript(name, actions))
+        scripts.add(SavedScript(name, actions, loopCount.coerceAtLeast(0), loopGapMs.coerceAtLeast(0L)))
         saveAllScripts(context, scripts)
     }
 
@@ -86,7 +106,9 @@ object ScriptStorage {
                 val name = obj.getString("name")
                 val actionsJson = obj.getString("actions")
                 val actions = ActionStep.listFromJson(actionsJson)
-                list.add(SavedScript(name, actions))
+                val loopCount = if (obj.has("loopCount")) obj.getInt("loopCount").coerceAtLeast(0) else 1
+                val loopGapMs = if (obj.has("loopGapMs")) obj.getLong("loopGapMs").coerceAtLeast(0L) else 0L
+                list.add(SavedScript(name, actions, loopCount, loopGapMs))
             }
             list
         } catch (_: Exception) {
@@ -101,6 +123,8 @@ object ScriptStorage {
             val obj = org.json.JSONObject()
             obj.put("name", script.name)
             obj.put("actions", ActionStep.listToJson(script.actions))
+            obj.put("loopCount", script.loopCount)
+            obj.put("loopGapMs", script.loopGapMs)
             arr.put(obj)
         }
         prefs.edit().putString(KEY_SCRIPTS, arr.toString()).apply()

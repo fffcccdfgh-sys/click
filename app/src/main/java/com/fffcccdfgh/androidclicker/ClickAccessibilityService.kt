@@ -5,6 +5,8 @@ import android.accessibilityservice.GestureDescription
 import android.graphics.Path
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import kotlin.coroutines.resume
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 class ClickAccessibilityService : AccessibilityService() {
 
@@ -23,9 +25,7 @@ class ClickAccessibilityService : AccessibilityService() {
         Log.i(TAG, "Accessibility service connected")
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // No-op: real event handling will be implemented in later issues
-    }
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
 
     override fun onInterrupt() {
         Log.w(TAG, "Accessibility service interrupted")
@@ -39,6 +39,42 @@ class ClickAccessibilityService : AccessibilityService() {
         Log.i(TAG, "Accessibility service destroyed")
     }
 
+    suspend fun dispatchGestureAwait(action: ActionStep): Boolean {
+        return try {
+            suspendCancellableCoroutine { cont ->
+                val callback = object : GestureResultCallback() {
+                    override fun onCompleted(gestureDescription: GestureDescription?) {
+                        cont.resume(true)
+                    }
+
+                    override fun onCancelled(gestureDescription: GestureDescription?) {
+                        cont.resume(true)
+                    }
+                }
+
+                val ok = when (action.type) {
+                    ActionStep.TYPE_TAP -> performTap(
+                        action.x!!, action.y!!,
+                        action.durationMs ?: 1, callback
+                    )
+                    ActionStep.TYPE_SWIPE -> performSwipe(
+                        action.startX!!, action.startY!!,
+                        action.endX!!, action.endY!!,
+                        action.durationMs ?: 1, callback
+                    )
+                    else -> false
+                }
+
+                if (!ok) {
+                    cont.resume(false)
+                }
+            }
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "dispatchGestureAwait failed", e)
+            false
+        }
+    }
+
     fun performTap(x: Int, y: Int): Boolean {
         return performTap(x, y, 1, null)
     }
@@ -48,7 +84,6 @@ class ClickAccessibilityService : AccessibilityService() {
     }
 
     fun performTap(x: Int, y: Int, durationMs: Long, callback: GestureResultCallback?): Boolean {
-        Log.i(TAG, "Dispatching tap gesture at ($x, $y) duration=${durationMs}ms")
         val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
         val stroke = GestureDescription.StrokeDescription(path, 0, durationMs)
         val gesture = GestureDescription.Builder()
@@ -61,8 +96,10 @@ class ClickAccessibilityService : AccessibilityService() {
         return performSwipe(startX, startY, endX, endY, durationMs, null)
     }
 
-    fun performSwipe(startX: Int, startY: Int, endX: Int, endY: Int, durationMs: Long = 300, callback: GestureResultCallback?): Boolean {
-        Log.i(TAG, "Dispatching swipe from ($startX, $startY) to ($endX, $endY) over ${durationMs}ms")
+    fun performSwipe(
+        startX: Int, startY: Int, endX: Int, endY: Int,
+        durationMs: Long = 300, callback: GestureResultCallback?
+    ): Boolean {
         val path = Path().apply {
             moveTo(startX.toFloat(), startY.toFloat())
             lineTo(endX.toFloat(), endY.toFloat())

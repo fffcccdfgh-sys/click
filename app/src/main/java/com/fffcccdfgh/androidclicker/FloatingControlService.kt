@@ -6,12 +6,15 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -23,6 +26,7 @@ import android.widget.TextView
 import android.widget.Toast
 
 class FloatingControlService : Service() {
+    private val stopDebugTag = "ClickerStopDebug"
 
     private var windowManager: WindowManager? = null
     private var floatingView: View? = null
@@ -57,6 +61,12 @@ class FloatingControlService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP_EXECUTION) {
+            Log.d(stopDebugTag, "FloatingControlService notification stop clicked isRunning=${ActionSequenceExecutor.isRunning}")
+            ActionSequenceExecutor.stop()
+            return START_NOT_STICKY
+        }
+
         val notification = createNotification()
         startForeground(NOTIFICATION_ID, notification)
 
@@ -78,6 +88,11 @@ class FloatingControlService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        Log.d(stopDebugTag, "FloatingControlService.onDestroy isRunning=${ActionSequenceExecutor.isRunning}")
+        if (ActionSequenceExecutor.isRunning) {
+            Log.d(stopDebugTag, "FloatingControlService.onDestroy stopping executor")
+            ActionSequenceExecutor.stop()
+        }
         hidePositionMarkers()
         hidePickerOverlay()
         hideFloatingControl()
@@ -97,17 +112,25 @@ class FloatingControlService : Service() {
     }
 
     private fun createNotification(): Notification {
-        val intent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
+        val openIntent = Intent(this, MainActivity::class.java)
+        val pendingOpen = PendingIntent.getActivity(
+            this, 0, openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val stopIntent = Intent(this, FloatingControlService::class.java).apply {
+            action = ACTION_STOP_EXECUTION
+        }
+        val pendingStop = PendingIntent.getService(
+            this, 1, stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.floating_notification_title))
             .setContentText(getString(R.string.floating_notification_text))
             .setSmallIcon(android.R.drawable.ic_menu_manage)
-            .setContentIntent(pendingIntent)
+            .setContentIntent(pendingOpen)
             .setOngoing(true)
+            .addAction(android.R.drawable.ic_media_pause, getString(R.string.notification_stop), pendingStop)
             .build()
     }
 
@@ -159,9 +182,13 @@ class FloatingControlService : Service() {
             }
         }
 
-        view.findViewById<View>(R.id.startButton).setOnClickListener {
+        bindStartStopTouch(view.findViewById(R.id.startButton)) {
             hideAllBeforeRun()
             executeSequence()
+        }
+
+        view.findViewById<View>(R.id.loopButton).setOnClickListener {
+            toggleLoopSettingsPanel()
         }
 
         view.findViewById<View>(R.id.addButton).setOnClickListener {
@@ -206,6 +233,7 @@ class FloatingControlService : Service() {
             } else {
                 hideActionList()
                 view.findViewById<View>(R.id.addMenu).visibility = View.GONE
+                view.findViewById<View>(R.id.loopSettingsPanel).visibility = View.GONE
                 val confirmPanel = view.findViewById<View>(R.id.saveConfirmPanel)
                 val nameInput = view.findViewById<EditText>(R.id.saveNameInput)
                 val editingName = getEditingScriptName()
@@ -228,7 +256,13 @@ class FloatingControlService : Service() {
                 return@setOnClickListener
             }
             val sequence = loadSequence()
-            ScriptStorage.saveNamedScript(this, name, sequence)
+            ScriptStorage.saveNamedScript(
+                this,
+                name,
+                sequence,
+                getLoopCount(this),
+                getLoopGapMs(this)
+            )
             setEditingScriptName(name)
             val msg = when {
                 editingName != null && name == editingName -> getString(R.string.script_updated)
@@ -246,9 +280,21 @@ class FloatingControlService : Service() {
             disableOverlayFocus()
         }
 
-        view.findViewById<View>(R.id.closeButton).setOnClickListener {
-            stopSelf()
-            Toast.makeText(this, getString(R.string.floating_stopped), Toast.LENGTH_SHORT).show()
+        view.findViewById<View>(R.id.closeButton).setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    if (ActionSequenceExecutor.isRunning) {
+                        ActionSequenceExecutor.stop()
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    stopSelf()
+                    Toast.makeText(this, getString(R.string.floating_stopped), Toast.LENGTH_SHORT).show()
+                    true
+                }
+                else -> false
+            }
         }
 
         view.findViewById<View>(R.id.foldButton).setOnClickListener {
@@ -256,14 +302,26 @@ class FloatingControlService : Service() {
         }
 
         // Collapsed mode controls
-        view.findViewById<View>(R.id.collapsedStartButton).setOnClickListener {
+        bindStartStopTouch(view.findViewById(R.id.collapsedStartButton)) {
             hideAllBeforeRun()
             executeSequence()
         }
 
-        view.findViewById<View>(R.id.collapsedCloseButton).setOnClickListener {
-            stopSelf()
-            Toast.makeText(this, getString(R.string.floating_stopped), Toast.LENGTH_SHORT).show()
+        view.findViewById<View>(R.id.collapsedCloseButton).setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    if (ActionSequenceExecutor.isRunning) {
+                        ActionSequenceExecutor.stop()
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    stopSelf()
+                    Toast.makeText(this, getString(R.string.floating_stopped), Toast.LENGTH_SHORT).show()
+                    true
+                }
+                else -> false
+            }
         }
 
         view.findViewById<View>(R.id.collapsedExpandButton).setOnClickListener {
@@ -292,22 +350,70 @@ class FloatingControlService : Service() {
             }
         }
 
+        view.findViewById<View>(R.id.loopSettingsSave).setOnClickListener {
+            saveLoopSettings()
+        }
+
+        loadLoopSettings()
+        updateLoopUI()
+
         updateFloatingTitle()
 
         wm.addView(view, floatingParams)
+        ControlZoneChecker.register("floating_control") { getControlZoneRect() }
     }
 
-    private fun enableOverlayFocus() {
-        floatingParams?.let {
-            it.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-            windowManager?.updateViewLayout(floatingView, it)
+    private fun bindStartStopTouch(button: View, onStart: () -> Unit) {
+        var stopTriggered = false
+        button.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    if (ActionSequenceExecutor.isRunning) {
+                        stopTriggered = true
+                        ActionSequenceExecutor.stop()
+                    } else {
+                        stopTriggered = false
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (stopTriggered) {
+                        stopTriggered = false
+                    } else if (!ActionSequenceExecutor.isRunning) {
+                        onStart()
+                    }
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    stopTriggered = false
+                    true
+                }
+                else -> false
+            }
         }
     }
 
+    private fun getControlZoneRect(): Rect? {
+        val view = floatingView ?: return null
+        val params = floatingParams ?: return null
+        if (view.width <= 0 || view.height <= 0) return null
+        return Rect(params.x, params.y, params.x + view.width, params.y + view.height)
+    }
+
+    private fun enableOverlayFocus() {
+        updateFloatingFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
+    }
+
     private fun disableOverlayFocus() {
-        floatingParams?.let {
-            it.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-            windowManager?.updateViewLayout(floatingView, it)
+        updateFloatingFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+    }
+
+    private fun updateFloatingFlags(flags: Int) {
+        val params = floatingParams ?: return
+        params.flags = flags
+        val view = floatingView ?: return
+        if (view.isAttachedToWindow) {
+            windowManager?.updateViewLayout(view, params)
         }
     }
 
@@ -336,9 +442,10 @@ class FloatingControlService : Service() {
     private fun updateFloatingTitle() {
         val view = floatingView ?: return
         val name = getEditingScriptName()
-        val title = if (name.isNullOrBlank()) getString(R.string.floating_control_label) else name
-        view.findViewById<TextView>(R.id.dragHandle).text = title
-        view.findViewById<TextView>(R.id.collapsedTitle).text = title
+        val fullTitle = if (name.isNullOrBlank()) getString(R.string.floating_control_label) else name
+        val shortTitle = if (name.isNullOrBlank()) getString(R.string.floating_control_label) else name.take(3)
+        view.findViewById<TextView>(R.id.dragHandle).text = fullTitle
+        view.findViewById<TextView>(R.id.collapsedTitle).text = shortTitle
     }
 
     private fun hideFloatingControl() {
@@ -352,6 +459,7 @@ class FloatingControlService : Service() {
         }
         floatingView = null
         floatingParams = null
+        ControlZoneChecker.unregister("floating_control")
     }
 
     private fun toggleAddMenu() {
@@ -361,6 +469,7 @@ class FloatingControlService : Service() {
         if (opening) {
             hideActionList()
             view.findViewById<View>(R.id.saveConfirmPanel).visibility = View.GONE
+            view.findViewById<View>(R.id.loopSettingsPanel).visibility = View.GONE
             disableOverlayFocus()
         }
         menu.visibility = if (opening) View.VISIBLE else View.GONE
@@ -379,6 +488,7 @@ class FloatingControlService : Service() {
         val panel = view.findViewById<View>(R.id.actionListPanel)
         view.findViewById<View>(R.id.addMenu).visibility = View.GONE
         view.findViewById<View>(R.id.saveConfirmPanel).visibility = View.GONE
+        view.findViewById<View>(R.id.loopSettingsPanel).visibility = View.GONE
         disableOverlayFocus()
         panel.visibility = View.VISIBLE
         actionListVisible = true
@@ -605,6 +715,7 @@ class FloatingControlService : Service() {
             val view = floatingView
             if (view != null) {
                 view.findViewById<View>(R.id.saveConfirmPanel).visibility = View.GONE
+                view.findViewById<View>(R.id.loopSettingsPanel).visibility = View.GONE
                 disableOverlayFocus()
             }
             showPositionMarkers()
@@ -879,6 +990,7 @@ class FloatingControlService : Service() {
         view.findViewById<View>(R.id.addMenu).visibility = View.GONE
         hideActionList()
         view.findViewById<View>(R.id.saveConfirmPanel).visibility = View.GONE
+        view.findViewById<View>(R.id.loopSettingsPanel).visibility = View.GONE
         disableOverlayFocus()
         hidePickerOverlay()
     }
@@ -1050,8 +1162,50 @@ class FloatingControlService : Service() {
     }
 
     private fun executeSequence() {
+        val count = getLoopCount(this)
+        ActionSequenceExecutor.loopCount = count
+        ActionSequenceExecutor.loopEnabled = count != 1
+        ActionSequenceExecutor.loopGapMs = getLoopGapMs(this)
+        Log.d(
+            stopDebugTag,
+            "FloatingControlService.executeSequence loopCount=$count loopEnabled=${ActionSequenceExecutor.loopEnabled} loopGapMs=${ActionSequenceExecutor.loopGapMs}"
+        )
+
+        ActionSequenceExecutor.onStarted = {
+            Log.d(stopDebugTag, "FloatingControlService.onStarted fired")
+            updateStartStopButtons(true)
+        }
+        ActionSequenceExecutor.onFinished = {
+            Log.d(stopDebugTag, "FloatingControlService.onFinished fired")
+            updateStartStopButtons(false)
+        }
+        ActionSequenceExecutor.onStopped = {
+            Log.d(stopDebugTag, "FloatingControlService.onStopped fired")
+            updateStartStopButtons(false)
+        }
+
         val sequence = loadSequence()
-        ActionSequenceExecutor.execute(this, sequence)
+        Log.d(stopDebugTag, "FloatingControlService.executeSequence sequenceSize=${sequence.size}")
+
+        // Pre-start check: refuse to start if any action overlaps the
+        // floating control zone, which would make the stop button unreliable.
+        val density = resources.displayMetrics.density
+        val paddingPx = ControlZoneChecker.dpToPx(density)
+        if (ControlZoneChecker.doesAnyActionOverlap(sequence, paddingPx)) {
+            Toast.makeText(this, R.string.action_overlaps_control_zone, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        ActionSequenceExecutor.execute(
+            this,
+            sequence,
+            canDispatchAction = { action ->
+                !ControlZoneChecker.isActionInAnyZone(action, paddingPx)
+            },
+            onBlocked = {
+                Toast.makeText(this, R.string.action_overlaps_control_stopped, Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     private fun showActionSettings(actionIndex: Int) {
@@ -1062,6 +1216,8 @@ class FloatingControlService : Service() {
         if (actionIndex < 0 || actionIndex >= sequence.size) return
         val action = sequence[actionIndex]
         settingsActionIndex = actionIndex
+
+        floatingView?.findViewById<View>(R.id.loopSettingsPanel)?.visibility = View.GONE
 
         val inflater = LayoutInflater.from(this)
         val picker = inflater.inflate(R.layout.timing_picker, null)
@@ -1133,6 +1289,94 @@ class FloatingControlService : Service() {
         }
     }
 
+    private fun toggleLoopSettingsPanel() {
+        val view = floatingView ?: return
+        val panel = view.findViewById<View>(R.id.loopSettingsPanel)
+        if (panel.visibility == View.VISIBLE) {
+            panel.visibility = View.GONE
+            disableOverlayFocus()
+        } else {
+            view.findViewById<View>(R.id.addMenu).visibility = View.GONE
+            hideActionList()
+            view.findViewById<View>(R.id.saveConfirmPanel).visibility = View.GONE
+            loadLoopSettings()
+            panel.visibility = View.VISIBLE
+            enableOverlayFocus()
+        }
+    }
+
+    private fun saveLoopSettings() {
+        val view = floatingView ?: return
+        val countInput = view.findViewById<EditText>(R.id.loopCountInput)
+        val gapInput = view.findViewById<EditText>(R.id.loopGapInput)
+
+        val countText = countInput.text.toString().trim()
+        val loopCount = if (countText.isEmpty()) {
+            1
+        } else {
+            val parsed = countText.toIntOrNull() ?: 1
+            if (parsed < 0) {
+                Toast.makeText(this, getString(R.string.loop_count_negative), Toast.LENGTH_SHORT).show()
+                return
+            }
+            parsed
+        }
+
+        val gapText = gapInput.text.toString().trim()
+        val loopGapMs = if (gapText.isEmpty()) {
+            0L
+        } else {
+            gapText.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+        }
+
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        prefs.edit()
+            .putInt(KEY_LOOP_COUNT, loopCount)
+            .putLong(KEY_LOOP_GAP_MS, loopGapMs)
+            .putBoolean(KEY_LOOP_SETTINGS_SAVED, true)
+            .apply()
+
+        view.findViewById<View>(R.id.loopSettingsPanel).visibility = View.GONE
+        disableOverlayFocus()
+        Toast.makeText(this, getString(R.string.loop_settings_saved), Toast.LENGTH_SHORT).show()
+    }
+
+    private fun loadLoopSettings() {
+        val savedCount = getLoopCount(this)
+        val savedGap = getLoopGapMs(this)
+
+        val view = floatingView ?: return
+        view.findViewById<EditText>(R.id.loopCountInput).setText(savedCount.toString())
+        view.findViewById<EditText>(R.id.loopGapInput).setText(savedGap.toString())
+    }
+
+    private fun updateLoopUI() {
+        val view = floatingView ?: return
+        val loopBtn = view.findViewById<TextView>(R.id.loopButton)
+        loopBtn.text = getString(R.string.loop_button)
+        loopBtn.setTextColor(Color.WHITE)
+        view.findViewById<View>(R.id.loopSettingsPanel).visibility = View.GONE
+        disableOverlayFocus()
+    }
+
+    private fun updateStartStopButtons(running: Boolean) {
+        val view = floatingView ?: return
+        val startBtn = view.findViewById<TextView>(R.id.startButton)
+        val collapsedStartBtn = view.findViewById<TextView>(R.id.collapsedStartButton)
+
+        if (running) {
+            startBtn.text = getString(R.string.stop_action)
+            startBtn.setTextColor(0xFFFF8888.toInt())
+            collapsedStartBtn.text = getString(R.string.stop_action)
+            collapsedStartBtn.setTextColor(0xFFFF8888.toInt())
+        } else {
+            startBtn.text = getString(R.string.start_action)
+            startBtn.setTextColor(Color.WHITE)
+            collapsedStartBtn.text = getString(R.string.start_action)
+            collapsedStartBtn.setTextColor(Color.WHITE)
+        }
+    }
+
     private fun getEditingScriptName(): String? {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         return prefs.getString(KEY_EDITING_SCRIPT_NAME, null)
@@ -1151,12 +1395,33 @@ class FloatingControlService : Service() {
     companion object {
         const val CHANNEL_ID = "floating_control_channel"
         const val NOTIFICATION_ID = 1
+        const val ACTION_STOP_EXECUTION = "com.fffcccdfgh.androidclicker.STOP_EXECUTION"
         var isRunning = false
             private set
 
         const val PREFS_NAME = "tap_config"
         const val KEY_ACTION_SEQUENCE = "action_sequence"
         const val KEY_EDITING_SCRIPT_NAME = "current_editing_script_name"
+        const val KEY_LOOP_ENABLED = "loop_enabled"
+        const val KEY_LOOP_COUNT = "loop_count"
+        const val KEY_LOOP_GAP_MS = "loop_gap_ms"
+        const val KEY_LOOP_SETTINGS_SAVED = "loop_settings_saved"
+
+        fun getLoopCount(context: Context): Int {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (!prefs.getBoolean(KEY_LOOP_SETTINGS_SAVED, false)) {
+                return 1
+            }
+            return prefs.getInt(KEY_LOOP_COUNT, 1).coerceAtLeast(0)
+        }
+
+        fun getLoopGapMs(context: Context): Long {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (!prefs.getBoolean(KEY_LOOP_SETTINGS_SAVED, false)) {
+                return 0L
+            }
+            return prefs.getLong(KEY_LOOP_GAP_MS, 0L).coerceAtLeast(0L)
+        }
 
         private const val PICKER_TAP_POINT = 0
         private const val PICKER_SWIPE_START = 1

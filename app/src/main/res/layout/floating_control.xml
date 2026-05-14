@@ -58,6 +58,23 @@
                 android:background="#33FFFFFF" />
 
             <TextView
+                android:id="@+id/loopButton"
+                android:layout_width="44dp"
+                android:layout_height="36dp"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="@string/loop_button"
+                android:textColor="@android:color/white"
+                android:textSize="13sp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="24dp"
+                android:background="#33FFFFFF" />
+
+            <TextView
                 android:id="@+id/addButton"
                 android:layout_width="44dp"
                 android:layout_height="36dp"
@@ -240,6 +257,95 @@
                     android:textSize="13sp" />
 
             </LinearLayout>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/loopSettingsPanel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="3dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/loop_count_label"
+                        android:textColor="#CCCCCC"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/loopCountInput"
+                        android:layout_width="72dp"
+                        android:layout_height="32dp"
+                        android:textColor="@android:color/black"
+                        android:textColorHint="#888888"
+                        android:hint="@string/loop_count_hint"
+                        android:textSize="13sp"
+                        android:background="#FFFFFF"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:inputType="number"
+                        android:maxLength="8"
+                        android:layout_marginStart="6dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/loop_gap_label"
+                        android:textColor="#CCCCCC"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/loopGapInput"
+                        android:layout_width="72dp"
+                        android:layout_height="32dp"
+                        android:textColor="@android:color/black"
+                        android:textColorHint="#888888"
+                        android:hint="0"
+                        android:textSize="13sp"
+                        android:background="#FFFFFF"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:inputType="number"
+                        android:maxLength="8"
+                        android:layout_marginStart="6dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/loopSettingsSave"
+                android:layout_width="48dp"
+                android:layout_height="64dp"
+                android:gravity="center"
+                android:text="@string/save"
+                android:textColor="#FF4CAF50"
+                android:textSize="13sp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@android:color/transparent"
+                android:layout_marginStart="8dp" />
 
         </LinearLayout>
 

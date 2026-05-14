@@ -101,10 +101,23 @@
     <string name="cancel">取消</string>
     <string name="settings_action_button">设置</string>
     <string name="execution_already_running">正在运行</string>
+    <string name="another_script_running">已有脚本正在运行</string>
     <string name="insert_before">前</string>
     <string name="insert_after">后</string>
     <string name="insert_action_type">选择插入类型</string>
     <string name="close_button">关闭</string>
     <string name="fold">折叠</string>
     <string name="expand">展开</string>
+    <string name="loop_button">循环</string>
+    <string name="loop_button_active">✓循环</string>
+    <string name="loop_count_label">循环次数：</string>
+    <string name="loop_gap_label">每次循环等待时间(ms)：</string>
+    <string name="loop_count_hint">0=无限循环</string>
+    <string name="loop_count_negative">循环次数不能为负数</string>
+    <string name="stop_action">停止</string>
+    <string name="execution_stopped">执行已停止</string>
+    <string name="loop_settings_saved">循环设置已保存</string>
+    <string name="notification_stop">停止执行</string>
+    <string name="action_overlaps_control_zone">动作位置与悬浮窗重叠，请移动悬浮窗或动作位置</string>
+    <string name="action_overlaps_control_stopped">动作位置与悬浮窗重叠，已停止</string>
 </resources>

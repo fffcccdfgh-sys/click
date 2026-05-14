@@ -139,6 +139,9 @@ class MainActivity : AppCompatActivity() {
         prefs.edit()
             .putString("action_sequence", ActionStep.listToJson(emptyList()))
             .remove("current_editing_script_name")
+            .putInt("loop_count", 1)
+            .putLong("loop_gap_ms", 0L)
+            .putBoolean("loop_settings_saved", true)
             .apply()
         val intent = Intent(this, FloatingControlService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
