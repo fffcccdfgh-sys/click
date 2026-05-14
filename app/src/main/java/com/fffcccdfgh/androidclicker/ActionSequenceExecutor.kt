@@ -152,6 +152,20 @@ object ActionSequenceExecutor {
             ActionStep.TYPE_WAIT -> {
                 delay((action.durationMs ?: 1L).coerceAtLeast(1L))
             }
+            ActionStep.TYPE_PROGRAM -> {
+                val code = action.code
+                if (code != null) {
+                    val result = ProgramActionParser.parse(code)
+                    if (result.isSuccess) {
+                        ProgramActionExecutor.execute(
+                            service,
+                            result.getOrThrow(),
+                            canDispatchAction,
+                            onBlocked
+                        )
+                    }
+                }
+            }
             else -> {
                 val guard = canDispatchAction
                 if (guard != null && !guard(action)) {

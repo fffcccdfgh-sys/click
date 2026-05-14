@@ -220,6 +220,11 @@ class FloatingControlService : Service() {
             showWaitDurationPicker()
         }
 
+        view.findViewById<View>(R.id.programOption).setOnClickListener {
+            addMenu.visibility = View.GONE
+            showProgramEditor()
+        }
+
         view.findViewById<View>(R.id.clearOption).setOnClickListener {
             addMenu.visibility = View.GONE
             clearSequence()
@@ -537,6 +542,10 @@ class FloatingControlService : Service() {
                     ActionStep.TYPE_WAIT -> getString(
                         R.string.action_list_wait_short,
                         i + 1, (action.durationMs ?: 0L) / 1000.0
+                    )
+                    ActionStep.TYPE_PROGRAM -> getString(
+                        R.string.action_list_program_short,
+                        i + 1
                     )
                     else -> ""
                 }
@@ -1040,7 +1049,8 @@ class FloatingControlService : Service() {
         val options = listOf(
             ActionStep.TYPE_TAP to getString(R.string.tap_action),
             ActionStep.TYPE_SWIPE to getString(R.string.swipe_action),
-            ActionStep.TYPE_WAIT to getString(R.string.wait_action)
+            ActionStep.TYPE_WAIT to getString(R.string.wait_action),
+            ActionStep.TYPE_PROGRAM to getString(R.string.program_action)
         )
 
         for ((actionType, label) in options) {
@@ -1058,6 +1068,7 @@ class FloatingControlService : Service() {
                         ActionStep.TYPE_TAP -> showPickerOverlay(PICKER_TAP_POINT)
                         ActionStep.TYPE_SWIPE -> showPickerOverlay(PICKER_SWIPE_START)
                         ActionStep.TYPE_WAIT -> showWaitDurationPicker()
+                        ActionStep.TYPE_PROGRAM -> showProgramEditor()
                     }
                 }
             }
@@ -1120,6 +1131,118 @@ class FloatingControlService : Service() {
         }
 
         wm.addView(picker, params)
+    }
+
+    private fun showProgramEditor() {
+        val wm = windowManager ?: return
+        if (pickerView != null) hidePickerOverlay()
+
+        val inflater = LayoutInflater.from(this)
+        val editor = inflater.inflate(R.layout.program_editor, null)
+        pickerView = editor
+
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.CENTER
+        }
+
+        val codeInput = editor.findViewById<EditText>(R.id.programCodeInput)
+        val delayInput = editor.findViewById<EditText>(R.id.programDelayInput)
+        val repeatInput = editor.findViewById<EditText>(R.id.programRepeatInput)
+
+        if (settingsActionIndex != -1) {
+            val sequence = loadSequence()
+            if (settingsActionIndex < sequence.size) {
+                val action = sequence[settingsActionIndex]
+                codeInput.setText(action.code ?: "")
+                delayInput.setText((action.delayBeforeMs ?: 1L).toString())
+                repeatInput.setText((action.repeatCount ?: 1).toString())
+            }
+        } else {
+            delayInput.setText("1")
+            repeatInput.setText("1")
+        }
+
+        editor.findViewById<View>(R.id.templateButton).setOnClickListener {
+            codeInput.setText(getString(R.string.program_template))
+        }
+
+        editor.findViewById<View>(R.id.testParseButton).setOnClickListener {
+            val code = codeInput.text.toString()
+            val result = ProgramActionParser.parse(code)
+            if (result.isSuccess) {
+                Toast.makeText(this, getString(R.string.program_parse_success), Toast.LENGTH_SHORT).show()
+            } else {
+                val error = result.exceptionOrNull()?.message ?: getString(R.string.program_parse_failed)
+                Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        editor.findViewById<View>(R.id.programCancelButton).setOnClickListener {
+            hidePickerOverlay()
+            settingsActionIndex = -1
+        }
+
+        editor.findViewById<View>(R.id.programSaveButton).setOnClickListener {
+            val code = codeInput.text.toString()
+            if (code.isBlank()) {
+                Toast.makeText(this, getString(R.string.program_code_empty), Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val result = ProgramActionParser.parse(code)
+            if (result.isFailure) {
+                val error = result.exceptionOrNull()?.message ?: getString(R.string.program_parse_failed)
+                Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val delayBefore = parseMsInput(delayInput.text.toString())
+            val repeatCount = parseRepeatCount(repeatInput.text.toString())
+
+            if (repeatCount < 0) {
+                Toast.makeText(this, getString(R.string.loop_count_negative), Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val action = ActionStep(
+                type = ActionStep.TYPE_PROGRAM,
+                code = code,
+                delayBeforeMs = delayBefore,
+                repeatCount = repeatCount
+            )
+
+            if (settingsActionIndex != -1) {
+                val sequence = loadSequence().toMutableList()
+                if (settingsActionIndex in sequence.indices) {
+                    sequence[settingsActionIndex] = action
+                    saveSequence(sequence)
+                    if (actionListVisible) renderActionList()
+                    refreshMarkers()
+                }
+                settingsActionIndex = -1
+            } else {
+                appendToSequence(action)
+            }
+
+            hidePickerOverlay()
+            Toast.makeText(this, getString(R.string.program_action_saved), Toast.LENGTH_SHORT).show()
+        }
+
+        wm.addView(editor, params)
     }
 
     private fun loadSequence(): List<ActionStep> {
@@ -1216,6 +1339,11 @@ class FloatingControlService : Service() {
         if (actionIndex < 0 || actionIndex >= sequence.size) return
         val action = sequence[actionIndex]
         settingsActionIndex = actionIndex
+
+        if (action.type == ActionStep.TYPE_PROGRAM) {
+            showProgramEditor()
+            return
+        }
 
         floatingView?.findViewById<View>(R.id.loopSettingsPanel)?.visibility = View.GONE
 

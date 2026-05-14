@@ -15,7 +15,8 @@ data class ActionStep(
     val delayBeforeMs: Long? = null,
     val repeatCount: Int? = null,
     val markerX: Int? = null,
-    val markerY: Int? = null
+    val markerY: Int? = null,
+    val code: String? = null
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("type", type)
@@ -37,6 +38,9 @@ data class ActionStep(
                 markerX?.let { put("markerX", it) }
                 markerY?.let { put("markerY", it) }
             }
+            TYPE_PROGRAM -> {
+                code?.let { put("code", it) }
+            }
         }
         delayBeforeMs?.let { put("delayBeforeMs", it) }
         repeatCount?.let { put("repeatCount", it) }
@@ -46,6 +50,7 @@ data class ActionStep(
         const val TYPE_TAP = "tap"
         const val TYPE_SWIPE = "swipe"
         const val TYPE_WAIT = "wait"
+        const val TYPE_PROGRAM = "program"
 
         fun fromJson(json: JSONObject): ActionStep {
             val type = json.getString("type")
@@ -77,6 +82,12 @@ data class ActionStep(
                     repeatCount = repeatCount,
                     markerX = if (json.has("markerX")) json.getInt("markerX") else null,
                     markerY = if (json.has("markerY")) json.getInt("markerY") else null
+                )
+                TYPE_PROGRAM -> ActionStep(
+                    type = TYPE_PROGRAM,
+                    code = if (json.has("code")) json.getString("code") else null,
+                    delayBeforeMs = delayBeforeMs,
+                    repeatCount = repeatCount
                 )
                 else -> throw IllegalArgumentException("Unknown action type: $type")
             }
