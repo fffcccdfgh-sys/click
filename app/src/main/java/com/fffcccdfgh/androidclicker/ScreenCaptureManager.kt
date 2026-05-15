@@ -10,14 +10,10 @@ import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
-import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.SystemClock
-import android.util.DisplayMetrics
 import android.util.Log
-import android.view.WindowManager
-import java.nio.ByteOrder
 
 object ScreenCaptureManager {
     private const val TAG = "ScreenCaptureMgr"
@@ -28,8 +24,6 @@ object ScreenCaptureManager {
     private var virtualDisplay: VirtualDisplay? = null
     private var captureWidth: Int = 0
     private var captureHeight: Int = 0
-    private var coordinateWidth: Int = 0
-    private var coordinateHeight: Int = 0
     private var backgroundThread: HandlerThread? = null
     private var backgroundHandler: Handler? = null
 
@@ -41,13 +35,8 @@ object ScreenCaptureManager {
         release()
 
         val dm = context.resources.displayMetrics
-        coordinateWidth = dm.widthPixels
-        coordinateHeight = dm.heightPixels
-
-        val realMetrics = getRealDisplayMetrics(context, dm)
-        captureWidth = realMetrics.widthPixels.coerceAtLeast(coordinateWidth)
-        captureHeight = realMetrics.heightPixels.coerceAtLeast(coordinateHeight)
-        val densityDpi = realMetrics.densityDpi.takeIf { it > 0 } ?: dm.densityDpi
+        captureWidth = dm.widthPixels
+        captureHeight = dm.heightPixels
 
         backgroundThread = HandlerThread("ScreenCapture").apply { start() }
         backgroundHandler = Handler(backgroundThread!!.looper)
@@ -66,35 +55,13 @@ object ScreenCaptureManager {
 
         virtualDisplay = mediaProjection?.createVirtualDisplay(
             "ScreenCapture",
-            captureWidth, captureHeight, densityDpi,
+            captureWidth, captureHeight, dm.densityDpi,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
             imageReader!!.surface, null, backgroundHandler
         )
 
         isReady = virtualDisplay != null
-        Log.d(
-            TAG,
-            "Initialized capture=${captureWidth}x${captureHeight} coordinate=${coordinateWidth}x${coordinateHeight} ready=$isReady"
-        )
-    }
-
-    private fun getRealDisplayMetrics(context: Context, fallback: DisplayMetrics): DisplayMetrics {
-        val out = DisplayMetrics().apply { setTo(fallback) }
-        return try {
-            val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                val bounds = wm.maximumWindowMetrics.bounds
-                out.widthPixels = bounds.width()
-                out.heightPixels = bounds.height()
-            } else {
-                @Suppress("DEPRECATION")
-                wm.defaultDisplay.getRealMetrics(out)
-            }
-            out
-        } catch (e: Exception) {
-            Log.w(TAG, "getRealDisplayMetrics failed; using resource display metrics", e)
-            out
-        }
+        Log.d(TAG, "Initialized: ${captureWidth}x${captureHeight} ready=$isReady")
     }
 
     fun captureFrameSync(timeoutMs: Long = 2500L): Image? {
@@ -130,39 +97,18 @@ object ScreenCaptureManager {
 
     fun readPixel(image: Image, x: Int, y: Int): Int {
         val plane = image.planes[0]
-        val buffer = plane.buffer
+        val buffer = plane.buffer.duplicate()
         val pixelStride = plane.pixelStride
         val rowStride = plane.rowStride
 
         val safeX = x.coerceIn(0, image.width - 1)
         val safeY = y.coerceIn(0, image.height - 1)
         val offset = safeY * rowStride + safeX * pixelStride
-
-        if (pixelStride >= 4 && offset + 4 <= buffer.limit()) {
-            return try {
-                val intBuffer = buffer.duplicate().order(ByteOrder.nativeOrder())
-                intBuffer.position(offset)
-                intBuffer.int
-            } catch (_: Exception) {
-                readPixelRgbaBytes(image, safeX, safeY)
-            }
-        }
-
-        return readPixelRgbaBytes(image, safeX, safeY)
-    }
-
-    private fun readPixelRgbaBytes(image: Image, x: Int, y: Int): Int {
-        val plane = image.planes[0]
-        val buffer = plane.buffer.duplicate()
-        val pixelStride = plane.pixelStride
-        val rowStride = plane.rowStride
-
-        val offset = y * rowStride + x * pixelStride
         buffer.position(offset)
 
         val r = buffer.get().toInt() and 0xFF
-        val g = if (pixelStride >= 2) buffer.get().toInt() and 0xFF else r
-        val b = if (pixelStride >= 3) buffer.get().toInt() and 0xFF else g
+        val g = buffer.get().toInt() and 0xFF
+        val b = buffer.get().toInt() and 0xFF
         val a = if (pixelStride >= 4) buffer.get().toInt() and 0xFF else 0xFF
 
         return (a shl 24) or (r shl 16) or (g shl 8) or b
@@ -191,11 +137,8 @@ object ScreenCaptureManager {
         }
     }
 
-    fun getCaptureWidth(): Int = if (coordinateWidth > 0) coordinateWidth else captureWidth
-    fun getCaptureHeight(): Int = if (coordinateHeight > 0) coordinateHeight else captureHeight
-
-    fun getImageWidth(): Int = captureWidth
-    fun getImageHeight(): Int = captureHeight
+    fun getCaptureWidth(): Int = captureWidth
+    fun getCaptureHeight(): Int = captureHeight
 
     fun release() {
         isReady = false
@@ -216,10 +159,6 @@ object ScreenCaptureManager {
         } catch (_: Exception) {}
         backgroundThread = null
         backgroundHandler = null
-        captureWidth = 0
-        captureHeight = 0
-        coordinateWidth = 0
-        coordinateHeight = 0
         Log.d(TAG, "Released")
     }
 }
