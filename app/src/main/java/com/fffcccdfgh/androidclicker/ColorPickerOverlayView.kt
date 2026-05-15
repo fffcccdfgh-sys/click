@@ -1,10 +1,12 @@
 package com.fffcccdfgh.androidclicker
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
@@ -30,6 +32,7 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
         private const val SAMPLE_THROTTLE_MS = 80L
         private const val BUTTON_BOTTOM_MARGIN_DP = 48f
         private const val BUTTON_SPACING_DP = 28f
+        private const val DEBUG_PREVIEW_WIDTH = 96
     }
 
     private var markerCx = 0f
@@ -58,6 +61,9 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
     private val hexTextPaint: Paint
     private val colorPreviewPaint: Paint
     private val colorPreviewBorderPaint: Paint
+    private val debugPreviewPaint: Paint
+    private val debugLabelBgPaint: Paint
+    private val debugLabelTextPaint: Paint
 
     private val circleRadius: Float
     private val dotRadius: Float
@@ -71,12 +77,16 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
     private val buttonContainer: LinearLayout
 
     private val idleHandler = Handler(Looper.getMainLooper())
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val showButtonsRunnable = Runnable {
         buttonsVisible = true
         buttonContainer.visibility = View.VISIBLE
     }
 
     private var lastSampleTime = 0L
+    private var debugPreviewBitmap: Bitmap? = null
+    @Volatile private var debugPreviewBuilding = false
+    @Volatile private var cleanedUp = false
 
     var onConfirm: ((screenX: Int, screenY: Int, hex: String) -> Unit)? = null
     var onCancel: (() -> Unit)? = null
@@ -129,6 +139,16 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
             style = Paint.Style.STROKE
             strokeWidth = 1f * density
             color = Color.WHITE
+        }
+        debugPreviewPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG)
+        debugLabelBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            color = 0xCC000000.toInt()
+        }
+        debugLabelTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 12f * density
+            typeface = Typeface.DEFAULT_BOLD
         }
 
         val btnPadH = (16 * density).toInt()
@@ -204,10 +224,12 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
         cancelHitRect.offset(buttonContainer.left, buttonContainer.top)
 
         updateMarkerScreenPosition()
+        buildDebugPreviewIfNeeded()
         sampleCurrentMarkerColor(force = true)
     }
 
     override fun onDraw(canvas: Canvas) {
+        drawDebugPreview(canvas)
         super.onDraw(canvas)
 
         canvas.drawCircle(markerCx, markerCy, circleRadius, circleStrokePaint)
@@ -218,6 +240,35 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
         if (currentHex.isNotEmpty()) {
             drawHexLabel(canvas)
         }
+    }
+
+    private fun drawDebugPreview(canvas: Canvas) {
+        val preview = debugPreviewBitmap
+        if (preview != null && !preview.isRecycled) {
+            canvas.drawBitmap(preview, null, RectF(0f, 0f, width.toFloat(), height.toFloat()), debugPreviewPaint)
+        } else {
+            canvas.drawColor(0x66000000)
+        }
+
+        val label = if (preview != null) "实际识别截图预览" else "正在生成识别截图预览..."
+        val padH = 8f * density
+        val padV = 5f * density
+        val textW = debugLabelTextPaint.measureText(label)
+        val fm = debugLabelTextPaint.fontMetrics
+        val h = (fm.descent - fm.ascent) + padV * 2
+        val left = 8f * density
+        val top = 8f * density
+        canvas.drawRoundRect(
+            left,
+            top,
+            left + textW + padH * 2,
+            top + h,
+            6f * density,
+            6f * density,
+            debugLabelBgPaint
+        )
+        val textY = top + h / 2f - (fm.ascent + fm.descent) / 2f
+        canvas.drawText(label, left + padH, textY, debugLabelTextPaint)
     }
 
     private fun drawHexLabel(canvas: Canvas) {
@@ -361,6 +412,49 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
         }
     }
 
+    private fun buildDebugPreviewIfNeeded() {
+        val sampler = colorSampler ?: return
+        if (debugPreviewBitmap != null || debugPreviewBuilding || width <= 0 || height <= 0) {
+            return
+        }
+
+        debugPreviewBuilding = true
+        val viewW = width
+        val viewH = height
+        val location = IntArray(2)
+        getLocationOnScreen(location)
+        val originX = location[0]
+        val originY = location[1]
+        val previewW = DEBUG_PREVIEW_WIDTH
+        val previewH = Math.max(1, Math.round(previewW * viewH.toFloat() / viewW.toFloat()))
+
+        Thread {
+            val bitmap = Bitmap.createBitmap(previewW, previewH, Bitmap.Config.ARGB_8888)
+            for (py in 0 until previewH) {
+                val screenY = originY + Math.round((py + 0.5f) * viewH / previewH)
+                for (px in 0 until previewW) {
+                    val screenX = originX + Math.round((px + 0.5f) * viewW / previewW)
+                    val color = try {
+                        parseHexSafe(sampler.invoke(screenX, screenY) ?: "#000000")
+                    } catch (_: Exception) {
+                        Color.BLACK
+                    }
+                    bitmap.setPixel(px, py, color or 0xFF000000.toInt())
+                }
+            }
+
+            mainHandler.post {
+                if (cleanedUp) {
+                    bitmap.recycle()
+                } else {
+                    debugPreviewBitmap = bitmap
+                    debugPreviewBuilding = false
+                    invalidate()
+                }
+            }
+        }.start()
+    }
+
     private fun parseHexSafe(hex: String): Int {
         return try {
             Color.parseColor(hex)
@@ -370,7 +464,10 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
     }
 
     fun cleanup() {
+        cleanedUp = true
         idleHandler.removeCallbacks(showButtonsRunnable)
+        debugPreviewBitmap?.recycle()
+        debugPreviewBitmap = null
         onConfirm = null
         onCancel = null
         colorSampler = null
