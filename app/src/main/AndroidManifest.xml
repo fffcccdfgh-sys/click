@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
     <application
         android:allowBackup="true"
@@ -31,6 +32,17 @@
             android:name=".ScriptListActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".ScreenCapturePermissionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <service
+            android:name=".ScreenCaptureForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+
         <service
             android:name=".ClickAccessibilityService"
             android:exported="true"
@@ -46,7 +58,7 @@
         <service
             android:name=".FloatingControlService"
             android:exported="false"
-            android:foregroundServiceType="specialUse">
+            android:foregroundServiceType="specialUse|mediaProjection">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="floating_overlay_window" />
@@ -55,7 +67,7 @@
         <service
             android:name=".RunFloatingControlService"
             android:exported="false"
-            android:foregroundServiceType="specialUse">
+            android:foregroundServiceType="specialUse|mediaProjection">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="run_floating_overlay_window" />

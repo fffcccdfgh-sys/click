@@ -2,13 +2,16 @@ package com.fffcccdfgh.androidclicker
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.graphics.Color
 import android.graphics.Path
 import android.graphics.Rect
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import kotlin.coroutines.resume
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 
 class ClickAccessibilityService : AccessibilityService() {
 
@@ -20,8 +23,19 @@ class ClickAccessibilityService : AccessibilityService() {
             private set
     }
 
-    fun checkCondition(action: ActionStep): Boolean {
+    suspend fun checkCondition(action: ActionStep): Boolean {
         val conditionType = action.conditionType ?: return true
+
+        return when (conditionType) {
+            ActionStep.CONDITION_TEXT_CONTAINS -> checkTextCondition(action, false)
+            ActionStep.CONDITION_TEXT_NOT_CONTAINS -> checkTextCondition(action, true)
+            ActionStep.CONDITION_COLOR_MATCH -> checkColorCondition(action, false)
+            ActionStep.CONDITION_COLOR_NOT_MATCH -> checkColorCondition(action, true)
+            else -> true
+        }
+    }
+
+    private fun checkTextCondition(action: ActionStep, invert: Boolean): Boolean {
         val conditionText = action.conditionText
         if (conditionText.isNullOrEmpty()) return true
 
@@ -37,11 +51,51 @@ class ClickAccessibilityService : AccessibilityService() {
         }
 
         val found = findConditionText(conditionText, areaRect)
+        return if (invert) !found else found
+    }
 
-        return when (conditionType) {
-            ActionStep.CONDITION_TEXT_CONTAINS -> found
-            ActionStep.CONDITION_TEXT_NOT_CONTAINS -> !found
-            else -> true
+    private suspend fun checkColorCondition(action: ActionStep, invert: Boolean): Boolean {
+        if (!ScreenCaptureManager.isReady) return false
+
+        val hex = action.conditionColorHex ?: return false
+        val tolerancePercent = action.conditionColorTolerance?.coerceIn(0, 100) ?: 10
+        val colorX = action.conditionColorX ?: return false
+        val colorY = action.conditionColorY ?: return false
+
+        val targetColor: Int
+        try {
+            targetColor = Color.parseColor(hex)
+        } catch (_: Exception) {
+            return false
+        }
+
+        val image = withContext(Dispatchers.Default) {
+            ScreenCaptureManager.captureFrameSync(2000L)
+        } ?: return false
+
+        return try {
+            val capW = ScreenCaptureManager.getCaptureWidth()
+            val capH = ScreenCaptureManager.getCaptureHeight()
+            val px = (colorX.toFloat() * capW / resources.displayMetrics.widthPixels).toInt()
+                .coerceIn(0, capW - 1)
+            val py = (colorY.toFloat() * capH / resources.displayMetrics.heightPixels).toInt()
+                .coerceIn(0, capH - 1)
+
+            val channelTolerance = Math.round(255f * tolerancePercent / 100f)
+
+            val found = withContext(Dispatchers.Default) {
+                val pixel = ScreenCaptureManager.readPixel(image, px, py)
+                val r = Color.red(pixel)
+                val g = Color.green(pixel)
+                val b = Color.blue(pixel)
+                Math.abs(r - Color.red(targetColor)) <= channelTolerance &&
+                    Math.abs(g - Color.green(targetColor)) <= channelTolerance &&
+                    Math.abs(b - Color.blue(targetColor)) <= channelTolerance
+            }
+
+            if (invert) !found else found
+        } finally {
+            image.close()
         }
     }
 

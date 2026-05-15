@@ -26,10 +26,22 @@
         android:text="@string/overlay_status_denied"
         android:textSize="16sp"
         android:layout_marginTop="8dp"
-        app:layout_constraintBottom_toTopOf="@+id/openSettingsButton"
+        app:layout_constraintBottom_toTopOf="@+id/screenCaptureStatusText"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/statusText" />
+
+    <TextView
+        android:id="@+id/screenCaptureStatusText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/screen_capture_status_denied"
+        android:textSize="16sp"
+        android:layout_marginTop="8dp"
+        app:layout_constraintBottom_toTopOf="@+id/openSettingsButton"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/overlayStatusText" />
 
     <Button
         android:id="@+id/openSettingsButton"
@@ -39,7 +51,7 @@
         app:layout_constraintBottom_toTopOf="@+id/openOverlaySettingsButton"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/overlayStatusText" />
+        app:layout_constraintTop_toBottomOf="@+id/screenCaptureStatusText" />
 
     <Button
         android:id="@+id/openOverlaySettingsButton"
@@ -47,10 +59,20 @@
         android:layout_height="wrap_content"
         android:text="@string/open_overlay_settings"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@+id/toggleFloatingButton"
+        app:layout_constraintBottom_toTopOf="@+id/grantScreenCaptureButton"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/openSettingsButton" />
+
+    <Button
+        android:id="@+id/grantScreenCaptureButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/grant_screen_capture"
+        app:layout_constraintBottom_toTopOf="@+id/toggleFloatingButton"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/openOverlaySettingsButton" />
 
     <Button
         android:id="@+id/toggleFloatingButton"
@@ -61,7 +83,7 @@
         app:layout_constraintBottom_toTopOf="@+id/myScriptsButton"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/openOverlaySettingsButton" />
+        app:layout_constraintTop_toBottomOf="@+id/grantScreenCaptureButton" />
 
     <Button
         android:id="@+id/myScriptsButton"

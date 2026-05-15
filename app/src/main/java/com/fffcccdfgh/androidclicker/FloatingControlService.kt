@@ -61,6 +61,10 @@ class FloatingControlService : Service() {
     private var condEditTop: Int? = null
     private var condEditRight: Int? = null
     private var condEditBottom: Int? = null
+    private var condEditColorHex: String? = null
+    private var condEditColorTolerance: Int? = null
+    private var condEditColorX: Int? = null
+    private var condEditColorY: Int? = null
 
     private enum class MarkerPointType { TAP, SWIPE_START, SWIPE_END, WAIT }
     private data class MarkerBinding(val actionIndex: Int, val pointType: MarkerPointType)
@@ -90,6 +94,7 @@ class FloatingControlService : Service() {
         hidePickerOverlay()
         showFloatingControl()
         isRunning = true
+        broadcastRunningState()
 
         return START_STICKY
     }
@@ -107,6 +112,14 @@ class FloatingControlService : Service() {
         hidePickerOverlay()
         hideFloatingControl()
         isRunning = false
+        broadcastRunningState()
+    }
+
+    private fun broadcastRunningState() {
+        sendBroadcast(Intent(ACTION_STATE_CHANGED).apply {
+            setPackage(packageName)
+            putExtra(EXTRA_IS_RUNNING, isRunning)
+        })
     }
 
     private fun createNotificationChannel() {
@@ -1391,6 +1404,25 @@ class FloatingControlService : Service() {
             gravity = Gravity.CENTER
         }
 
+        picker.findViewById<View>(R.id.settingsTitle).setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    initialX = params.x
+                    initialY = params.y
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    params.x = initialX + (event.rawX - initialTouchX).toInt()
+                    params.y = initialY + (event.rawY - initialTouchY).toInt()
+                    wm.updateViewLayout(picker, params)
+                    true
+                }
+                else -> false
+            }
+        }
+
         val durationInput = picker.findViewById<EditText>(R.id.durationInput)
         val delayBeforeInput = picker.findViewById<EditText>(R.id.delayBeforeInput)
         val repeatCountInput = picker.findViewById<EditText>(R.id.repeatCountInput)
@@ -1399,14 +1431,14 @@ class FloatingControlService : Service() {
         delayBeforeInput.setText((action.delayBeforeMs ?: 1L).toString())
         repeatCountInput.setText((action.repeatCount ?: 1).toString())
 
-        picker.findViewById<View>(R.id.settingsSaveButton).setOnClickListener {
+        fun saveCurrentSettingsInputs(): Boolean {
             val durationMs = parseMsInput(durationInput.text.toString())
             val delayBeforeMs = parseMsInput(delayBeforeInput.text.toString())
             val repeatCount = parseRepeatCount(repeatCountInput.text.toString())
 
             if (repeatCount < 0) {
                 Toast.makeText(this, getString(R.string.loop_count_negative), Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
+                return false
             }
 
             val updatedSequence = loadSequence().toMutableList()
@@ -1420,6 +1452,13 @@ class FloatingControlService : Service() {
                 saveSequence(updatedSequence)
                 if (actionListVisible) renderActionList()
                 refreshMarkers()
+            }
+            return true
+        }
+
+        picker.findViewById<View>(R.id.settingsSaveButton).setOnClickListener {
+            if (!saveCurrentSettingsInputs()) {
+                return@setOnClickListener
             }
             hidePickerOverlay()
             settingsActionIndex = -1
@@ -1439,6 +1478,9 @@ class FloatingControlService : Service() {
             isClickable = true
             isFocusable = true
             setOnClickListener {
+                if (!saveCurrentSettingsInputs()) {
+                    return@setOnClickListener
+                }
                 loadConditionEditState()
                 hidePickerOverlay()
                 showConditionPicker()
@@ -1458,6 +1500,10 @@ class FloatingControlService : Service() {
                     condEditType = ActionStep.CONDITION_TEXT_CONTAINS
                     condEditInvert = true
                 }
+                ActionStep.CONDITION_COLOR_NOT_MATCH -> {
+                    condEditType = ActionStep.CONDITION_COLOR_MATCH
+                    condEditInvert = true
+                }
                 else -> {
                     condEditType = action.conditionType
                     condEditInvert = false
@@ -1469,6 +1515,10 @@ class FloatingControlService : Service() {
             condEditTop = action.conditionTop
             condEditRight = action.conditionRight
             condEditBottom = action.conditionBottom
+            condEditColorHex = action.conditionColorHex
+            condEditColorTolerance = action.conditionColorTolerance
+            condEditColorX = action.conditionColorX
+            condEditColorY = action.conditionColorY
         }
     }
 
@@ -1525,6 +1575,10 @@ class FloatingControlService : Service() {
         val textLabel = picker.findViewById<TextView>(R.id.conditionTextLabel)
         val condTypeDropdown = picker.findViewById<TextView>(R.id.condTypeDropdown)
         val invertBtn = picker.findViewById<TextView>(R.id.condInvertBtn)
+        val colorPickBtn = picker.findViewById<TextView>(R.id.condColorPickBtn)
+        val colorPosRow = picker.findViewById<View>(R.id.conditionColorPosRow)
+        val colorPosText = picker.findViewById<TextView>(R.id.condColorPosText)
+        val areaSection = picker.findViewById<View>(R.id.conditionAreaSection)
         val areaLabel = picker.findViewById<TextView>(R.id.conditionAreaLabel)
         val areaButtons = picker.findViewById<View>(R.id.condAreaButtons)
         val areaFullscreenBtn = picker.findViewById<TextView>(R.id.condAreaFullscreenBtn)
@@ -1533,9 +1587,12 @@ class FloatingControlService : Service() {
         val areaRangeText = picker.findViewById<TextView>(R.id.condAreaRangeText)
         val selectAreaBtn = picker.findViewById<TextView>(R.id.condSelectAreaBtn)
         val clearAreaBtn = picker.findViewById<TextView>(R.id.condClearAreaBtn)
+        val colorToleranceRow = picker.findViewById<View>(R.id.conditionColorToleranceRow)
+        val colorToleranceInput = picker.findViewById<EditText>(R.id.conditionColorToleranceInput)
 
         fun condTypeToLabel(type: String?): String = when (type) {
             ActionStep.CONDITION_TEXT_CONTAINS -> getString(R.string.condition_type_text_contains)
+            ActionStep.CONDITION_COLOR_MATCH -> getString(R.string.condition_type_color_match)
             else -> getString(R.string.condition_type_none)
         }
 
@@ -1564,18 +1621,47 @@ class FloatingControlService : Service() {
             }
         }
 
+        fun updateColorPosText() {
+            val x = condEditColorX
+            val y = condEditColorY
+            if (x != null && y != null) {
+                colorPosText.text = getString(R.string.condition_color_pos_text, x, y)
+                colorPosText.setTextColor(0xFF4CAF50.toInt())
+            } else {
+                colorPosText.text = getString(R.string.condition_color_pos_text_none)
+                colorPosText.setTextColor(0xFFAAAAAA.toInt())
+            }
+        }
+
         fun updateConditionFormUI() {
             val hasCondition = condEditType != null
+            val isColor = condEditType == ActionStep.CONDITION_COLOR_MATCH
             val visible = if (hasCondition) View.VISIBLE else View.GONE
             textLabel.visibility = visible
             textInput.visibility = visible
-            areaLabel.visibility = visible
-            areaButtons.visibility = visible
-            if (!hasCondition) {
-                areaRangeText.visibility = View.GONE
-                areaControls.visibility = View.GONE
+            if (isColor) {
+                textLabel.text = getString(R.string.condition_content_label)
+                textInput.hint = getString(R.string.condition_color_hint)
+                colorPickBtn.visibility = View.VISIBLE
+                colorToleranceRow.visibility = View.VISIBLE
+                colorPosRow.visibility = View.VISIBLE
+                areaSection.visibility = View.GONE
+                updateColorPosText()
             } else {
-                updateAreaUI()
+                textLabel.text = getString(R.string.condition_content_label)
+                textInput.hint = getString(R.string.condition_text_hint)
+                colorPickBtn.visibility = View.GONE
+                colorToleranceRow.visibility = View.GONE
+                colorPosRow.visibility = View.GONE
+                areaSection.visibility = if (hasCondition) View.VISIBLE else View.GONE
+                areaLabel.visibility = if (hasCondition) View.VISIBLE else View.GONE
+                areaButtons.visibility = if (hasCondition) View.VISIBLE else View.GONE
+                if (!hasCondition) {
+                    areaRangeText.visibility = View.GONE
+                    areaControls.visibility = View.GONE
+                } else {
+                    updateAreaUI()
+                }
             }
             updateInvertUI()
         }
@@ -1585,7 +1671,11 @@ class FloatingControlService : Service() {
         }
 
         fun onCondTypeSelected(index: Int) {
-            condEditType = if (index == 1) ActionStep.CONDITION_TEXT_CONTAINS else null
+            condEditType = when (index) {
+                1 -> ActionStep.CONDITION_TEXT_CONTAINS
+                2 -> ActionStep.CONDITION_COLOR_MATCH
+                else -> null
+            }
             if (condEditType == null) {
                 condEditInvert = false
                 condEditUseArea = false
@@ -1593,6 +1683,10 @@ class FloatingControlService : Service() {
                 condEditTop = null
                 condEditRight = null
                 condEditBottom = null
+                condEditColorHex = null
+                condEditColorTolerance = null
+                condEditColorX = null
+                condEditColorY = null
             }
             updateCondTypeDropdown()
             updateConditionFormUI()
@@ -1607,7 +1701,8 @@ class FloatingControlService : Service() {
 
             val options = listOf(
                 getString(R.string.condition_type_none),
-                getString(R.string.condition_type_text_contains)
+                getString(R.string.condition_type_text_contains),
+                getString(R.string.condition_type_color_match)
             )
 
             val popup = PopupWindow(
@@ -1649,7 +1744,8 @@ class FloatingControlService : Service() {
             popup.showAsDropDown(condTypeDropdown, 0, 4)
         }
 
-        textInput.setText(condEditText ?: "")
+        textInput.setText(if (condEditType == ActionStep.CONDITION_COLOR_MATCH) (condEditColorHex ?: "") else (condEditText ?: ""))
+        colorToleranceInput.setText((condEditColorTolerance ?: 10).toString())
         updateCondTypeDropdown()
         updateConditionFormUI()
 
@@ -1685,15 +1781,39 @@ class FloatingControlService : Service() {
             renderConditionAreaRange(areaRangeText)
         }
 
+        colorPickBtn.setOnClickListener {
+            if (!ScreenCaptureManager.isReady) {
+                Toast.makeText(this, getString(R.string.screen_capture_not_ready), Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            wm.removeView(picker)
+            pickerView = null
+            showColorPickerOverlay()
+        }
+
         picker.findViewById<View>(R.id.condSaveBtn).setOnClickListener {
-            val text = textInput.text.toString()
-            condEditText = text
+            val text = textInput.text.toString().trim()
+            val isColor = condEditType == ActionStep.CONDITION_COLOR_MATCH
 
             if (condEditType != null) {
                 if (text.isEmpty()) {
-                    Toast.makeText(this, getString(R.string.condition_text_empty), Toast.LENGTH_SHORT).show()
+                    val msg = if (isColor) getString(R.string.condition_color_empty) else getString(R.string.condition_text_empty)
+                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
                 }
+            }
+
+            if (isColor) {
+                condEditColorHex = text
+                val toleranceText = colorToleranceInput.text.toString().trim()
+                val tolerance = toleranceText.toIntOrNull() ?: 10
+                condEditColorTolerance = tolerance.coerceIn(0, 100)
+                if (condEditColorX == null || condEditColorY == null) {
+                    Toast.makeText(this, getString(R.string.condition_color_pos_required), Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+            } else {
+                condEditText = text
             }
 
             if (condEditUseArea && condEditType != null) {
@@ -1709,21 +1829,30 @@ class FloatingControlService : Service() {
 
             val savedType = when {
                 condEditType == null -> null
+                condEditType == ActionStep.CONDITION_COLOR_MATCH -> {
+                    if (condEditInvert) ActionStep.CONDITION_COLOR_NOT_MATCH else ActionStep.CONDITION_COLOR_MATCH
+                }
                 condEditInvert -> ActionStep.CONDITION_TEXT_NOT_CONTAINS
                 else -> ActionStep.CONDITION_TEXT_CONTAINS
             }
+
+            val isSavedColor = savedType == ActionStep.CONDITION_COLOR_MATCH || savedType == ActionStep.CONDITION_COLOR_NOT_MATCH
 
             val sequence = loadSequence().toMutableList()
             if (settingsActionIndex in sequence.indices) {
                 val oldAction = sequence[settingsActionIndex]
                 sequence[settingsActionIndex] = oldAction.copy(
                     conditionType = savedType,
-                    conditionText = if (savedType != null) condEditText else null,
+                    conditionText = if (savedType != null && !isSavedColor) condEditText else null,
                     conditionUseArea = if (savedType != null) condEditUseArea else null,
                     conditionLeft = if (condEditUseArea && savedType != null) condEditLeft else null,
                     conditionTop = if (condEditUseArea && savedType != null) condEditTop else null,
                     conditionRight = if (condEditUseArea && savedType != null) condEditRight else null,
-                    conditionBottom = if (condEditUseArea && savedType != null) condEditBottom else null
+                    conditionBottom = if (condEditUseArea && savedType != null) condEditBottom else null,
+                    conditionColorHex = if (isSavedColor) condEditColorHex else null,
+                    conditionColorTolerance = if (isSavedColor) condEditColorTolerance else null,
+                    conditionColorX = if (isSavedColor) condEditColorX else null,
+                    conditionColorY = if (isSavedColor) condEditColorY else null
                 )
                 saveSequence(sequence)
                 if (actionListVisible) renderActionList()
@@ -1797,6 +1926,117 @@ class FloatingControlService : Service() {
         }
 
         wm.addView(view, params)
+    }
+
+    private fun showColorPickerOverlay() {
+        val wm = windowManager ?: return
+
+        if (!ScreenCaptureManager.isReady) {
+            Toast.makeText(this, getString(R.string.screen_capture_not_ready), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Hide main floating control so it doesn't block the screen
+        floatingView?.visibility = View.INVISIBLE
+        hidePositionMarkersForScreenshot()
+
+        val screenW = resources.displayMetrics.widthPixels
+        val screenH = resources.displayMetrics.heightPixels
+        val capW = ScreenCaptureManager.getCaptureWidth()
+        val capH = ScreenCaptureManager.getCaptureHeight()
+
+        // Capture one frame and reuse it for the entire picking session
+        Thread {
+            val image = ScreenCaptureManager.captureFrameSync(COLOR_PICK_CAPTURE_TIMEOUT_MS)
+            android.os.Handler(mainLooper).post {
+                if (image == null) {
+                    restoreFloatingUI()
+                    Toast.makeText(this, getString(R.string.condition_color_pick_failed), Toast.LENGTH_SHORT).show()
+                    showConditionPicker()
+                    return@post
+                }
+
+                val overlay = ColorPickerOverlayView(this)
+
+                val initX = screenW / 2
+                val initY = screenH / 2
+                val initHex = samplePixelHex(image, initX, initY, screenW, screenH, capW, capH)
+                overlay.setInitialPosition(initX, initY, initHex)
+
+                overlay.colorSampler = { x, y ->
+                    samplePixelHex(image, x, y, screenW, screenH, capW, capH)
+                }
+
+                overlay.onConfirm = { x, y, hex ->
+                    condEditColorHex = hex
+                    condEditColorX = x
+                    condEditColorY = y
+                    try { wm.removeView(overlay) } catch (_: Exception) {}
+                    pickerView = null
+                    image.close()
+                    restoreFloatingUI()
+                    showConditionPicker()
+                }
+
+                overlay.onCancel = {
+                    try { wm.removeView(overlay) } catch (_: Exception) {}
+                    pickerView = null
+                    image.close()
+                    restoreFloatingUI()
+                    showConditionPicker()
+                }
+
+                pickerView = overlay
+
+                val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                } else {
+                    @Suppress("DEPRECATION")
+                    WindowManager.LayoutParams.TYPE_PHONE
+                }
+                val params = WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    type,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                    PixelFormat.TRANSLUCENT
+                )
+                wm.addView(overlay, params)
+            }
+        }.start()
+    }
+
+    private fun samplePixelHex(
+        image: android.media.Image,
+        screenX: Int, screenY: Int,
+        screenW: Int, screenH: Int,
+        capW: Int, capH: Int
+    ): String {
+        val sx = (screenX.toFloat() * capW / screenW).toInt().coerceIn(0, capW - 1)
+        val sy = (screenY.toFloat() * capH / screenH).toInt().coerceIn(0, capH - 1)
+        val pixel = ScreenCaptureManager.readPixel(image, sx, sy)
+        val r = android.graphics.Color.red(pixel)
+        val g = android.graphics.Color.green(pixel)
+        val b = android.graphics.Color.blue(pixel)
+        return String.format("#%02X%02X%02X", r, g, b)
+    }
+
+    private fun hidePositionMarkersForScreenshot() {
+        val wm = windowManager ?: return
+        for (view in positionMarkerViews) {
+            try {
+                wm.removeView(view)
+            } catch (_: Exception) {}
+        }
+        positionMarkerViews.clear()
+        markerBindings.clear()
+    }
+
+    private fun restoreFloatingUI() {
+        floatingView?.visibility = View.VISIBLE
+        if (positionVisible) {
+            showPositionMarkers()
+        }
     }
 
     private fun parseMsInput(input: String): Long {
@@ -1926,6 +2166,8 @@ class FloatingControlService : Service() {
         const val CHANNEL_ID = "floating_control_channel"
         const val NOTIFICATION_ID = 1
         const val ACTION_STOP_EXECUTION = "com.fffcccdfgh.androidclicker.STOP_EXECUTION"
+        const val ACTION_STATE_CHANGED = "com.fffcccdfgh.androidclicker.FLOATING_STATE_CHANGED"
+        const val EXTRA_IS_RUNNING = "is_running"
         var isRunning = false
             private set
 
@@ -1957,5 +2199,6 @@ class FloatingControlService : Service() {
         private const val PICKER_SWIPE_START = 1
         private const val PICKER_SWIPE_END = 2
         private const val DRAG_THRESHOLD_DP = 12f
+        private const val COLOR_PICK_CAPTURE_TIMEOUT_MS = 1000L
     }
 }

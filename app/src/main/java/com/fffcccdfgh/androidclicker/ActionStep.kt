@@ -23,7 +23,11 @@ data class ActionStep(
     val conditionLeft: Int? = null,
     val conditionTop: Int? = null,
     val conditionRight: Int? = null,
-    val conditionBottom: Int? = null
+    val conditionBottom: Int? = null,
+    val conditionColorHex: String? = null,
+    val conditionColorTolerance: Int? = null,
+    val conditionColorX: Int? = null,
+    val conditionColorY: Int? = null
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("type", type)
@@ -58,6 +62,10 @@ data class ActionStep(
         conditionTop?.let { put("conditionTop", it) }
         conditionRight?.let { put("conditionRight", it) }
         conditionBottom?.let { put("conditionBottom", it) }
+        conditionColorHex?.let { put("conditionColorHex", it) }
+        conditionColorTolerance?.let { put("conditionColorTolerance", it) }
+        conditionColorX?.let { put("conditionColorX", it) }
+        conditionColorY?.let { put("conditionColorY", it) }
     }
 
     companion object {
@@ -68,6 +76,8 @@ data class ActionStep(
 
         const val CONDITION_TEXT_CONTAINS = "text_contains"
         const val CONDITION_TEXT_NOT_CONTAINS = "text_not_contains"
+        const val CONDITION_COLOR_MATCH = "color_match"
+        const val CONDITION_COLOR_NOT_MATCH = "color_not_match"
 
         fun fromJson(json: JSONObject): ActionStep {
             val type = json.getString("type")
@@ -80,6 +90,10 @@ data class ActionStep(
             val conditionTop = if (json.has("conditionTop")) json.getInt("conditionTop") else null
             val conditionRight = if (json.has("conditionRight")) json.getInt("conditionRight") else null
             val conditionBottom = if (json.has("conditionBottom")) json.getInt("conditionBottom") else null
+            val conditionColorHex = if (json.has("conditionColorHex")) json.getString("conditionColorHex") else null
+            val conditionColorTolerance = if (json.has("conditionColorTolerance")) json.getInt("conditionColorTolerance") else null
+            val conditionColorX = if (json.has("conditionColorX")) json.getInt("conditionColorX") else null
+            val conditionColorY = if (json.has("conditionColorY")) json.getInt("conditionColorY") else null
             return when (type) {
                 TYPE_TAP -> ActionStep(
                     type = TYPE_TAP,
@@ -94,7 +108,11 @@ data class ActionStep(
                     conditionLeft = conditionLeft,
                     conditionTop = conditionTop,
                     conditionRight = conditionRight,
-                    conditionBottom = conditionBottom
+                    conditionBottom = conditionBottom,
+                    conditionColorHex = conditionColorHex,
+                    conditionColorTolerance = conditionColorTolerance,
+                    conditionColorX = conditionColorX,
+                    conditionColorY = conditionColorY
                 )
                 TYPE_SWIPE -> ActionStep(
                     type = TYPE_SWIPE,
@@ -111,7 +129,11 @@ data class ActionStep(
                     conditionLeft = conditionLeft,
                     conditionTop = conditionTop,
                     conditionRight = conditionRight,
-                    conditionBottom = conditionBottom
+                    conditionBottom = conditionBottom,
+                    conditionColorHex = conditionColorHex,
+                    conditionColorTolerance = conditionColorTolerance,
+                    conditionColorX = conditionColorX,
+                    conditionColorY = conditionColorY
                 )
                 TYPE_WAIT -> ActionStep(
                     type = TYPE_WAIT,
@@ -126,7 +148,11 @@ data class ActionStep(
                     conditionLeft = conditionLeft,
                     conditionTop = conditionTop,
                     conditionRight = conditionRight,
-                    conditionBottom = conditionBottom
+                    conditionBottom = conditionBottom,
+                    conditionColorHex = conditionColorHex,
+                    conditionColorTolerance = conditionColorTolerance,
+                    conditionColorX = conditionColorX,
+                    conditionColorY = conditionColorY
                 )
                 TYPE_PROGRAM -> ActionStep(
                     type = TYPE_PROGRAM,
@@ -139,7 +165,11 @@ data class ActionStep(
                     conditionLeft = conditionLeft,
                     conditionTop = conditionTop,
                     conditionRight = conditionRight,
-                    conditionBottom = conditionBottom
+                    conditionBottom = conditionBottom,
+                    conditionColorHex = conditionColorHex,
+                    conditionColorTolerance = conditionColorTolerance,
+                    conditionColorX = conditionColorX,
+                    conditionColorY = conditionColorY
                 )
                 else -> throw IllegalArgumentException("Unknown action type: $type")
             }

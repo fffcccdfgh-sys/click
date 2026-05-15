@@ -1,6 +1,9 @@
 package com.fffcccdfgh.androidclicker
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -16,10 +19,21 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var statusText: TextView
     private lateinit var overlayStatusText: TextView
+    private lateinit var screenCaptureStatusText: TextView
     private lateinit var openSettingsButton: Button
     private lateinit var openOverlaySettingsButton: Button
+    private lateinit var grantScreenCaptureButton: Button
     private lateinit var toggleFloatingButton: Button
     private lateinit var myScriptsButton: Button
+    private var floatingTogglePending = false
+    private val floatingStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == FloatingControlService.ACTION_STATE_CHANGED) {
+                floatingTogglePending = false
+                updateFloatingButtonState()
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,8 +47,10 @@ class MainActivity : AppCompatActivity() {
 
         statusText = findViewById(R.id.statusText)
         overlayStatusText = findViewById(R.id.overlayStatusText)
+        screenCaptureStatusText = findViewById(R.id.screenCaptureStatusText)
         openSettingsButton = findViewById(R.id.openSettingsButton)
         openOverlaySettingsButton = findViewById(R.id.openOverlaySettingsButton)
+        grantScreenCaptureButton = findViewById(R.id.grantScreenCaptureButton)
         toggleFloatingButton = findViewById(R.id.toggleFloatingButton)
         myScriptsButton = findViewById(R.id.myScriptsButton)
 
@@ -50,6 +66,15 @@ class MainActivity : AppCompatActivity() {
             toggleFloatingControl()
         }
 
+        grantScreenCaptureButton.setOnClickListener {
+            if (ScreenCaptureManager.isReady) {
+                ScreenCaptureForegroundService.stop(this)
+                updateUI()
+            } else {
+                startActivity(Intent(this, ScreenCapturePermissionActivity::class.java))
+            }
+        }
+
         myScriptsButton.setOnClickListener {
             startActivity(Intent(this, ScriptListActivity::class.java))
         }
@@ -57,13 +82,28 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        val filter = IntentFilter(FloatingControlService.ACTION_STATE_CHANGED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(floatingStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(floatingStateReceiver, filter)
+        }
         updateUI()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        try {
+            unregisterReceiver(floatingStateReceiver)
+        } catch (_: Exception) {
+        }
     }
 
     private fun updateUI() {
         updateAccessibilityStatus()
         updateOverlayStatus()
-        updateFloatingButton()
+        updateScreenCaptureStatus()
+        updateFloatingButtonState()
     }
 
     private fun updateAccessibilityStatus() {
@@ -85,9 +125,24 @@ class MainActivity : AppCompatActivity() {
         openOverlaySettingsButton.visibility = if (granted) android.view.View.GONE else android.view.View.VISIBLE
     }
 
-    private fun updateFloatingButton() {
+    private fun updateScreenCaptureStatus() {
+        val ready = ScreenCaptureManager.isReady
+        screenCaptureStatusText.text = if (ready) {
+            getString(R.string.screen_capture_status_granted)
+        } else {
+            getString(R.string.screen_capture_status_denied)
+        }
+        grantScreenCaptureButton.visibility = android.view.View.VISIBLE
+        grantScreenCaptureButton.text = if (ready) {
+            getString(R.string.close_screen_capture)
+        } else {
+            getString(R.string.grant_screen_capture)
+        }
+    }
+
+    private fun updateFloatingButtonState() {
         val serviceRunning = FloatingControlService.isRunning
-        toggleFloatingButton.isEnabled = isOverlayPermissionGranted()
+        toggleFloatingButton.isEnabled = isOverlayPermissionGranted() && !floatingTogglePending
         toggleFloatingButton.text = if (serviceRunning) {
             getString(R.string.stop_floating_control)
         } else {
@@ -126,6 +181,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun toggleFloatingControl() {
+        if (floatingTogglePending) return
         if (FloatingControlService.isRunning) {
             stopFloatingService()
         } else {
@@ -134,7 +190,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startFloatingService() {
-        stopService(Intent(this, FloatingControlService::class.java))
+        floatingTogglePending = true
+        updateFloatingButtonState()
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         prefs.edit()
             .putString("action_sequence", ActionStep.listToJson(emptyList()))
@@ -149,13 +206,22 @@ class MainActivity : AppCompatActivity() {
         } else {
             startService(intent)
         }
-        toggleFloatingButton.text = getString(R.string.stop_floating_control)
+        scheduleFloatingStateFallbackRefresh()
     }
 
     private fun stopFloatingService() {
+        floatingTogglePending = true
+        updateFloatingButtonState()
         val intent = Intent(this, FloatingControlService::class.java)
         stopService(intent)
-        toggleFloatingButton.text = getString(R.string.start_floating_control)
+        scheduleFloatingStateFallbackRefresh()
+    }
+
+    private fun scheduleFloatingStateFallbackRefresh() {
+        toggleFloatingButton.postDelayed({
+            floatingTogglePending = false
+            updateFloatingButtonState()
+        }, 1200)
     }
 
     companion object {
