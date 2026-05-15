@@ -1730,6 +1730,10 @@ class FloatingControlService : Service() {
                 }
             }
             condEditType = newType
+            // Sync text input to the new type
+            textInput.setText(
+                if (newType == ActionStep.CONDITION_TEXT_CONTAINS) (condEditText ?: "") else ""
+            )
             updateCondTypeDropdown()
             updateConditionFormUI()
         }
@@ -1786,7 +1790,7 @@ class FloatingControlService : Service() {
             popup.showAsDropDown(condTypeDropdown, 0, 4)
         }
 
-        textInput.setText(if (condEditType == ActionStep.CONDITION_COLOR_MATCH) (condEditColorHex ?: "") else (condEditText ?: ""))
+        textInput.setText(condEditText ?: "")
         colorToleranceInput.setText((condEditColorTolerance ?: 10).toString())
         updateCondTypeDropdown()
         updateConditionFormUI()
