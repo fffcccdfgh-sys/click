@@ -18,7 +18,7 @@ import android.util.Log
 object ScreenCaptureManager {
     private const val TAG = "ScreenCaptureMgr"
     private const val CAPTURE_POLL_INTERVAL_MS = 16L
-    private const val FRAME_SETTLE_DELAY_MS = 350L
+    private const val FRAME_SETTLE_DELAY_MS = 450L
 
     private var mediaProjection: MediaProjection? = null
     private var imageReader: ImageReader? = null
@@ -77,16 +77,6 @@ object ScreenCaptureManager {
             Thread.currentThread().interrupt()
             return null
         }
-
-        var oldImage: Image?
-        do {
-            oldImage = try {
-                reader.acquireLatestImage()
-            } catch (_: Exception) {
-                null
-            }
-            oldImage?.close()
-        } while (oldImage != null)
 
         val deadline = SystemClock.uptimeMillis() + timeoutMs
         while (SystemClock.uptimeMillis() < deadline) {
