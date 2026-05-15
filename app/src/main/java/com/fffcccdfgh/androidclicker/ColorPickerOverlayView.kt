@@ -189,8 +189,15 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
+
+        // getHitRect() returns each button's bounds in buttonContainer coordinates,
+        // while MotionEvent.x/y are in this overlay's coordinate space.
+        // Offset the rects into the overlay coordinate space so button taps are detected.
         confirmBtn.getHitRect(confirmHitRect)
+        confirmHitRect.offset(buttonContainer.left, buttonContainer.top)
+
         cancelBtn.getHitRect(cancelHitRect)
+        cancelHitRect.offset(buttonContainer.left, buttonContainer.top)
     }
 
     override fun onDraw(canvas: Canvas) {
