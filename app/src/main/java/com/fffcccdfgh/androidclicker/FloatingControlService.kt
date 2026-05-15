@@ -26,6 +26,9 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import android.widget.Toast
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ImageSpan
 
 class FloatingControlService : Service() {
     private val stopDebugTag = "ClickerStopDebug"
@@ -389,6 +392,19 @@ class FloatingControlService : Service() {
 
         wm.addView(view, floatingParams)
         ControlZoneChecker.register("floating_control") { getControlZoneRect() }
+
+        ScreenshotHider.register("floating_control",
+            hide = {
+                floatingView?.visibility = View.INVISIBLE
+                hidePositionMarkersForScreenshot()
+            },
+            reveal = {
+                floatingView?.visibility = View.VISIBLE
+                if (positionVisible) {
+                    showPositionMarkers()
+                }
+            }
+        )
     }
 
     private fun bindStartStopTouch(button: View, onStart: () -> Unit) {
@@ -485,6 +501,7 @@ class FloatingControlService : Service() {
             } catch (_: Exception) {
             }
         }
+        ScreenshotHider.unregister("floating_control")
         floatingView = null
         floatingParams = null
         ControlZoneChecker.unregister("floating_control")
@@ -1578,15 +1595,7 @@ class FloatingControlService : Service() {
         val colorPickBtn = picker.findViewById<TextView>(R.id.condColorPickBtn)
         val colorPosRow = picker.findViewById<View>(R.id.conditionColorPosRow)
         val colorPosText = picker.findViewById<TextView>(R.id.condColorPosText)
-        val areaSection = picker.findViewById<View>(R.id.conditionAreaSection)
-        val areaLabel = picker.findViewById<TextView>(R.id.conditionAreaLabel)
-        val areaButtons = picker.findViewById<View>(R.id.condAreaButtons)
-        val areaFullscreenBtn = picker.findViewById<TextView>(R.id.condAreaFullscreenBtn)
-        val areaCustomBtn = picker.findViewById<TextView>(R.id.condAreaCustomBtn)
-        val areaControls = picker.findViewById<View>(R.id.condAreaControls)
-        val areaRangeText = picker.findViewById<TextView>(R.id.condAreaRangeText)
         val selectAreaBtn = picker.findViewById<TextView>(R.id.condSelectAreaBtn)
-        val clearAreaBtn = picker.findViewById<TextView>(R.id.condClearAreaBtn)
         val colorToleranceRow = picker.findViewById<View>(R.id.conditionColorToleranceRow)
         val colorToleranceInput = picker.findViewById<EditText>(R.id.conditionColorToleranceInput)
 
@@ -1594,21 +1603,6 @@ class FloatingControlService : Service() {
             ActionStep.CONDITION_TEXT_CONTAINS -> getString(R.string.condition_type_text_contains)
             ActionStep.CONDITION_COLOR_MATCH -> getString(R.string.condition_type_color_match)
             else -> getString(R.string.condition_type_none)
-        }
-
-        fun updateAreaUI() {
-            if (condEditUseArea) {
-                areaFullscreenBtn.setTextColor(0xFFCCCCCC.toInt())
-                areaCustomBtn.setTextColor(0xFF4CAF50.toInt())
-                areaRangeText.visibility = View.VISIBLE
-                areaControls.visibility = View.VISIBLE
-                renderConditionAreaRange(areaRangeText)
-            } else {
-                areaFullscreenBtn.setTextColor(0xFF4CAF50.toInt())
-                areaCustomBtn.setTextColor(0xFFCCCCCC.toInt())
-                areaRangeText.visibility = View.GONE
-                areaControls.visibility = View.GONE
-            }
         }
 
         fun updateInvertUI() {
@@ -1633,35 +1627,55 @@ class FloatingControlService : Service() {
             }
         }
 
+        fun buildColorContentLabel(): CharSequence {
+            val hex = condEditColorHex
+            return if (hex != null) {
+                val color = try { Color.parseColor(hex) } catch (_: Exception) { null }
+                val prefix = getString(R.string.condition_content_label)  // "条件内容："
+                // Two spaces as placeholder for the color swatch
+                val full = SpannableStringBuilder(prefix + "  " + hex)
+                if (color != null) {
+                    val swatch = GradientDrawable().apply {
+                        setColor(color)
+                        setStroke(1, Color.parseColor("#33000000"))
+                        shape = GradientDrawable.RECTANGLE
+                    }
+                    val size = (12 * resources.displayMetrics.density).toInt()
+                    swatch.setBounds(0, 0, size, size)
+                    val span = ImageSpan(swatch, ImageSpan.ALIGN_BASELINE)
+                    // Place the swatch over the two placeholder spaces
+                    full.setSpan(
+                        span,
+                        prefix.length,
+                        prefix.length + 2,
+                        Spanned.SPAN_INCLUSIVE_EXCLUSIVE
+                    )
+                }
+                full
+            } else {
+                getString(R.string.condition_content_label)
+            }
+        }
+
         fun updateConditionFormUI() {
             val hasCondition = condEditType != null
             val isColor = condEditType == ActionStep.CONDITION_COLOR_MATCH
             val visible = if (hasCondition) View.VISIBLE else View.GONE
             textLabel.visibility = visible
-            textInput.visibility = visible
             if (isColor) {
-                textLabel.text = getString(R.string.condition_content_label)
-                textInput.hint = getString(R.string.condition_color_hint)
+                textLabel.text = buildColorContentLabel()
+                textInput.visibility = View.GONE
                 colorPickBtn.visibility = View.VISIBLE
                 colorToleranceRow.visibility = View.VISIBLE
                 colorPosRow.visibility = View.VISIBLE
-                areaSection.visibility = View.GONE
                 updateColorPosText()
             } else {
-                textLabel.text = getString(R.string.condition_content_label)
+                textLabel.text = getString(R.string.condition_text_label)
                 textInput.hint = getString(R.string.condition_text_hint)
                 colorPickBtn.visibility = View.GONE
                 colorToleranceRow.visibility = View.GONE
                 colorPosRow.visibility = View.GONE
-                areaSection.visibility = if (hasCondition) View.VISIBLE else View.GONE
-                areaLabel.visibility = if (hasCondition) View.VISIBLE else View.GONE
-                areaButtons.visibility = if (hasCondition) View.VISIBLE else View.GONE
-                if (!hasCondition) {
-                    areaRangeText.visibility = View.GONE
-                    areaControls.visibility = View.GONE
-                } else {
-                    updateAreaUI()
-                }
+                selectAreaBtn.visibility = if (hasCondition) View.VISIBLE else View.GONE
             }
             updateInvertUI()
         }
@@ -1758,27 +1772,9 @@ class FloatingControlService : Service() {
             updateInvertUI()
         }
 
-        areaFullscreenBtn.setOnClickListener {
-            condEditUseArea = false
-            updateAreaUI()
-        }
-
-        areaCustomBtn.setOnClickListener {
-            condEditUseArea = true
-            updateAreaUI()
-        }
-
         selectAreaBtn.setOnClickListener {
             hidePickerOverlay()
             showAreaPicker()
-        }
-
-        clearAreaBtn.setOnClickListener {
-            condEditLeft = null
-            condEditTop = null
-            condEditRight = null
-            condEditBottom = null
-            renderConditionAreaRange(areaRangeText)
         }
 
         colorPickBtn.setOnClickListener {
@@ -1792,19 +1788,25 @@ class FloatingControlService : Service() {
         }
 
         picker.findViewById<View>(R.id.condSaveBtn).setOnClickListener {
-            val text = textInput.text.toString().trim()
             val isColor = condEditType == ActionStep.CONDITION_COLOR_MATCH
 
             if (condEditType != null) {
-                if (text.isEmpty()) {
-                    val msg = if (isColor) getString(R.string.condition_color_empty) else getString(R.string.condition_text_empty)
-                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
+                if (isColor) {
+                    if (condEditColorHex.isNullOrEmpty()) {
+                        Toast.makeText(this, getString(R.string.condition_color_empty), Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                } else {
+                    val text = textInput.text.toString().trim()
+                    if (text.isEmpty()) {
+                        Toast.makeText(this, getString(R.string.condition_text_empty), Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    condEditText = text
                 }
             }
 
             if (isColor) {
-                condEditColorHex = text
                 val toleranceText = colorToleranceInput.text.toString().trim()
                 val tolerance = toleranceText.toIntOrNull() ?: 10
                 condEditColorTolerance = tolerance.coerceIn(0, 100)
@@ -1812,8 +1814,6 @@ class FloatingControlService : Service() {
                     Toast.makeText(this, getString(R.string.condition_color_pos_required), Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
                 }
-            } else {
-                condEditText = text
             }
 
             if (condEditUseArea && condEditType != null) {
@@ -1871,20 +1871,6 @@ class FloatingControlService : Service() {
         wm.addView(picker, params)
     }
 
-    private fun renderConditionAreaRange(rangeText: TextView) {
-        val l = condEditLeft
-        val t = condEditTop
-        val r = condEditRight
-        val b = condEditBottom
-        if (l != null && t != null && r != null && b != null) {
-            rangeText.text = getString(R.string.condition_area_range, l, t, r, b)
-            rangeText.setTextColor(0xFF4CAF50.toInt())
-        } else {
-            rangeText.text = getString(R.string.condition_area_none)
-            rangeText.setTextColor(0xFFAAAAAA.toInt())
-        }
-    }
-
     private fun showAreaPicker() {
         val wm = windowManager ?: return
 
@@ -1919,6 +1905,16 @@ class FloatingControlService : Service() {
                 condEditTop = top
                 condEditRight = right
                 condEditBottom = bottom
+                condEditUseArea = true
+                // For text condition: read the text inside the selected area
+                if (condEditType == ActionStep.CONDITION_TEXT_CONTAINS) {
+                    val service = ClickAccessibilityService.instance
+                    if (service != null && ClickAccessibilityService.isRunning) {
+                        val areaRect = android.graphics.Rect(left, top, right, bottom)
+                        val foundText = service.collectTextInArea(areaRect)
+                        condEditText = foundText
+                    }
+                }
                 wm.removeView(view)
                 pickerView = null
                 showConditionPicker()
@@ -1936,21 +1932,23 @@ class FloatingControlService : Service() {
             return
         }
 
-        // Hide main floating control so it doesn't block the screen
-        floatingView?.visibility = View.INVISIBLE
-        hidePositionMarkersForScreenshot()
+        // Hide all overlay windows so they don't appear in the screenshot
+        ScreenshotHider.hideAll()
 
         val screenW = resources.displayMetrics.widthPixels
         val screenH = resources.displayMetrics.heightPixels
         val capW = ScreenCaptureManager.getCaptureWidth()
         val capH = ScreenCaptureManager.getCaptureHeight()
 
-        // Capture one frame and reuse it for the entire picking session
+        // Capture one frame and reuse it for the entire picking session.
+        // Wait for the window manager to render a frame without the overlays,
+        // then capture on a background thread.
         Thread {
+            Thread.sleep(300)
             val image = ScreenCaptureManager.captureFrameSync(COLOR_PICK_CAPTURE_TIMEOUT_MS)
             android.os.Handler(mainLooper).post {
                 if (image == null) {
-                    restoreFloatingUI()
+                    ScreenshotHider.revealAll()
                     Toast.makeText(this, getString(R.string.condition_color_pick_failed), Toast.LENGTH_SHORT).show()
                     showConditionPicker()
                     return@post
@@ -1974,7 +1972,7 @@ class FloatingControlService : Service() {
                     try { wm.removeView(overlay) } catch (_: Exception) {}
                     pickerView = null
                     image.close()
-                    restoreFloatingUI()
+                    ScreenshotHider.revealAll()
                     showConditionPicker()
                 }
 
@@ -1982,7 +1980,7 @@ class FloatingControlService : Service() {
                     try { wm.removeView(overlay) } catch (_: Exception) {}
                     pickerView = null
                     image.close()
-                    restoreFloatingUI()
+                    ScreenshotHider.revealAll()
                     showConditionPicker()
                 }
 
@@ -2199,6 +2197,6 @@ class FloatingControlService : Service() {
         private const val PICKER_SWIPE_START = 1
         private const val PICKER_SWIPE_END = 2
         private const val DRAG_THRESHOLD_DP = 12f
-        private const val COLOR_PICK_CAPTURE_TIMEOUT_MS = 1000L
+        private const val COLOR_PICK_CAPTURE_TIMEOUT_MS = 3000L
     }
 }

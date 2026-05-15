@@ -99,6 +99,56 @@ class ClickAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * Collect text from all accessibility nodes that intersect the given rect.
+     * Joins them with a space for easy pre-filling into the condition editor.
+     */
+    fun collectTextInArea(area: Rect): String {
+        val sb = StringBuilder()
+        for (window in windows) {
+            val root = window.root ?: continue
+            try {
+                if (root.packageName?.toString() == packageName) continue
+                collectTextInTree(root, area, sb)
+            } finally {
+                root.recycle()
+            }
+        }
+        if (sb.isEmpty()) {
+            val root = rootInActiveWindow ?: return ""
+            try {
+                if (root.packageName?.toString() != packageName) {
+                    collectTextInTree(root, area, sb)
+                }
+            } finally {
+                root.recycle()
+            }
+        }
+        return sb.toString().trim()
+    }
+
+    private fun collectTextInTree(node: AccessibilityNodeInfo, area: Rect, sb: StringBuilder) {
+        val nodeRect = Rect()
+        node.getBoundsInScreen(nodeRect)
+        if (!nodeRect.isEmpty && Rect.intersects(nodeRect, area)) {
+            val text = node.text?.toString()?.trim().orEmpty()
+            if (text.isNotEmpty()) {
+                if (sb.isNotEmpty()) sb.append(' ')
+                sb.append(text)
+            }
+            val desc = node.contentDescription?.toString()?.trim().orEmpty()
+            if (desc.isNotEmpty() && desc != text) {
+                if (sb.isNotEmpty()) sb.append(' ')
+                sb.append(desc)
+            }
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            collectTextInTree(child, area, sb)
+            child.recycle()
+        }
+    }
+
     private fun findConditionText(text: String, area: Rect?): Boolean {
         var checkedExternalWindow = false
 

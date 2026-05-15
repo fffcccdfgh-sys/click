@@ -225,6 +225,14 @@ class RunFloatingControlService : Service() {
 
         wm.addView(view, entry.params)
         ControlZoneChecker.register(zoneKey(entry)) { getControlZoneRect(entry) }
+        ScreenshotHider.register(zoneKey(entry),
+            hide = {
+                entry.view?.visibility = View.INVISIBLE
+            },
+            reveal = {
+                entry.view?.visibility = View.VISIBLE
+            }
+        )
     }
 
     private fun bindStartStopTouch(entry: WindowEntry, button: View) {
@@ -277,6 +285,7 @@ class RunFloatingControlService : Service() {
         if (view != null && wm != null) {
             try { wm.removeView(view) } catch (_: Exception) {}
         }
+        ScreenshotHider.unregister(zoneKey(entry))
         entry.view = null
         entry.params = null
         ControlZoneChecker.unregister(zoneKey(entry))

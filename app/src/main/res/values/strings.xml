@@ -140,6 +140,8 @@
     <string name="condition_type_text_not_contains">未识别到文字</string>
     <string name="condition_type_color_match">颜色识别</string>
     <string name="condition_content_label">条件内容：</string>
+    <string name="condition_text_label">识别到文字：</string>
+    <string name="condition_content_color_label">条件内容：颜色%1$s</string>
     <string name="condition_text_hint">输入要匹配的文字</string>
     <string name="condition_color_hint">输入颜色值，例如：#FF0000</string>
     <string name="condition_text_empty">请输入条件文字</string>

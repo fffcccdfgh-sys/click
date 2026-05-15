@@ -30,6 +30,10 @@ object ActionSequenceExecutor {
     var loopCount = 1
     var loopGapMs = 0L
 
+    // Execution generation counter to prevent stale finally blocks from
+    // finishing a newer execution after stop() followed by a quick restart.
+    private var executionId = 0
+
     var onStarted: (() -> Unit)? = null
     var onFinished: (() -> Unit)? = null
     var onStopped: (() -> Unit)? = null
@@ -79,6 +83,8 @@ object ActionSequenceExecutor {
         this.canDispatchAction = canDispatchAction
         this.onBlocked = onBlocked
 
+        executionId++
+        val thisExecutionId = executionId
         isRunning = true
         onStarted?.invoke()
 
@@ -92,7 +98,7 @@ object ActionSequenceExecutor {
             } catch (_: CancellationException) {
                 // stop() already fired onStopped
             } finally {
-                if (isRunning) {
+                if (isRunning && executionId == thisExecutionId) {
                     finishAndNotify()
                 }
             }
