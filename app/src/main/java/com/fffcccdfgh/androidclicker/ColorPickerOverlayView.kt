@@ -34,6 +34,8 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
 
     private var markerCx = 0f
     private var markerCy = 0f
+    private var markerScreenX = 0
+    private var markerScreenY = 0
     private var currentHex = ""
     private var parsedPreviewColor = Color.WHITE
 
@@ -182,6 +184,8 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
     fun setInitialPosition(x: Int, y: Int, hex: String) {
         markerCx = x.toFloat()
         markerCy = y.toFloat()
+        markerScreenX = x
+        markerScreenY = y
         currentHex = hex
         parsedPreviewColor = parseHexSafe(hex)
         invalidate()
@@ -198,6 +202,9 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
 
         cancelBtn.getHitRect(cancelHitRect)
         cancelHitRect.offset(buttonContainer.left, buttonContainer.top)
+
+        updateMarkerScreenPosition()
+        sampleCurrentMarkerColor(force = true)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -306,7 +313,7 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
             MotionEvent.ACTION_UP -> {
                 if (touchStartedOnButton) {
                     if (confirmHitRect.contains(event.x.toInt(), event.y.toInt())) {
-                        onConfirm?.invoke(markerCx.toInt(), markerCy.toInt(), currentHex)
+                        onConfirm?.invoke(markerScreenX, markerScreenY, currentHex)
                     } else if (cancelHitRect.contains(event.x.toInt(), event.y.toInt())) {
                         onCancel?.invoke()
                     }
@@ -330,17 +337,28 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
     private fun updateMarkerPosition(x: Float, y: Float) {
         markerCx = x.coerceIn(circleRadius, width.toFloat() - circleRadius)
         markerCy = y.coerceIn(circleRadius, height.toFloat() - circleRadius)
-
-        val now = SystemClock.uptimeMillis()
-        if (now - lastSampleTime >= SAMPLE_THROTTLE_MS) {
-            lastSampleTime = now
-            colorSampler?.invoke(markerCx.toInt(), markerCy.toInt())?.let { hex ->
-                currentHex = hex
-                parsedPreviewColor = parseHexSafe(hex)
-            }
-        }
-
+        updateMarkerScreenPosition()
+        sampleCurrentMarkerColor(force = false)
         invalidate()
+    }
+
+    private fun updateMarkerScreenPosition() {
+        val location = IntArray(2)
+        getLocationOnScreen(location)
+        markerScreenX = Math.round(markerCx + location[0])
+        markerScreenY = Math.round(markerCy + location[1])
+    }
+
+    private fun sampleCurrentMarkerColor(force: Boolean) {
+        val now = SystemClock.uptimeMillis()
+        if (!force && now - lastSampleTime < SAMPLE_THROTTLE_MS) {
+            return
+        }
+        lastSampleTime = now
+        colorSampler?.invoke(markerScreenX, markerScreenY)?.let { hex ->
+            currentHex = hex
+            parsedPreviewColor = parseHexSafe(hex)
+        }
     }
 
     private fun parseHexSafe(hex: String): Int {
