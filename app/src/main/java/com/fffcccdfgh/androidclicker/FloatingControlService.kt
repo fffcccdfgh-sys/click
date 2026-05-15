@@ -1660,22 +1660,26 @@ class FloatingControlService : Service() {
         fun updateConditionFormUI() {
             val hasCondition = condEditType != null
             val isColor = condEditType == ActionStep.CONDITION_COLOR_MATCH
-            val visible = if (hasCondition) View.VISIBLE else View.GONE
-            textLabel.visibility = visible
+            val isText = hasCondition && !isColor
+            // Label
+            textLabel.visibility = if (hasCondition) View.VISIBLE else View.GONE
             if (isColor) {
                 textLabel.text = buildColorContentLabel()
-                textInput.visibility = View.GONE
-                colorPickBtn.visibility = View.VISIBLE
-                colorToleranceRow.visibility = View.VISIBLE
-                colorPosRow.visibility = View.VISIBLE
-                updateColorPosText()
             } else {
                 textLabel.text = getString(R.string.condition_text_label)
+            }
+            // Text-specific controls
+            textInput.visibility = if (isText) View.VISIBLE else View.GONE
+            if (isText) {
                 textInput.hint = getString(R.string.condition_text_hint)
-                colorPickBtn.visibility = View.GONE
-                colorToleranceRow.visibility = View.GONE
-                colorPosRow.visibility = View.GONE
-                selectAreaBtn.visibility = if (hasCondition) View.VISIBLE else View.GONE
+            }
+            selectAreaBtn.visibility = if (isText) View.VISIBLE else View.GONE
+            // Color-specific controls
+            colorPickBtn.visibility = if (isColor) View.VISIBLE else View.GONE
+            colorToleranceRow.visibility = if (isColor) View.VISIBLE else View.GONE
+            colorPosRow.visibility = if (isColor) View.VISIBLE else View.GONE
+            if (isColor) {
+                updateColorPosText()
             }
             updateInvertUI()
         }
@@ -1685,23 +1689,47 @@ class FloatingControlService : Service() {
         }
 
         fun onCondTypeSelected(index: Int) {
-            condEditType = when (index) {
+            val newType = when (index) {
                 1 -> ActionStep.CONDITION_TEXT_CONTAINS
                 2 -> ActionStep.CONDITION_COLOR_MATCH
                 else -> null
             }
-            if (condEditType == null) {
-                condEditInvert = false
-                condEditUseArea = false
-                condEditLeft = null
-                condEditTop = null
-                condEditRight = null
-                condEditBottom = null
-                condEditColorHex = null
-                condEditColorTolerance = null
-                condEditColorX = null
-                condEditColorY = null
+            // Clear state belonging to the previous type when switching
+            if (newType != condEditType) {
+                when (newType) {
+                    ActionStep.CONDITION_COLOR_MATCH -> {
+                        // Switching to color: clear text-related state
+                        condEditText = null
+                        condEditUseArea = false
+                        condEditLeft = null
+                        condEditTop = null
+                        condEditRight = null
+                        condEditBottom = null
+                    }
+                    ActionStep.CONDITION_TEXT_CONTAINS -> {
+                        // Switching to text: clear color-related state
+                        condEditColorHex = null
+                        condEditColorTolerance = null
+                        condEditColorX = null
+                        condEditColorY = null
+                    }
+                    null -> {
+                        // Switching to unconditional: clear everything
+                        condEditInvert = false
+                        condEditText = null
+                        condEditUseArea = false
+                        condEditLeft = null
+                        condEditTop = null
+                        condEditRight = null
+                        condEditBottom = null
+                        condEditColorHex = null
+                        condEditColorTolerance = null
+                        condEditColorX = null
+                        condEditColorY = null
+                    }
+                }
             }
+            condEditType = newType
             updateCondTypeDropdown()
             updateConditionFormUI()
         }
