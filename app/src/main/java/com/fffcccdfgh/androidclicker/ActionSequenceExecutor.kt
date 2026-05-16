@@ -43,6 +43,7 @@ object ActionSequenceExecutor {
 
     fun stop() {
         if (!isRunning) return
+        ProgramActionExecutor.stopLua()
         runningJob?.cancel()
         runningJob = null
         isRunning = false
@@ -169,15 +170,12 @@ object ActionSequenceExecutor {
             ActionStep.TYPE_PROGRAM -> {
                 val code = action.code
                 if (code != null) {
-                    val result = ProgramActionParser.parse(code)
-                    if (result.isSuccess) {
-                        ProgramActionExecutor.execute(
-                            service,
-                            result.getOrThrow(),
-                            canDispatchAction,
-                            onBlocked
-                        )
-                    }
+                    ProgramActionExecutor.execute(
+                        service,
+                        code,
+                        canDispatchAction,
+                        onBlocked
+                    )
                 }
             }
             else -> {

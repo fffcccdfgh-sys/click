@@ -9,4 +9,16 @@ sealed class ProgramCommand {
     ) : ProgramCommand()
     data class WaitCmd(val ms: Long) : ProgramCommand()
     data class RepeatCmd(val count: Int, val commands: List<ProgramCommand>) : ProgramCommand()
+    data class ConditionCmd(
+        val conditionType: String,
+        val conditionText: String?,
+        val conditionLeft: Int?,
+        val conditionTop: Int?,
+        val conditionRight: Int?,
+        val conditionBottom: Int?,
+        val conditionColorHex: String?,
+        val conditionColorTolerance: Int?,
+        val conditionColorX: Int?,
+        val conditionColorY: Int?
+    ) : ProgramCommand()
 }

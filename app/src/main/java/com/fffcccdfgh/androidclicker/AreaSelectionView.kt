@@ -5,9 +5,13 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.RectF
+import android.os.Handler
+import android.os.Looper
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 
 class AreaSelectionView @JvmOverloads constructor(
     context: Context,
@@ -15,16 +19,25 @@ class AreaSelectionView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private var startX = 0f
-    private var startY = 0f
-    private var endX = 0f
-    private var endY = 0f
-    private var isDragging = false
-    private var hasSelection = false
+    private val rect = RectF()
+    private var hasInitialRect = false
+
+    private val edgeHitSize by lazy { (30 * resources.displayMetrics.density) }
+    private val minSize by lazy { (20 * resources.displayMetrics.density) }
+    private val touchSlop by lazy { ViewConfiguration.get(context).scaledTouchSlop }
+
+    private var touchMode = TouchMode.NONE
+    private var lastTouchX = 0f
+    private var lastTouchY = 0f
+    private var dragMoveDistance = 0f
+
+    private val idleHandler = Handler(Looper.getMainLooper())
+    private val showButtonsRunnable = Runnable { onInteractionFinished?.invoke() }
 
     private val fillPaint = Paint().apply {
         color = Color.parseColor("#334CAF50")
         style = Paint.Style.FILL
+        isAntiAlias = true
     }
     private val strokePaint = Paint().apply {
         color = Color.parseColor("#FF4CAF50")
@@ -32,53 +45,93 @@ class AreaSelectionView @JvmOverloads constructor(
         strokeWidth = 3f
         isAntiAlias = true
     }
+    private val handlePaint = Paint().apply {
+        color = Color.parseColor("#FF4CAF50")
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
 
-    var onSelectionComplete: ((left: Int, top: Int, right: Int, bottom: Int) -> Unit)? = null
+    var onInteractionStarted: (() -> Unit)? = null
+    var onInteractionFinished: (() -> Unit)? = null
 
-    private val minSizePx by lazy {
-        (20 * resources.displayMetrics.density).toInt()
+    private enum class TouchMode {
+        NONE, MOVE,
+        RESIZE_N, RESIZE_S, RESIZE_E, RESIZE_W,
+        RESIZE_NE, RESIZE_NW, RESIZE_SE, RESIZE_SW
+    }
+
+    fun setInitialRect(left: Int?, top: Int?, right: Int?, bottom: Int?) {
+        if (left != null && top != null && right != null && bottom != null
+            && right > left && bottom > top
+        ) {
+            rect.set(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())
+            hasInitialRect = true
+        } else {
+            hasInitialRect = false
+        }
+        invalidate()
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        if (!hasInitialRect && width > 0 && height > 0) {
+            val boxW = (200 * resources.displayMetrics.density)
+            val boxH = (150 * resources.displayMetrics.density)
+            val cx = width / 2f
+            val cy = height / 2f
+            rect.set(cx - boxW / 2, cy - boxH / 2, cx + boxW / 2, cy + boxH / 2)
+            hasInitialRect = true
+            invalidate()
+        }
+    }
+
+    fun getSelectionRect(): Rect? {
+        if (!hasInitialRect) return null
+        val l = rect.left.toInt()
+        val t = rect.top.toInt()
+        val r = rect.right.toInt()
+        val b = rect.bottom.toInt()
+        if (r - l < minSize || b - t < minSize) return null
+        return Rect(l, t, r, b)
+    }
+
+    fun cleanup() {
+        idleHandler.removeCallbacks(showButtonsRunnable)
+        onInteractionStarted = null
+        onInteractionFinished = null
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        val x = event.x
+        val y = event.y
+
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                startX = event.x
-                startY = event.y
-                endX = startX
-                endY = startY
-                isDragging = true
-                hasSelection = false
-                invalidate()
+                if (!hasInitialRect) return false
+                touchMode = detectTouchMode(x, y)
+                if (touchMode == TouchMode.NONE) return false
+                lastTouchX = x
+                lastTouchY = y
+                dragMoveDistance = 0f
+                idleHandler.removeCallbacks(showButtonsRunnable)
+                onInteractionStarted?.invoke()
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                if (isDragging) {
-                    endX = event.x
-                    endY = event.y
-                    invalidate()
-                }
+                if (touchMode == TouchMode.NONE) return false
+                val dx = x - lastTouchX
+                val dy = y - lastTouchY
+                dragMoveDistance += Math.abs(dx) + Math.abs(dy)
+                applyMove(dx, dy)
+                lastTouchX = x
+                lastTouchY = y
+                invalidate()
                 return true
             }
-            MotionEvent.ACTION_UP -> {
-                if (isDragging) {
-                    isDragging = false
-                    endX = event.x
-                    endY = event.y
-                    hasSelection = true
-                    invalidate()
-
-                    val left = startX.coerceAtMost(endX).toInt()
-                    val top = startY.coerceAtMost(endY).toInt()
-                    val right = startX.coerceAtLeast(endX).toInt()
-                    val bottom = startY.coerceAtLeast(endY).toInt()
-                    val width = right - left
-                    val height = bottom - top
-
-                    if (width < minSizePx || height < minSizePx) {
-                        onSelectionComplete?.invoke(-1, -1, -1, -1)
-                    } else {
-                        onSelectionComplete?.invoke(left, top, right, bottom)
-                    }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                touchMode = TouchMode.NONE
+                if (dragMoveDistance >= touchSlop) {
+                    idleHandler.postDelayed(showButtonsRunnable, IDLE_SHOW_BUTTONS_MS)
                 }
                 return true
             }
@@ -86,29 +139,85 @@ class AreaSelectionView @JvmOverloads constructor(
         return super.onTouchEvent(event)
     }
 
-    fun getSelectionRect(): Rect? {
-        if (!hasSelection) return null
-        val left = startX.coerceAtMost(endX).toInt()
-        val top = startY.coerceAtMost(endY).toInt()
-        val right = startX.coerceAtLeast(endX).toInt()
-        val bottom = startY.coerceAtLeast(endY).toInt()
-        if (right - left < minSizePx || bottom - top < minSizePx) return null
-        return Rect(left, top, right, bottom)
+    private fun detectTouchMode(x: Float, y: Float): TouchMode {
+        val onLeft = Math.abs(x - rect.left) < edgeHitSize
+        val onRight = Math.abs(x - rect.right) < edgeHitSize
+        val onTop = Math.abs(y - rect.top) < edgeHitSize
+        val onBottom = Math.abs(y - rect.bottom) < edgeHitSize
+
+        // Corners (checked first so they take priority over single edges)
+        if (onLeft && onTop) return TouchMode.RESIZE_NW
+        if (onRight && onTop) return TouchMode.RESIZE_NE
+        if (onLeft && onBottom) return TouchMode.RESIZE_SW
+        if (onRight && onBottom) return TouchMode.RESIZE_SE
+
+        // Single edges (only when also inside the opposite axis range)
+        if (onLeft && y > rect.top && y < rect.bottom) return TouchMode.RESIZE_W
+        if (onRight && y > rect.top && y < rect.bottom) return TouchMode.RESIZE_E
+        if (onTop && x > rect.left && x < rect.right) return TouchMode.RESIZE_N
+        if (onBottom && x > rect.left && x < rect.right) return TouchMode.RESIZE_S
+
+        // Everything else: move the entire box
+        return TouchMode.MOVE
+    }
+
+    private fun applyMove(dx: Float, dy: Float) {
+        when (touchMode) {
+            TouchMode.MOVE -> {
+                rect.offset(dx, dy)
+                if (rect.left < 0) rect.offset(-rect.left, 0f)
+                if (rect.top < 0) rect.offset(0f, -rect.top)
+                if (rect.right > width) rect.offset(width - rect.right, 0f)
+                if (rect.bottom > height) rect.offset(0f, height - rect.bottom)
+            }
+            TouchMode.RESIZE_N -> {
+                rect.top = (rect.top + dy).coerceIn(0f, rect.bottom - minSize)
+            }
+            TouchMode.RESIZE_S -> {
+                rect.bottom = (rect.bottom + dy).coerceIn(rect.top + minSize, height.toFloat())
+            }
+            TouchMode.RESIZE_W -> {
+                rect.left = (rect.left + dx).coerceIn(0f, rect.right - minSize)
+            }
+            TouchMode.RESIZE_E -> {
+                rect.right = (rect.right + dx).coerceIn(rect.left + minSize, width.toFloat())
+            }
+            TouchMode.RESIZE_NW -> {
+                rect.top = (rect.top + dy).coerceIn(0f, rect.bottom - minSize)
+                rect.left = (rect.left + dx).coerceIn(0f, rect.right - minSize)
+            }
+            TouchMode.RESIZE_NE -> {
+                rect.top = (rect.top + dy).coerceIn(0f, rect.bottom - minSize)
+                rect.right = (rect.right + dx).coerceIn(rect.left + minSize, width.toFloat())
+            }
+            TouchMode.RESIZE_SW -> {
+                rect.bottom = (rect.bottom + dy).coerceIn(rect.top + minSize, height.toFloat())
+                rect.left = (rect.left + dx).coerceIn(0f, rect.right - minSize)
+            }
+            TouchMode.RESIZE_SE -> {
+                rect.bottom = (rect.bottom + dy).coerceIn(rect.top + minSize, height.toFloat())
+                rect.right = (rect.right + dx).coerceIn(rect.left + minSize, width.toFloat())
+            }
+            TouchMode.NONE -> {}
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        if (!hasInitialRect) return
 
-        if (!isDragging && !hasSelection) return
+        canvas.drawRect(rect, fillPaint)
+        canvas.drawRect(rect, strokePaint)
 
-        val left = startX.coerceAtMost(endX)
-        val top = startY.coerceAtMost(endY)
-        val right = startX.coerceAtLeast(endX)
-        val bottom = startY.coerceAtLeast(endY)
+        // Corner handles
+        val r = edgeHitSize / 3
+        canvas.drawCircle(rect.left, rect.top, r, handlePaint)
+        canvas.drawCircle(rect.right, rect.top, r, handlePaint)
+        canvas.drawCircle(rect.left, rect.bottom, r, handlePaint)
+        canvas.drawCircle(rect.right, rect.bottom, r, handlePaint)
+    }
 
-        if (left == right || top == bottom) return
-
-        canvas.drawRect(left, top, right, bottom, fillPaint)
-        canvas.drawRect(left, top, right, bottom, strokePaint)
+    companion object {
+        private const val IDLE_SHOW_BUTTONS_MS = 400L
     }
 }

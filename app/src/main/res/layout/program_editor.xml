@@ -1,6 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="280dp"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/floating_control_bg"
     android:orientation="vertical"
@@ -19,7 +18,7 @@
     <EditText
         android:id="@+id/programCodeInput"
         android:layout_width="match_parent"
-        android:layout_height="150dp"
+        android:layout_height="300dp"
         android:textColor="@android:color/black"
         android:textColorHint="#888888"
         android:hint="@string/program_code_hint"
@@ -78,52 +77,6 @@
         android:layout_height="1dp"
         android:background="#33FFFFFF"
         android:layout_marginBottom="8dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/settings_delay_before"
-        android:textColor="#CCCCCC"
-        android:textSize="12sp"
-        android:layout_marginBottom="4dp" />
-
-    <EditText
-        android:id="@+id/programDelayInput"
-        android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:textColor="@android:color/black"
-        android:textColorHint="#888888"
-        android:hint="1"
-        android:textSize="13sp"
-        android:background="#FFFFFF"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
-        android:inputType="number"
-        android:maxLength="8"
-        android:layout_marginBottom="8dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/settings_repeat_count"
-        android:textColor="#CCCCCC"
-        android:textSize="12sp"
-        android:layout_marginBottom="4dp" />
-
-    <EditText
-        android:id="@+id/programRepeatInput"
-        android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:textColor="@android:color/black"
-        android:textColorHint="#888888"
-        android:hint="@string/settings_repeat_count_hint"
-        android:textSize="13sp"
-        android:background="#FFFFFF"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
-        android:inputType="number"
-        android:maxLength="8"
-        android:layout_marginBottom="12dp" />
 
     <LinearLayout
         android:layout_width="match_parent"

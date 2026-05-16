@@ -51,6 +51,8 @@ data class ActionStep(
             }
             TYPE_PROGRAM -> {
                 code?.let { put("code", it) }
+                markerX?.let { put("markerX", it) }
+                markerY?.let { put("markerY", it) }
             }
         }
         delayBeforeMs?.let { put("delayBeforeMs", it) }
@@ -159,6 +161,8 @@ data class ActionStep(
                     code = if (json.has("code")) json.getString("code") else null,
                     delayBeforeMs = delayBeforeMs,
                     repeatCount = repeatCount,
+                    markerX = if (json.has("markerX")) json.getInt("markerX") else null,
+                    markerY = if (json.has("markerY")) json.getInt("markerY") else null,
                     conditionType = conditionType,
                     conditionText = conditionText,
                     conditionUseArea = conditionUseArea,

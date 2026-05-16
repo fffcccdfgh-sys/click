@@ -35,6 +35,28 @@ class ClickAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * Evaluate a condition defined by a cond() command in program code.
+     * Builds a temporary ActionStep and delegates to [checkCondition].
+     */
+    suspend fun checkConditionFromCmd(cmd: ProgramCommand.ConditionCmd): Boolean {
+        val action = ActionStep(
+            type = ActionStep.TYPE_PROGRAM,
+            conditionType = cmd.conditionType,
+            conditionText = cmd.conditionText,
+            conditionUseArea = cmd.conditionLeft != null,
+            conditionLeft = cmd.conditionLeft,
+            conditionTop = cmd.conditionTop,
+            conditionRight = cmd.conditionRight,
+            conditionBottom = cmd.conditionBottom,
+            conditionColorHex = cmd.conditionColorHex,
+            conditionColorTolerance = cmd.conditionColorTolerance,
+            conditionColorX = cmd.conditionColorX,
+            conditionColorY = cmd.conditionColorY
+        )
+        return checkCondition(action)
+    }
+
     private fun checkTextCondition(action: ActionStep, invert: Boolean): Boolean {
         val conditionText = action.conditionText
         if (conditionText.isNullOrEmpty()) return true
@@ -100,7 +122,8 @@ class ClickAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * Collect text from all accessibility nodes that intersect the given rect.
+     * Collect text from all accessibility leaf nodes that have meaningful overlap
+     * (≥ 25 % area ratio) with the given rect.
      * Joins them with a space for easy pre-filling into the condition editor.
      */
     fun collectTextInArea(area: Rect): String {
@@ -130,8 +153,29 @@ class ClickAccessibilityService : AccessibilityService() {
     private fun collectTextInTree(node: AccessibilityNodeInfo, area: Rect, sb: StringBuilder) {
         val nodeRect = Rect()
         node.getBoundsInScreen(nodeRect)
-        val intersects = !nodeRect.isEmpty && Rect.intersects(nodeRect, area)
-        if (intersects && node.childCount == 0) {
+        // Require meaningful overlap: at least 25% of the node's area must be
+        // inside the target rect, OR at least 25% of the target rect must be
+        // covered by the node.  This is more robust than center‑point checks
+        // (handles wide views) and stricter than bare intersects.
+        val contained = if (nodeRect.isEmpty) {
+            false
+        } else {
+            val overlap = Rect()
+            val hasOverlap = overlap.setIntersect(nodeRect, area)
+            if (!hasOverlap) {
+                false
+            } else {
+                val overlapArea = overlap.width().toLong() * overlap.height().toLong()
+                val nodeArea = nodeRect.width().toLong() * nodeRect.height().toLong()
+                val areaArea = area.width().toLong() * area.height().toLong()
+                // >= 25 % of the node or >= 25 % of the target area
+                overlapArea * 4 >= nodeArea || overlapArea * 4 >= areaArea
+            }
+        }
+        // Always recurse into nodes that intersect the area — a child may
+        // be meaningfully inside even if its parent is only partially overlapping.
+        val shouldRecurse = nodeRect.isEmpty || Rect.intersects(nodeRect, area)
+        if (contained && node.childCount == 0) {
             val text = node.text?.toString()?.trim().orEmpty()
             if (text.isNotEmpty()) {
                 if (sb.isNotEmpty()) sb.append(' ')
@@ -143,7 +187,7 @@ class ClickAccessibilityService : AccessibilityService() {
                 sb.append(desc)
             }
         }
-        if (intersects) {
+        if (shouldRecurse) {
             for (i in 0 until node.childCount) {
                 val child = node.getChild(i) ?: continue
                 collectTextInTree(child, area, sb)
@@ -192,13 +236,26 @@ class ClickAccessibilityService : AccessibilityService() {
         text: String,
         area: Rect?
     ): Boolean {
+        val nodeRect = Rect()
+        node.getBoundsInScreen(nodeRect)
+
+        // Require meaningful overlap (≥ 25 % of node area or ≥ 25 % of target area)
+        // before checking a node's text.  More robust than center‑point and
+        // stricter than bare Rect.intersects.
         val matchesArea = if (area != null) {
-            val nodeRect = Rect()
-            node.getBoundsInScreen(nodeRect)
             if (nodeRect.isEmpty) {
                 false
             } else {
-                Rect.intersects(nodeRect, area)
+                val overlap = Rect()
+                val hasOverlap = overlap.setIntersect(nodeRect, area)
+                if (!hasOverlap) {
+                    false
+                } else {
+                    val overlapArea = overlap.width().toLong() * overlap.height().toLong()
+                    val nodeArea = nodeRect.width().toLong() * nodeRect.height().toLong()
+                    val areaArea = area.width().toLong() * area.height().toLong()
+                    overlapArea * 4 >= nodeArea || overlapArea * 4 >= areaArea
+                }
             }
         } else {
             true
@@ -212,13 +269,23 @@ class ClickAccessibilityService : AccessibilityService() {
             }
         }
 
-        for (i in 0 until node.childCount) {
-            val child = node.getChild(i) ?: continue
-            if (findTextInTree(child, text, area)) {
+        // Recurse into children that intersect the area — a child may
+        // have meaningful overlap even if this node does not.
+        val shouldRecurse = if (area != null) {
+            nodeRect.isEmpty || Rect.intersects(nodeRect, area)
+        } else {
+            true
+        }
+
+        if (shouldRecurse) {
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i) ?: continue
+                if (findTextInTree(child, text, area)) {
+                    child.recycle()
+                    return true
+                }
                 child.recycle()
-                return true
             }
-            child.recycle()
         }
 
         return false

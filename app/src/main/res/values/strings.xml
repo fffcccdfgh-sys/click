@@ -123,12 +123,13 @@
     <string name="action_overlaps_control_stopped">动作位置与悬浮窗重叠，已停止</string>
     <string name="program_action">编程</string>
     <string name="program_editor_title">编程动作</string>
-    <string name="program_code_hint">输入命令，例如：\ntap(500, 800, 1)\nwait(100)\nswipe(500, 1200, 500, 300, 300)</string>
+    <string name="program_code_hint">输入 Lua 代码，例如：\ncheck_text(\'重启\', 2434, 1103, 2689, 1234)\nwhile true do\n    tap(881, 965, 1)\n    wait(1)\nend</string>
     <string name="insert_template">插入模板</string>
     <string name="test_parse">测试解析</string>
-    <string name="program_parse_success">解析成功</string>
-    <string name="program_parse_failed">解析失败</string>
-    <string name="program_template">tap(500, 800, 1)\nwait(100)\nswipe(500, 1200, 500, 300, 300)</string>
+    <string name="program_parse_success">语法检查通过</string>
+    <string name="program_parse_failed">语法错误</string>
+    <string name="program_template">check_text(\"重启\", 2434, 1103, 2689, 1234)\nwhile true do\n    tap(881, 965)\n    wait(1)\nend</string>
+    <string name="program_template_lua">check_text(\"重启\", 2434, 1103, 2689, 1234)\n\nwhile true do\n    tap(881, 965)\n    wait(1)\nend</string>
     <string name="program_action_saved">编程动作已保存</string>
     <string name="action_list_program_short">第%1$d步：编程</string>
     <string name="program_code_empty">请输入代码</string>

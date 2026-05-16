@@ -1,4 +1,4 @@
-package com.fffcccdfgh.androidclicker
+﻿package com.fffcccdfgh.androidclicker
 
 import android.annotation.SuppressLint
 import android.app.Notification
@@ -69,7 +69,7 @@ class FloatingControlService : Service() {
     private var condEditColorX: Int? = null
     private var condEditColorY: Int? = null
 
-    private enum class MarkerPointType { TAP, SWIPE_START, SWIPE_END, WAIT }
+    private enum class MarkerPointType { TAP, SWIPE_START, SWIPE_END, WAIT, PROGRAM }
     private data class MarkerBinding(val actionIndex: Int, val pointType: MarkerPointType)
 
     override fun onCreate() {
@@ -249,12 +249,6 @@ class FloatingControlService : Service() {
         view.findViewById<View>(R.id.programOption).setOnClickListener {
             addMenu.visibility = View.GONE
             showProgramEditor()
-        }
-
-        view.findViewById<View>(R.id.clearOption).setOnClickListener {
-            addMenu.visibility = View.GONE
-            clearSequence()
-            Toast.makeText(this, getString(R.string.sequence_cleared), Toast.LENGTH_SHORT).show()
         }
 
         view.findViewById<View>(R.id.saveButton).setOnClickListener {
@@ -870,6 +864,22 @@ class FloatingControlService : Service() {
                     positionMarkerViews.add(marker)
                     waitCount++
                 }
+                ActionStep.TYPE_PROGRAM -> {
+                    val progX = action.markerX ?: ((16 * density).toInt())
+                    val progY = action.markerY
+                        ?: ((80 * density).toInt() + waitCount * (56 * density).toInt())
+                    val circle = createCircleContent(markerSizePx, strokePx,
+                        0x669C27B0.toInt(), 0xFF9C27B0.toInt(),
+                        "\u7F16\u7A0B", null)  // 编程
+                    val marker = createMarkerView(circle, stepNum, labelHeightPx)
+                    val params = createMarkerParams(type, markerSizePx, winHeight, progX, progY,
+                        screenWidthPx, screenHeightPx)
+                    markerBindings[marker] = MarkerBinding(i, MarkerPointType.PROGRAM)
+                    marker.setOnTouchListener { v, event -> handleMarkerDrag(v, event, markerSizePx) }
+                    wm.addView(marker, params)
+                    positionMarkerViews.add(marker)
+                    waitCount++
+                }
             }
         }
     }
@@ -1027,6 +1037,7 @@ class FloatingControlService : Service() {
             MarkerPointType.SWIPE_START -> oldAction.copy(startX = newX, startY = newY)
             MarkerPointType.SWIPE_END -> oldAction.copy(endX = newX, endY = newY)
             MarkerPointType.WAIT -> oldAction.copy(markerX = newX, markerY = newY)
+            MarkerPointType.PROGRAM -> oldAction.copy(markerX = newX, markerY = newY)
         }
         sequence[binding.actionIndex] = updatedAction
         saveSequence(sequence)
@@ -1126,6 +1137,20 @@ class FloatingControlService : Service() {
             container.addView(option)
         }
 
+        val cancel = TextView(this).apply {
+            text = getString(R.string.cancel)
+            setTextColor(0xFFFF8888.toInt())
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setPadding(32, 16, 32, 16)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                hidePickerOverlay()
+            }
+        }
+        container.addView(cancel)
+
         wm.addView(picker, params)
     }
 
@@ -1199,8 +1224,10 @@ class FloatingControlService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
+        val editorWidth = (resources.displayMetrics.widthPixels * 0.9).toInt()
+
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            editorWidth,
             WindowManager.LayoutParams.WRAP_CONTENT,
             type,
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
@@ -1212,34 +1239,47 @@ class FloatingControlService : Service() {
         }
 
         val codeInput = editor.findViewById<EditText>(R.id.programCodeInput)
-        val delayInput = editor.findViewById<EditText>(R.id.programDelayInput)
-        val repeatInput = editor.findViewById<EditText>(R.id.programRepeatInput)
+
+        // Drag support
+        editor.findViewById<View>(R.id.programEditorTitle).setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    initialX = params.x
+                    initialY = params.y
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    params.x = initialX + (event.rawX - initialTouchX).toInt()
+                    params.y = initialY + (event.rawY - initialTouchY).toInt()
+                    wm.updateViewLayout(editor, params)
+                    true
+                }
+                else -> false
+            }
+        }
 
         if (settingsActionIndex != -1) {
             val sequence = loadSequence()
             if (settingsActionIndex < sequence.size) {
                 val action = sequence[settingsActionIndex]
                 codeInput.setText(action.code ?: "")
-                delayInput.setText((action.delayBeforeMs ?: 1L).toString())
-                repeatInput.setText((action.repeatCount ?: 1).toString())
             }
-        } else {
-            delayInput.setText("1")
-            repeatInput.setText("1")
         }
 
         editor.findViewById<View>(R.id.templateButton).setOnClickListener {
-            codeInput.setText(getString(R.string.program_template))
+            codeInput.setText(getString(R.string.program_template_lua))
         }
 
         editor.findViewById<View>(R.id.testParseButton).setOnClickListener {
             val code = codeInput.text.toString()
-            val result = ProgramActionParser.parse(code)
-            if (result.isSuccess) {
+            try {
+                val globals = org.luaj.vm2.lib.jse.JsePlatform.standardGlobals()
+                globals.load(code, "test")
                 Toast.makeText(this, getString(R.string.program_parse_success), Toast.LENGTH_SHORT).show()
-            } else {
-                val error = result.exceptionOrNull()?.message ?: getString(R.string.program_parse_failed)
-                Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, e.message ?: getString(R.string.program_parse_failed), Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -1254,20 +1294,16 @@ class FloatingControlService : Service() {
                 Toast.makeText(this, getString(R.string.program_code_empty), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            val result = ProgramActionParser.parse(code)
-            if (result.isFailure) {
-                val error = result.exceptionOrNull()?.message ?: getString(R.string.program_parse_failed)
-                Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
+            try {
+                val globals = org.luaj.vm2.lib.jse.JsePlatform.standardGlobals()
+                globals.load(code, "test")
+            } catch (e: Exception) {
+                Toast.makeText(this, e.message ?: getString(R.string.program_parse_failed), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            val delayBefore = parseMsInput(delayInput.text.toString())
-            val repeatCount = parseRepeatCount(repeatInput.text.toString())
-
-            if (repeatCount < 0) {
-                Toast.makeText(this, getString(R.string.loop_count_negative), Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
+            val delayBefore = 1L
+            val repeatCount = 1
 
             val action = ActionStep(
                 type = ActionStep.TYPE_PROGRAM,
@@ -1279,7 +1315,12 @@ class FloatingControlService : Service() {
             if (settingsActionIndex != -1) {
                 val sequence = loadSequence().toMutableList()
                 if (settingsActionIndex in sequence.indices) {
-                    sequence[settingsActionIndex] = action
+                    val oldAction = sequence[settingsActionIndex]
+                    sequence[settingsActionIndex] = oldAction.copy(
+                        code = code,
+                        delayBeforeMs = delayBefore,
+                        repeatCount = repeatCount
+                    )
                     saveSequence(sequence)
                     if (actionListVisible) renderActionList()
                     refreshMarkers()
@@ -1596,6 +1637,7 @@ class FloatingControlService : Service() {
         val colorPosRow = picker.findViewById<View>(R.id.conditionColorPosRow)
         val colorPosText = picker.findViewById<TextView>(R.id.condColorPosText)
         val selectAreaBtn = picker.findViewById<TextView>(R.id.condSelectAreaBtn)
+        val areaRangeText = picker.findViewById<TextView>(R.id.condAreaRangeText)
         val colorToleranceRow = picker.findViewById<View>(R.id.conditionColorToleranceRow)
         val colorToleranceInput = picker.findViewById<EditText>(R.id.conditionColorToleranceInput)
 
@@ -1674,6 +1716,17 @@ class FloatingControlService : Service() {
                 textInput.hint = getString(R.string.condition_text_hint)
             }
             selectAreaBtn.visibility = if (isText) View.VISIBLE else View.GONE
+            // Area range display (text type only, after area is set)
+            if (isText && condEditUseArea && condEditLeft != null && condEditRight != null
+                && condEditTop != null && condEditBottom != null) {
+                areaRangeText.visibility = View.VISIBLE
+                areaRangeText.text = getString(
+                    R.string.condition_area_range,
+                    condEditLeft!!, condEditTop!!, condEditRight!!, condEditBottom!!
+                )
+            } else {
+                areaRangeText.visibility = View.GONE
+            }
             // Color-specific controls
             colorPickBtn.visibility = if (isColor) View.VISIBLE else View.GONE
             colorToleranceRow.visibility = if (isColor) View.VISIBLE else View.GONE
@@ -1921,36 +1974,64 @@ class FloatingControlService : Service() {
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             type,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         )
 
         val selectionView = view.findViewById<AreaSelectionView>(R.id.areaSelectionView)
-        selectionView.onSelectionComplete = { left, top, right, bottom ->
-            if (left < 0) {
-                wm.removeView(view)
-                pickerView = null
-                Toast.makeText(this, getString(R.string.condition_area_too_small), Toast.LENGTH_SHORT).show()
-                showConditionPicker()
-            } else {
-                condEditLeft = left
-                condEditTop = top
-                condEditRight = right
-                condEditBottom = bottom
+        val buttonsRow = view.findViewById<View>(R.id.areaPickerButtons)
+        val saveBtn = view.findViewById<TextView>(R.id.areaPickerSaveBtn)
+        val cancelBtn = view.findViewById<TextView>(R.id.areaPickerCancelBtn)
+
+        // Restore previous area if editing an existing condition
+        selectionView.setInitialRect(condEditLeft, condEditTop, condEditRight, condEditBottom)
+
+        selectionView.onInteractionStarted = {
+            buttonsRow.visibility = View.GONE
+        }
+
+        selectionView.onInteractionFinished = {
+            buttonsRow.visibility = View.VISIBLE
+        }
+
+        saveBtn.setOnClickListener {
+            val rect = selectionView.getSelectionRect()
+            if (rect != null) {
+                // Convert view-relative coordinates to screen coordinates,
+                // matching getBoundsInScreen() used by the accessibility tree.
+                val loc = IntArray(2)
+                selectionView.getLocationOnScreen(loc)
+                val screenLeft = rect.left + loc[0]
+                val screenTop = rect.top + loc[1]
+                val screenRight = rect.right + loc[0]
+                val screenBottom = rect.bottom + loc[1]
+                condEditLeft = screenLeft
+                condEditTop = screenTop
+                condEditRight = screenRight
+                condEditBottom = screenBottom
                 condEditUseArea = true
                 // For text condition: read the text inside the selected area
                 if (condEditType == ActionStep.CONDITION_TEXT_CONTAINS) {
                     val service = ClickAccessibilityService.instance
                     if (service != null && ClickAccessibilityService.isRunning) {
-                        val areaRect = android.graphics.Rect(left, top, right, bottom)
+                        val areaRect = android.graphics.Rect(screenLeft, screenTop, screenRight, screenBottom)
                         val foundText = service.collectTextInArea(areaRect)
                         condEditText = foundText
                     }
                 }
-                wm.removeView(view)
-                pickerView = null
-                showConditionPicker()
             }
+            selectionView.cleanup()
+            wm.removeView(view)
+            pickerView = null
+            showConditionPicker()
+        }
+
+        cancelBtn.setOnClickListener {
+            selectionView.cleanup()
+            wm.removeView(view)
+            pickerView = null
+            showConditionPicker()
         }
 
         wm.addView(view, params)

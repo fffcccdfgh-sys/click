@@ -193,6 +193,16 @@
         android:textSize="14sp"
         android:visibility="gone" />
 
+    <TextView
+        android:id="@+id/condAreaRangeText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:text="@string/condition_area_none"
+        android:textColor="#AAAAAA"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
