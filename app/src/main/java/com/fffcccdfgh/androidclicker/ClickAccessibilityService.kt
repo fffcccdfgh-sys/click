@@ -130,7 +130,8 @@ class ClickAccessibilityService : AccessibilityService() {
     private fun collectTextInTree(node: AccessibilityNodeInfo, area: Rect, sb: StringBuilder) {
         val nodeRect = Rect()
         node.getBoundsInScreen(nodeRect)
-        if (!nodeRect.isEmpty && Rect.intersects(nodeRect, area)) {
+        val intersects = !nodeRect.isEmpty && Rect.intersects(nodeRect, area)
+        if (intersects && node.childCount == 0) {
             val text = node.text?.toString()?.trim().orEmpty()
             if (text.isNotEmpty()) {
                 if (sb.isNotEmpty()) sb.append(' ')
@@ -142,10 +143,12 @@ class ClickAccessibilityService : AccessibilityService() {
                 sb.append(desc)
             }
         }
-        for (i in 0 until node.childCount) {
-            val child = node.getChild(i) ?: continue
-            collectTextInTree(child, area, sb)
-            child.recycle()
+        if (intersects) {
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i) ?: continue
+                collectTextInTree(child, area, sb)
+                child.recycle()
+            }
         }
     }
 
