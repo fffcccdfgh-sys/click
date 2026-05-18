@@ -14,3 +14,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+.claude/
+docs/superpowers/
+key/
+*.apk
+app/release/
