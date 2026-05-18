@@ -1,6 +1,6 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_height="match_parent"
     android:background="@drawable/floating_control_bg"
     android:orientation="vertical"
     android:padding="16dp">
@@ -15,22 +15,115 @@
         android:layout_marginBottom="8dp"
         android:layout_gravity="center" />
 
-    <EditText
-        android:id="@+id/programCodeInput"
+    <LinearLayout
+        android:id="@+id/programEditToolbar"
         android:layout_width="match_parent"
-        android:layout_height="300dp"
-        android:textColor="@android:color/black"
-        android:textColorHint="#888888"
-        android:hint="@string/program_code_hint"
-        android:textSize="12sp"
-        android:background="#FFFFFF"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
-        android:gravity="top|start"
-        android:inputType="textMultiLine|textNoSuggestions"
-        android:scrollbars="vertical"
-        android:maxLength="4096"
-        android:layout_marginBottom="8dp" />
+        android:layout_height="34dp"
+        android:layout_marginBottom="8dp"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/programSelectAllButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/program_edit_select_all"
+            android:textColor="#FF2196F3"
+            android:textSize="13sp" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="20dp"
+            android:background="#33FFFFFF" />
+
+        <TextView
+            android:id="@+id/programCopyButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/program_edit_copy"
+            android:textColor="#FF2196F3"
+            android:textSize="13sp" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="20dp"
+            android:background="#33FFFFFF" />
+
+        <TextView
+            android:id="@+id/programCutButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/program_edit_cut"
+            android:textColor="#FFFFC107"
+            android:textSize="13sp" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="20dp"
+            android:background="#33FFFFFF" />
+
+        <TextView
+            android:id="@+id/programPasteButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/program_edit_paste"
+            android:textColor="#FF4CAF50"
+            android:textSize="13sp" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginBottom="8dp"
+        android:orientation="horizontal">
+
+        <EditText
+            android:id="@+id/programCodeInput"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:textColor="@android:color/black"
+            android:textColorHint="#888888"
+            android:hint="@string/program_code_hint"
+            android:textSize="12sp"
+            android:background="#FFFFFF"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:gravity="top|start"
+            android:inputType="textMultiLine|textNoSuggestions"
+            android:scrollbars="none"
+            android:overScrollMode="always"
+            android:maxLength="4096" />
+
+        <com.fffcccdfgh.androidclicker.ProgramCodeScrollBar
+            android:id="@+id/programCodeScrollBar"
+            android:layout_width="16dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="6dp" />
+
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -68,6 +161,82 @@
             android:gravity="center"
             android:text="@string/test_parse"
             android:textColor="#FFFFC107"
+            android:textSize="13sp" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:id="@+id/programPickTapButton"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="@string/program_pick_tap"
+            android:textColor="#FF2196F3"
+            android:textSize="13sp" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="20dp"
+            android:background="#33FFFFFF" />
+
+        <TextView
+            android:id="@+id/programPickCoordButton"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="@string/program_pick_coord"
+            android:textColor="#FF2196F3"
+            android:textSize="13sp" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="20dp"
+            android:background="#33FFFFFF" />
+
+        <TextView
+            android:id="@+id/programPickAreaButton"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="@string/program_pick_area"
+            android:textColor="#FF2196F3"
+            android:textSize="13sp" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="20dp"
+            android:background="#33FFFFFF" />
+
+        <TextView
+            android:id="@+id/programPickColorButton"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="@string/program_pick_color"
+            android:textColor="#FF2196F3"
             android:textSize="13sp" />
 
     </LinearLayout>

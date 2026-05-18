@@ -108,6 +108,32 @@ object ProgramActionExecutor {
                         )
                     }
                 })
+                globals.rawset(LuaValue.valueOf("ocr_text"), object : VarArgFunction() {
+                    override fun invoke(args: Varargs): Varargs {
+                        return LuaValue.valueOf(
+                            ClickerBridge.ocrText(
+                                args.arg(1).tojstring(),
+                                args.arg(2).checkint(),
+                                args.arg(3).checkint(),
+                                args.arg(4).checkint(),
+                                args.arg(5).checkint()
+                            )
+                        )
+                    }
+                })
+                globals.rawset(LuaValue.valueOf("ocr_text_not"), object : VarArgFunction() {
+                    override fun invoke(args: Varargs): Varargs {
+                        return LuaValue.valueOf(
+                            ClickerBridge.ocrTextNot(
+                                args.arg(1).tojstring(),
+                                args.arg(2).checkint(),
+                                args.arg(3).checkint(),
+                                args.arg(4).checkint(),
+                                args.arg(5).checkint()
+                            )
+                        )
+                    }
+                })
                 globals.rawset(LuaValue.valueOf("parallel"), object : VarArgFunction() {
                     override fun invoke(args: Varargs): Varargs {
                         val n = args.narg()

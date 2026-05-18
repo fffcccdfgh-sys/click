@@ -58,6 +58,23 @@
                 android:background="#33FFFFFF" />
 
             <TextView
+                android:id="@+id/stopPositionButton"
+                android:layout_width="44dp"
+                android:layout_height="36dp"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="@string/stop_position_action"
+                android:textColor="@android:color/white"
+                android:textSize="13sp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="24dp"
+                android:background="#33FFFFFF" />
+
+            <TextView
                 android:id="@+id/loopButton"
                 android:layout_width="44dp"
                 android:layout_height="36dp"

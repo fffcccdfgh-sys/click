@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">连点器</string>
+    <string name="app_name">click</string>
     <string name="accessibility_service_description">连点器无障碍服务用于在无 root 权限下执行自动触控操作。</string>
     <string name="status_enabled">无障碍服务：已开启</string>
     <string name="status_disabled">无障碍服务：未开启</string>
@@ -78,7 +78,7 @@
     <string name="script_exported">脚本已导出</string>
     <string name="script_imported">脚本已导入：%1$s</string>
     <string name="script_import_failed">导入失败：格式无效</string>
-    <string name="script_export_filename">脚本_%1$s.json</string>
+    <string name="script_export_filename">脚本_%1$s.lua</string>
     <string name="run_label">运行</string>
     <string name="run_action">运行</string>
     <string name="run_notification_channel">运行悬浮窗服务</string>
@@ -114,6 +114,8 @@
     <string name="loop_count_hint">0=无限循环</string>
     <string name="loop_count_negative">循环次数不能为负数</string>
     <string name="stop_action">停止</string>
+    <string name="stop_position_action">停位</string>
+    <string name="stop_position_done">完成</string>
     <string name="execution_stopped">执行已停止</string>
     <string name="loop_settings_saved">循环设置已保存</string>
     <string name="notification_stop">停止执行</string>
@@ -123,13 +125,17 @@
     <string name="action_overlaps_control_stopped">动作位置与悬浮窗重叠，已停止</string>
     <string name="program_action">编程</string>
     <string name="program_editor_title">编程动作</string>
-    <string name="program_code_hint">输入 Lua 代码，例如：\ncheck_text(\'重启\', 2434, 1103, 2689, 1234)\nwhile true do\n    tap(881, 965, 1)\n    wait(1)\nend</string>
-    <string name="insert_template">插入模板</string>
+    <string name="program_code_hint">输入 Lua 代码，例如：\nwhile true do\n    if check_text(\'重启\', 2434, 1103, 2689, 1234) then\n        tap(881, 965, 1)\n    end\n    wait(500)\nend\n\ncheck_text 会先 OCR，再用无障碍文本兜底；ocr_text 仅使用截图 OCR。</string>
+    <string name="insert_template">模板 ▾</string>
     <string name="test_parse">测试解析</string>
+    <string name="program_pick_tap">取点</string>
+    <string name="program_pick_coord">坐标</string>
+    <string name="program_pick_area">区域</string>
+    <string name="program_pick_color">取色</string>
     <string name="program_parse_success">语法检查通过</string>
     <string name="program_parse_failed">语法错误</string>
-    <string name="program_template">check_text(\"重启\", 2434, 1103, 2689, 1234)\nwhile true do\n    tap(881, 965)\n    wait(1)\nend</string>
-    <string name="program_template_lua">check_text(\"重启\", 2434, 1103, 2689, 1234)\n\nwhile true do\n    tap(881, 965)\n    wait(1)\nend</string>
+    <string name="program_template">while true do\n    if check_text(\"重启\", 2434, 1103, 2689, 1234) then\n        tap(881, 965)\n    end\n    wait(500)\nend</string>
+    <string name="program_template_lua">-- check_text: OCR 优先，无障碍文本兜底\n-- ocr_text: 仅使用截图 OCR\n\nwhile true do\n    if check_text(\"重启\", 2434, 1103, 2689, 1234) then\n        tap(881, 965)\n    end\n    wait(500)\nend</string>
     <string name="program_action_saved">编程动作已保存</string>
     <string name="action_list_program_short">第%1$d步：编程</string>
     <string name="program_code_empty">请输入代码</string>
@@ -137,13 +143,13 @@
     <string name="condition_title">条件设置</string>
     <string name="condition_type_label">条件类型：</string>
     <string name="condition_type_none">无条件</string>
-    <string name="condition_type_text_contains">识别到文字</string>
+    <string name="condition_type_text_contains">文字识别（OCR优先）</string>
     <string name="condition_type_text_not_contains">未识别到文字</string>
     <string name="condition_type_color_match">颜色识别</string>
     <string name="condition_content_label">条件内容：</string>
-    <string name="condition_text_label">识别到文字：</string>
+    <string name="condition_text_label">匹配文字：</string>
     <string name="condition_content_color_label">条件内容：颜色%1$s</string>
-    <string name="condition_text_hint">输入要匹配的文字</string>
+    <string name="condition_text_hint">输入要匹配的文字（OCR优先）</string>
     <string name="condition_color_hint">输入颜色值，例如：#FF0000</string>
     <string name="condition_text_empty">请输入条件文字</string>
     <string name="condition_color_empty">请输入颜色值</string>
@@ -169,7 +175,7 @@
     <string name="close_screen_capture">关闭屏幕捕获</string>
     <string name="screen_capture_notification_channel">屏幕捕获服务</string>
     <string name="screen_capture_notification_title">屏幕捕获已开启</string>
-    <string name="screen_capture_notification_text">颜色识别正在使用屏幕捕获</string>
+    <string name="screen_capture_notification_text">颜色和 OCR 文字识别正在使用屏幕捕获</string>
     <string name="condition_area_label">识别范围：</string>
     <string name="condition_area_fullscreen">全屏</string>
     <string name="condition_area_custom">指定范围</string>
@@ -186,4 +192,13 @@
     <string name="area_picker_instruction">拖动选择识别范围</string>
     <string name="action_list_has_condition">有条件</string>
     <string name="action_list_has_condition_area">有条件/区域</string>
+    <string name="program_edit_select_all">全选</string>
+    <string name="program_edit_copy">复制</string>
+    <string name="program_edit_cut">剪切</string>
+    <string name="program_edit_paste">粘贴</string>
+    <string name="program_edit_no_selection">请先选择代码</string>
+    <string name="program_edit_clipboard_empty">剪贴板为空</string>
+    <string name="program_edit_copied">已复制</string>
+    <string name="program_edit_cut_done">已剪切</string>
+    <string name="program_edit_pasted">已粘贴</string>
 </resources>

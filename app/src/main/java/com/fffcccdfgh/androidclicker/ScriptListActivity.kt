@@ -7,6 +7,7 @@ import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -31,7 +32,7 @@ class ScriptListActivity : AppCompatActivity() {
     }
 
     private val exportLauncher = registerForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
+        ActivityResultContracts.CreateDocument("text/x-lua")
     ) { uri: Uri? ->
         uri?.let { writeScriptToUri(it) }
     }
@@ -55,7 +56,7 @@ class ScriptListActivity : AppCompatActivity() {
         scriptListContainer = findViewById(R.id.scriptListContainer)
 
         findViewById<Button>(R.id.importScriptButton).setOnClickListener {
-            importLauncher.launch(arrayOf("application/json", "*/*"))
+            importLauncher.launch(arrayOf("text/x-lua", "text/plain", "application/json", "*/*"))
         }
     }
 
@@ -242,9 +243,9 @@ class ScriptListActivity : AppCompatActivity() {
         val script = pendingShareScript ?: return
         pendingShareScript = null
         try {
-            val json = ScriptStorage.exportScriptToJson(script)
+            val lua = ScriptStorage.exportScriptToLua(script)
             contentResolver.openOutputStream(uri)?.use { stream ->
-                stream.write(json.toByteArray(Charsets.UTF_8))
+                stream.write(lua.toByteArray(Charsets.UTF_8))
             }
             Toast.makeText(this, getString(R.string.script_exported), Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
@@ -253,10 +254,10 @@ class ScriptListActivity : AppCompatActivity() {
     }
 
     private fun shareScript(script: ScriptStorage.SavedScript) {
-        val json = ScriptStorage.exportScriptToJson(script)
+        val lua = ScriptStorage.exportScriptToLua(script)
         val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, json)
+            type = "text/x-lua"
+            putExtra(Intent.EXTRA_TEXT, lua)
             putExtra(Intent.EXTRA_SUBJECT, script.name)
         }
         startActivity(Intent.createChooser(intent, getString(R.string.share_script)))
@@ -270,11 +271,22 @@ class ScriptListActivity : AppCompatActivity() {
                 Toast.makeText(this, getString(R.string.script_import_failed), Toast.LENGTH_SHORT).show()
                 return
             }
-            val name = ScriptStorage.importScriptFromJson(this, json)
+            val name = ScriptStorage.importScriptFromText(this, json, getDisplayName(uri))
             Toast.makeText(this, getString(R.string.script_imported, name), Toast.LENGTH_SHORT).show()
             renderScriptList()
         } catch (e: Exception) {
             Toast.makeText(this, getString(R.string.script_import_failed), Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun getDisplayName(uri: Uri): String? {
+        return contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+                } else {
+                    null
+                }
+            }
     }
 }

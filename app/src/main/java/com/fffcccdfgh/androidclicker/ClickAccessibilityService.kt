@@ -57,7 +57,7 @@ class ClickAccessibilityService : AccessibilityService() {
         return checkCondition(action)
     }
 
-    private fun checkTextCondition(action: ActionStep, invert: Boolean): Boolean {
+    private suspend fun checkTextCondition(action: ActionStep, invert: Boolean): Boolean {
         val conditionText = action.conditionText
         if (conditionText.isNullOrEmpty()) return true
 
@@ -72,8 +72,30 @@ class ClickAccessibilityService : AccessibilityService() {
             null
         }
 
-        val found = findConditionText(conditionText, areaRect)
+        val foundByOcr = detectConditionTextWithOcr(conditionText, areaRect)
+        val found = TextConditionDetector.containsText(
+            targetText = conditionText,
+            ocrLookup = { foundByOcr },
+            accessibilityLookup = { findConditionText(conditionText, areaRect) }
+        )
         return if (invert) !found else found
+    }
+
+    private suspend fun detectConditionTextWithOcr(text: String, area: Rect?): Boolean {
+        if (!ScreenCaptureManager.isReady) return false
+
+        ScreenCaptureManager.refreshDisplayMetrics(this)
+        if (!ScreenCaptureManager.isReady) return false
+        val screenWidth = ScreenCaptureManager.getCaptureWidth()
+        val screenHeight = ScreenCaptureManager.getCaptureHeight()
+        return withContext(Dispatchers.Default) {
+            OcrHelper.detectText(
+                targetText = text,
+                area = area,
+                screenWidth = screenWidth,
+                screenHeight = screenHeight
+            )
+        }
     }
 
     private suspend fun checkColorCondition(action: ActionStep, invert: Boolean): Boolean {
@@ -91,22 +113,27 @@ class ClickAccessibilityService : AccessibilityService() {
             return false
         }
 
+        ScreenCaptureManager.refreshDisplayMetrics(this)
+        if (!ScreenCaptureManager.isReady) return false
+
         val image = withContext(Dispatchers.Default) {
             ScreenCaptureManager.captureFrameSync(2000L)
         } ?: return false
 
         return try {
-            val capW = ScreenCaptureManager.getCaptureWidth()
-            val capH = ScreenCaptureManager.getCaptureHeight()
-            val px = (colorX.toFloat() * capW / resources.displayMetrics.widthPixels).toInt()
-                .coerceIn(0, capW - 1)
-            val py = (colorY.toFloat() * capH / resources.displayMetrics.heightPixels).toInt()
-                .coerceIn(0, capH - 1)
+            val point = ScreenCapturePointMapper.mapScreenPointToCapturePoint(
+                screenX = colorX,
+                screenY = colorY,
+                screenWidth = ScreenCaptureManager.getCaptureWidth(),
+                screenHeight = ScreenCaptureManager.getCaptureHeight(),
+                captureWidth = image.width,
+                captureHeight = image.height
+            ) ?: return false
 
             val channelTolerance = Math.round(255f * tolerancePercent / 100f)
 
             val found = withContext(Dispatchers.Default) {
-                val pixel = ScreenCaptureManager.readPixel(image, px, py)
+                val pixel = ScreenCaptureManager.readPixel(image, point.x, point.y)
                 val r = Color.red(pixel)
                 val g = Color.green(pixel)
                 val b = Color.blue(pixel)

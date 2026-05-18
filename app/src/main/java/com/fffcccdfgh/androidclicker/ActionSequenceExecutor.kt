@@ -43,6 +43,7 @@ object ActionSequenceExecutor {
 
     fun stop() {
         if (!isRunning) return
+        ExecutionTouchInterlock.resumeDispatch()
         ProgramActionExecutor.stopLua()
         runningJob?.cancel()
         runningJob = null
@@ -53,6 +54,7 @@ object ActionSequenceExecutor {
     }
 
     private fun finishAndNotify() {
+        ExecutionTouchInterlock.resumeDispatch()
         isRunning = false
         canDispatchAction = null
         onBlocked = null
@@ -179,6 +181,8 @@ object ActionSequenceExecutor {
                 }
             }
             else -> {
+                ExecutionTouchInterlock.awaitIfPaused()
+                if (!coroutineContext.isActive) return false
                 val guard = canDispatchAction
                 if (guard != null && !guard(action)) {
                     withContext(Dispatchers.Main) { onBlocked?.invoke() }

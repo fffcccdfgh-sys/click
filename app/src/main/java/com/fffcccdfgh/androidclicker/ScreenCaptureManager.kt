@@ -24,6 +24,7 @@ object ScreenCaptureManager {
     private var virtualDisplay: VirtualDisplay? = null
     private var captureWidth: Int = 0
     private var captureHeight: Int = 0
+    private var captureDensityDpi: Int = 0
     private var backgroundThread: HandlerThread? = null
     private var backgroundHandler: Handler? = null
 
@@ -34,9 +35,10 @@ object ScreenCaptureManager {
     fun initialize(context: Context, resultCode: Int, data: Intent) {
         release()
 
-        val dm = context.resources.displayMetrics
-        captureWidth = dm.widthPixels
-        captureHeight = dm.heightPixels
+        val displayInfo = ScreenCaptureDisplayReader.current(context)
+        captureWidth = displayInfo.width
+        captureHeight = displayInfo.height
+        captureDensityDpi = displayInfo.densityDpi
 
         backgroundThread = HandlerThread("ScreenCapture").apply { start() }
         backgroundHandler = Handler(backgroundThread!!.looper)
@@ -55,13 +57,76 @@ object ScreenCaptureManager {
 
         virtualDisplay = mediaProjection?.createVirtualDisplay(
             "ScreenCapture",
-            captureWidth, captureHeight, dm.densityDpi,
+            captureWidth, captureHeight, captureDensityDpi,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
             imageReader!!.surface, null, backgroundHandler
         )
 
         isReady = virtualDisplay != null
-        Log.d(TAG, "Initialized: ${captureWidth}x${captureHeight} ready=$isReady")
+        Log.d(TAG, "Initialized: ${captureWidth}x${captureHeight} dpi=$captureDensityDpi ready=$isReady")
+    }
+
+    fun refreshDisplayMetrics(context: Context) {
+        val projection = mediaProjection ?: return
+        val handler = backgroundHandler ?: return
+        val current = ScreenCaptureDisplayReader.current(context)
+        if (!current.isValid) return
+        if (
+            current.width == captureWidth &&
+            current.height == captureHeight &&
+            current.densityDpi == captureDensityDpi &&
+            imageReader != null &&
+            virtualDisplay != null
+        ) {
+            return
+        }
+
+        Log.d(
+            TAG,
+            "Refreshing capture display: ${captureWidth}x${captureHeight}/$captureDensityDpi -> " +
+                "${current.width}x${current.height}/${current.densityDpi}"
+        )
+
+        val newReader = ImageReader.newInstance(
+            current.width,
+            current.height,
+            PixelFormat.RGBA_8888,
+            2
+        )
+        try {
+            val display = virtualDisplay
+            if (display == null) {
+                virtualDisplay = projection.createVirtualDisplay(
+                    "ScreenCapture",
+                    current.width,
+                    current.height,
+                    current.densityDpi,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                    newReader.surface,
+                    null,
+                    handler
+                )
+            } else {
+                display.resize(current.width, current.height, current.densityDpi)
+                display.setSurface(newReader.surface)
+            }
+
+            try {
+                imageReader?.close()
+            } catch (_: Exception) {}
+
+            imageReader = newReader
+            captureWidth = current.width
+            captureHeight = current.height
+            captureDensityDpi = current.densityDpi
+            isReady = virtualDisplay != null
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to refresh capture display", e)
+            try {
+                newReader.close()
+            } catch (_: Exception) {}
+            isReady = false
+        }
     }
 
     fun captureFrameSync(timeoutMs: Long = 2500L): Image? {
@@ -139,6 +204,7 @@ object ScreenCaptureManager {
 
     fun getCaptureWidth(): Int = captureWidth
     fun getCaptureHeight(): Int = captureHeight
+    fun getCaptureDensityDpi(): Int = captureDensityDpi
 
     fun release() {
         isReady = false
@@ -150,6 +216,9 @@ object ScreenCaptureManager {
             imageReader?.close()
         } catch (_: Exception) {}
         imageReader = null
+        captureWidth = 0
+        captureHeight = 0
+        captureDensityDpi = 0
         try {
             mediaProjection?.stop()
         } catch (_: Exception) {}
