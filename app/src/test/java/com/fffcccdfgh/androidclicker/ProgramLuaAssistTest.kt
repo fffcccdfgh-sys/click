@@ -19,6 +19,7 @@ class ProgramLuaAssistTest {
     @Test
     fun buildsCoordinateAndConditionSnippets() {
         assertEquals("tap(100, 200)", ProgramLuaAssist.tapSnippet(100, 200))
+        assertEquals("swipe(100, 200, 300, 400)", ProgramLuaAssist.swipeSnippet(100, 200, 300, 400))
         assertEquals("100, 200", ProgramLuaAssist.coordinateSnippet(100, 200))
         assertEquals(
             "check_text(\"文字\", 10, 20, 300, 400)",

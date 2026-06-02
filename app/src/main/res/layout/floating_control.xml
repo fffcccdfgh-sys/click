@@ -389,10 +389,34 @@
                 android:layout_marginBottom="4dp" />
 
             <LinearLayout
-                android:id="@+id/actionListContainer"
+                android:id="@+id/actionListBody"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="vertical" />
+                android:orientation="horizontal">
+
+                <ScrollView
+                    android:id="@+id/actionListScroll"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:overScrollMode="ifContentScrolls"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/actionListContainer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+
+                </ScrollView>
+
+                <com.fffcccdfgh.androidclicker.ProgramTemplateMenuScrollBar
+                    android:id="@+id/actionListScrollBar"
+                    android:layout_width="8dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="6dp"
+                    android:visibility="gone" />
+
+            </LinearLayout>
 
         </LinearLayout>
 

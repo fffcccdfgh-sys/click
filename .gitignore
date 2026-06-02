@@ -17,5 +17,6 @@ local.properties
 .claude/
 docs/superpowers/
 key/
+/key
 *.apk
 app/release/

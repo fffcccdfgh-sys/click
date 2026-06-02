@@ -209,6 +209,24 @@
             android:background="#33FFFFFF" />
 
         <TextView
+            android:id="@+id/programPickSwipeButton"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="@string/program_pick_swipe"
+            android:textColor="#FF2196F3"
+            android:textSize="13sp" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="20dp"
+            android:background="#33FFFFFF" />
+
+        <TextView
             android:id="@+id/programPickAreaButton"
             android:layout_width="0dp"
             android:layout_height="34dp"

@@ -179,6 +179,8 @@ class FloatingControlService : Service() {
         floatingView = view
 
         val wm = windowManager ?: return
+        screenWidthPx = resources.displayMetrics.widthPixels
+        screenHeightPx = resources.displayMetrics.heightPixels
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -213,6 +215,7 @@ class FloatingControlService : Service() {
                         lp.x = initialX + (event.rawX - initialTouchX).toInt()
                         lp.y = initialY + (event.rawY - initialTouchY).toInt()
                         windowManager?.updateViewLayout(view, lp)
+                        if (actionListVisible) updateActionListViewport(loadSequence().size)
                     }
                     true
                 }
@@ -395,6 +398,7 @@ class FloatingControlService : Service() {
             saveLoopSettings()
         }
 
+        bindActionListScrollBar(view)
         loadLoopSettings()
         updateLoopUI()
         updateStopPositionButton()
@@ -645,6 +649,7 @@ class FloatingControlService : Service() {
 
         if (sequence.isEmpty()) {
             header.text = getString(R.string.action_list_empty)
+            updateActionListViewport(0)
             return
         }
 
@@ -755,6 +760,59 @@ class FloatingControlService : Service() {
             row.addView(desc)
             row.addView(buttonRow)
             container.addView(row)
+        }
+        updateActionListViewport(sequence.size)
+    }
+
+    private fun bindActionListScrollBar(view: View) {
+        val scroll = view.findViewById<ScrollView>(R.id.actionListScroll)
+        val scrollBar = view.findViewById<ProgramTemplateMenuScrollBar>(R.id.actionListScrollBar)
+        scrollBar.attachTo(scroll)
+    }
+
+    private fun updateActionListViewport(itemCount: Int) {
+        val view = floatingView ?: return
+        val scroll = view.findViewById<ScrollView>(R.id.actionListScroll)
+        val scrollBar = view.findViewById<View>(R.id.actionListScrollBar)
+
+        if (itemCount <= 0) {
+            scroll.layoutParams = scroll.layoutParams.apply {
+                height = ViewGroup.LayoutParams.WRAP_CONTENT
+            }
+            scroll.scrollTo(0, 0)
+            scrollBar.visibility = View.GONE
+            return
+        }
+
+        val density = resources.displayMetrics.density
+        val rowHeightPx = (ACTION_LIST_ROW_HEIGHT_DP * density + 0.5f).toInt()
+        val maxRowsHeight = ProgramTemplateMenuLayout.popupHeight(
+            itemCount = itemCount,
+            itemHeightPx = rowHeightPx,
+            verticalPaddingPx = 0,
+            maxVisibleRows = ACTION_LIST_MAX_VISIBLE_ROWS
+        )
+        val screenHeight = (screenHeightPx.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels)
+        val panelY = (floatingParams?.y ?: 0).coerceAtLeast(0)
+        val reservedHeight = (
+            ACTION_LIST_RESERVED_HEIGHT_DP * density +
+                ACTION_LIST_BOTTOM_MARGIN_DP * density +
+                0.5f
+            ).toInt()
+        val maxByScreen = (screenHeight - panelY - reservedHeight)
+            .coerceAtLeast((ACTION_LIST_MIN_HEIGHT_DP * density + 0.5f).toInt())
+        val viewportHeight = maxRowsHeight.coerceAtMost(maxByScreen)
+
+        scroll.layoutParams = scroll.layoutParams.apply {
+            height = viewportHeight
+        }
+
+        val likelyNeedsScroll = itemCount > ACTION_LIST_MAX_VISIBLE_ROWS || maxRowsHeight > maxByScreen
+        scrollBar.visibility = if (likelyNeedsScroll) View.VISIBLE else View.GONE
+        scroll.post {
+            val contentHeight = scroll.getChildAt(0)?.height ?: 0
+            scrollBar.visibility = if (contentHeight > scroll.height) View.VISIBLE else View.GONE
+            scrollBar.invalidate()
         }
     }
 
@@ -1409,6 +1467,10 @@ class FloatingControlService : Service() {
             }
         }
 
+        editor.findViewById<View>(R.id.programPickSwipeButton).setOnClickListener {
+            startProgramSwipeAssist(codeInput)
+        }
+
         editor.findViewById<View>(R.id.programPickAreaButton).setOnClickListener {
             saveProgramDraftForAssist(codeInput)
             hidePickerOverlay()
@@ -1706,6 +1768,19 @@ class FloatingControlService : Service() {
         hidePickerOverlay()
         showPickerOverlay(PICKER_TAP_POINT) { x, y ->
             restoreProgramEditorWithSnippet(snippetBuilder(x, y))
+        }
+    }
+
+    private fun startProgramSwipeAssist(codeInput: EditText) {
+        saveProgramDraftForAssist(codeInput)
+        hidePickerOverlay()
+        showPickerOverlay(PICKER_SWIPE_START) { startX, startY ->
+            Toast.makeText(this, getString(R.string.swipe_start_set, startX, startY), Toast.LENGTH_SHORT).show()
+            showPickerOverlay(PICKER_SWIPE_END) { endX, endY ->
+                restoreProgramEditorWithSnippet(
+                    ProgramLuaAssist.swipeSnippet(startX, startY, endX, endY)
+                )
+            }
         }
     }
 
@@ -2809,5 +2884,10 @@ class FloatingControlService : Service() {
         private const val PICKER_SWIPE_END = 2
         private const val DRAG_THRESHOLD_DP = 12f
         private const val COLOR_PICK_CAPTURE_TIMEOUT_MS = 3000L
+        private const val ACTION_LIST_ROW_HEIGHT_DP = 44f
+        private const val ACTION_LIST_MAX_VISIBLE_ROWS = 15
+        private const val ACTION_LIST_MIN_HEIGHT_DP = 120f
+        private const val ACTION_LIST_RESERVED_HEIGHT_DP = 128f
+        private const val ACTION_LIST_BOTTOM_MARGIN_DP = 16f
     }
 }

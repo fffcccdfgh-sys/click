@@ -27,6 +27,10 @@ object ProgramLuaAssist {
 
     fun tapSnippet(x: Int, y: Int): String = "tap($x, $y)"
 
+    fun swipeSnippet(startX: Int, startY: Int, endX: Int, endY: Int): String {
+        return "swipe($startX, $startY, $endX, $endY)"
+    }
+
     fun coordinateSnippet(x: Int, y: Int): String = "$x, $y"
 
     fun textAreaSnippet(left: Int, top: Int, right: Int, bottom: Int): String {
