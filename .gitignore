@@ -20,3 +20,4 @@ key/
 /key
 *.apk
 app/release/
+output/imagegen/

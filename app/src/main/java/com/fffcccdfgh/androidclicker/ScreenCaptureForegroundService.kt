@@ -54,6 +54,7 @@ class ScreenCaptureForegroundService : Service() {
             if (resultCode == Activity.RESULT_OK && resultData != null) {
                 try {
                     ScreenCaptureManager.initialize(this, resultCode, resultData)
+                    OcrHelper.warmUpAsync()
                     Log.d(TAG, "Screen capture initialized")
                 } catch (e: SecurityException) {
                     Log.e(TAG, "Failed to initialize screen capture", e)

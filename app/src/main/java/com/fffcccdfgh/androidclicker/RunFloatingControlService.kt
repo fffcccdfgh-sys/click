@@ -419,10 +419,12 @@ class RunFloatingControlService : Service() {
         val btn = view.findViewById<TextView>(R.id.runStartButton)
         if (running) {
             btn.text = getString(R.string.stop_action)
-            btn.setTextColor(0xFFFF8888.toInt())
+            btn.setTextColor(Color.WHITE)
+            btn.background = getDrawable(R.drawable.floating_pill_danger)
         } else {
             btn.text = getString(R.string.start_action)
             btn.setTextColor(Color.WHITE)
+            btn.background = getDrawable(R.drawable.floating_pill_primary)
         }
     }
 

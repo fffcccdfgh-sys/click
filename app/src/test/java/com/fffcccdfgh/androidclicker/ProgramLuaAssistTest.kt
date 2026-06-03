@@ -2,6 +2,7 @@ package com.fffcccdfgh.androidclicker
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.luaj.vm2.LuaValue
 
 class ProgramLuaAssistTest {
     @Test
@@ -9,26 +10,37 @@ class ProgramLuaAssistTest {
         val result = ProgramLuaAssist.insertSnippet(
             code = "while true do\nend",
             cursor = 14,
-            snippet = "tap(100, 200)"
+            snippet = "tap(50.00, 50.00)"
         )
 
-        assertEquals("while true do\ntap(100, 200)\nend", result.code)
-        assertEquals(27, result.cursor)
+        assertEquals("while true do\ntap(50.00, 50.00)\nend", result.code)
+        assertEquals(31, result.cursor)
     }
 
     @Test
-    fun buildsCoordinateAndConditionSnippets() {
-        assertEquals("tap(100, 200)", ProgramLuaAssist.tapSnippet(100, 200))
-        assertEquals("swipe(100, 200, 300, 400)", ProgramLuaAssist.swipeSnippet(100, 200, 300, 400))
-        assertEquals("100, 200", ProgramLuaAssist.coordinateSnippet(100, 200))
+    fun buildsCoordinateAndConditionSnippetsAsPercentValues() {
+        assertEquals("tap(25.00, 50.00)", ProgramLuaAssist.tapSnippet(250, 1000, 1000, 2000))
         assertEquals(
-            "check_text(\"文字\", 10, 20, 300, 400)",
-            ProgramLuaAssist.textAreaSnippet(10, 20, 300, 400)
+            "swipe(10.00, 10.00, 30.00, 20.00)",
+            ProgramLuaAssist.swipeSnippet(100, 200, 300, 400, 1000, 2000)
+        )
+        assertEquals("12.30, 22.80", ProgramLuaAssist.coordinateSnippet(123, 456, 1000, 2000))
+        assertEquals(
+            "check_text(\"文字\", 1.00, 1.00, 30.00, 20.00)",
+            ProgramLuaAssist.textAreaSnippet(10, 20, 300, 400, 1000, 2000)
         )
         assertEquals(
-            "check_color(\"#AABBCC\", 10, 123, 456)",
-            ProgramLuaAssist.colorSnippet("#AABBCC", 123, 456)
+            "check_color(\"#AABBCC\", 10, 12.30, 22.80)",
+            ProgramLuaAssist.colorSnippet("#AABBCC", 123, 456, 1000, 2000)
         )
+    }
+
+    @Test
+    fun convertsPercentArgsToCurrentScreenPixels() {
+        assertEquals(360, ProgramCoordinateAdapter.xArgToPointPx(LuaValue.valueOf(25.00), 1440))
+        assertEquals(1600, ProgramCoordinateAdapter.yArgToPointPx(LuaValue.valueOf(50.00), 3200))
+        assertEquals(1439, ProgramCoordinateAdapter.xArgToPointPx(LuaValue.valueOf(100.00), 1440))
+        assertEquals(1440, ProgramCoordinateAdapter.xArgToEdgePx(LuaValue.valueOf(100.00), 1440))
     }
 
     @Test
@@ -49,9 +61,13 @@ class ProgramLuaAssistTest {
             ),
             templates.map { it.id }
         )
-        assertEquals("tap(100, 200)", templates.first { it.id == "tap" }.snippet)
+        assertEquals("tap(50.00, 50.00)", templates.first { it.id == "tap" }.snippet)
         assertEquals(
-            "if check_color(\"#FF0000\", 10, 100, 200) then\n    tap(100, 200)\nend",
+            "while true do\nwait(500)\nend",
+            templates.first { it.id == "loop_forever" }.snippet
+        )
+        assertEquals(
+            "if check_color(\"#FF0000\", 10, 50.00, 50.00) then\ntap(50.00, 50.00)\nend",
             templates.first { it.id == "check_color_tap" }.snippet
         )
     }

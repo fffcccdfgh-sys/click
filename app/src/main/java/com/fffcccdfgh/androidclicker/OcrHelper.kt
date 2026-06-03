@@ -2,6 +2,7 @@ package com.fffcccdfgh.androidclicker
 
 import android.graphics.Bitmap
 import android.graphics.Rect
+import android.os.SystemClock
 import android.util.Log
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
@@ -10,16 +11,19 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Optical Character Recognition helper using ML Kit Chinese recognizer.
  */
 object OcrHelper {
     private const val TAG = "OcrHelper"
+    private const val WARM_UP_BITMAP_SIZE = 32
 
     private val recognizer: TextRecognizer by lazy {
         TextRecognition.getClient(ChineseTextRecognizerOptions.Builder().build())
     }
+    private val warmUpStarted = AtomicBoolean(false)
 
     /**
      * Run OCR on the current screen and search for [targetText] within [area].
@@ -29,24 +33,28 @@ object OcrHelper {
         targetText: String,
         area: Rect?,
         screenWidth: Int,
-        screenHeight: Int
+        screenHeight: Int,
+        filterMode: String? = null
     ): Boolean {
         if (targetText.isEmpty()) return true
         return recognizeText(
             area = area,
             screenWidth = screenWidth,
-            screenHeight = screenHeight
+            screenHeight = screenHeight,
+            filterMode = filterMode
         ).contains(targetText)
     }
 
     fun recognizeText(
         area: Rect?,
         screenWidth: Int,
-        screenHeight: Int
+        screenHeight: Int,
+        captureTimeoutMs: Long = OcrTimingPolicy.DEFAULT_CAPTURE_TIMEOUT_MS,
+        filterMode: String? = null
     ): String {
-        val bitmap = captureAreaBitmap(area, screenWidth, screenHeight) ?: return ""
+        val bitmap = captureAreaBitmap(area, screenWidth, screenHeight, captureTimeoutMs) ?: return ""
         return try {
-            recognizeTextFromBitmap(bitmap)
+            recognizeTextFromBitmap(bitmap, filterMode)
         } finally {
             bitmap.recycle()
         }
@@ -55,69 +63,86 @@ object OcrHelper {
     fun captureAreaBitmap(
         area: Rect?,
         screenWidth: Int,
-        screenHeight: Int
+        screenHeight: Int,
+        timeoutMs: Long = OcrTimingPolicy.DEFAULT_CAPTURE_TIMEOUT_MS
     ): Bitmap? {
         if (!ScreenCaptureManager.isReady) {
             Log.d(TAG, "OCR skipped: screen capture is not ready")
             return null
         }
 
-        val image = ScreenCaptureManager.captureFrameSync(3000L) ?: run {
+        val image = ScreenCaptureManager.captureFrameSync(timeoutMs) ?: run {
             Log.d(TAG, "OCR skipped: failed to capture a frame")
             return null
         }
-        var sourceBitmap: Bitmap? = null
         return try {
-            sourceBitmap = ScreenCaptureManager.imageToBitmap(image)
-            val capturedBitmap = sourceBitmap ?: return null
             val captureArea = mapCaptureArea(
                 area = area,
                 screenWidth = screenWidth,
                 screenHeight = screenHeight,
-                captureWidth = capturedBitmap.width,
-                captureHeight = capturedBitmap.height
+                captureWidth = image.width,
+                captureHeight = image.height
             ) ?: return null
 
             if (
                 captureArea.left == 0 &&
                 captureArea.top == 0 &&
-                captureArea.right == capturedBitmap.width &&
-                captureArea.bottom == capturedBitmap.height
+                captureArea.right == image.width &&
+                captureArea.bottom == image.height
             ) {
-                val result = capturedBitmap
-                sourceBitmap = null
-                result
+                ScreenCaptureManager.imageToBitmap(image)
             } else {
-                Bitmap.createBitmap(
-                    capturedBitmap,
-                    captureArea.left,
-                    captureArea.top,
-                    captureArea.width,
-                    captureArea.height
-                )
+                OcrImageCropper.cropImageAreaToBitmap(image, captureArea)
             }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to crop OCR bitmap", e)
             null
         } finally {
-            sourceBitmap?.recycle()
             image.close()
         }
     }
 
-    fun recognizeTextFromBitmap(bitmap: Bitmap): String {
-        return processBitmapText(bitmap) { result ->
-            result.text.trim()
-        } ?: ""
+    fun recognizeTextFromBitmap(bitmap: Bitmap, filterMode: String? = null): String {
+        val filteredBitmap = OcrBitmapFilter.apply(bitmap, filterMode)
+        return try {
+            processBitmapText(filteredBitmap) { result ->
+                result.text.trim()
+            } ?: ""
+        } finally {
+            if (filteredBitmap !== bitmap) {
+                filteredBitmap.recycle()
+            }
+        }
+    }
+
+    fun warmUpAsync() {
+        if (!warmUpStarted.compareAndSet(false, true)) return
+        Thread {
+            val startedAt = SystemClock.uptimeMillis()
+            val bitmap = Bitmap.createBitmap(
+                WARM_UP_BITMAP_SIZE,
+                WARM_UP_BITMAP_SIZE,
+                Bitmap.Config.ARGB_8888
+            )
+            try {
+                processBitmapText(bitmap, OcrTimingPolicy.WARM_UP_RECOGNITION_TIMEOUT_MS) { Unit }
+                Log.d(TAG, "OCR warm-up finished in ${SystemClock.uptimeMillis() - startedAt}ms")
+            } catch (e: Exception) {
+                Log.w(TAG, "OCR warm-up failed", e)
+            } finally {
+                bitmap.recycle()
+            }
+        }.start()
     }
 
     private fun <T> processBitmapText(
         bitmap: Bitmap,
+        timeoutMs: Long = 5000L,
         handleResult: (Text) -> T
     ): T? {
         return try {
             val inputImage = InputImage.fromBitmap(bitmap, 0)
-            val result = Tasks.await(recognizer.process(inputImage), 5, TimeUnit.SECONDS)
+            val result = Tasks.await(recognizer.process(inputImage), timeoutMs, TimeUnit.MILLISECONDS)
             if (result == null) return null
 
             handleResult(result)

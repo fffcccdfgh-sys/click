@@ -155,22 +155,24 @@ object ActionSequenceExecutor {
         service: ClickAccessibilityService,
         action: ActionStep
     ): Boolean {
-        if (!service.checkCondition(action)) {
+        val runtimeAction = ProgramCoordinateAdapter.storedActionToRuntimePx(action, currentScreenSize(service))
+
+        if (!service.checkCondition(runtimeAction)) {
             return false
         }
 
-        val delayBefore = action.delayBeforeMs ?: 1L
+        val delayBefore = runtimeAction.delayBeforeMs ?: 1L
         if (delayBefore > 0) {
             delay(delayBefore)
             if (!coroutineContext.isActive) return false
         }
 
-        when (action.type) {
+        when (runtimeAction.type) {
             ActionStep.TYPE_WAIT -> {
-                delay((action.durationMs ?: 1L).coerceAtLeast(1L))
+                delay((runtimeAction.durationMs ?: 1L).coerceAtLeast(1L))
             }
             ActionStep.TYPE_PROGRAM -> {
-                val code = action.code
+                val code = runtimeAction.code
                 if (code != null) {
                     ProgramActionExecutor.execute(
                         service,
@@ -184,14 +186,25 @@ object ActionSequenceExecutor {
                 ExecutionTouchInterlock.awaitIfPaused()
                 if (!coroutineContext.isActive) return false
                 val guard = canDispatchAction
-                if (guard != null && !guard(action)) {
+                if (guard != null && !guard(runtimeAction)) {
                     withContext(Dispatchers.Main) { onBlocked?.invoke() }
                     stop()
                     return true
                 }
-                service.dispatchGestureAwait(action)
+                service.dispatchGestureAwait(runtimeAction)
             }
         }
         return true
+    }
+
+    private fun currentScreenSize(service: ClickAccessibilityService): ProgramScreenSize {
+        ScreenCaptureManager.refreshDisplayMetrics(service)
+        val captureWidth = ScreenCaptureManager.getCaptureWidth()
+        val captureHeight = ScreenCaptureManager.getCaptureHeight()
+        if (captureWidth > 0 && captureHeight > 0) {
+            return ProgramScreenSize(captureWidth, captureHeight)
+        }
+        val display = ScreenCaptureDisplayReader.current(service)
+        return ProgramScreenSize(display.width, display.height)
     }
 }

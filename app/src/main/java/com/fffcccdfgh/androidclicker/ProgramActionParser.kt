@@ -23,127 +23,146 @@ object ProgramActionParser {
             val lineNum = startLineNum + i + 1
             val trimmed = lines[i].trim()
 
-            if (trimmed.isEmpty()) { i++; continue }
-            if (trimmed.startsWith("//")) { i++; continue }
+            if (trimmed.isEmpty() || trimmed.startsWith("//") || trimmed.startsWith("--")) {
+                i++
+                continue
+            }
 
             if (trimmed == "}") {
-                if (!untilBrace) {
-                    throw ParseException("第${lineNum}行：多余的 '}'", lineNum)
-                }
+                if (!untilBrace) throw ParseException("Line $lineNum: extra '}'", lineNum)
                 return BlockResult(commands, i + 1)
             }
 
             when {
-                trimmed.startsWith("tap(") -> {
-                    commands.add(parseTap(trimmed, lineNum))
-                }
-                trimmed.startsWith("swipe(") -> {
-                    commands.add(parseSwipe(trimmed, lineNum))
-                }
-                trimmed.startsWith("wait(") -> {
-                    commands.add(parseWait(trimmed, lineNum))
-                }
-                trimmed.startsWith("cond(") -> {
-                    commands.add(parseCond(trimmed, lineNum))
-                }
+                trimmed.startsWith("tap(") -> commands.add(parseTap(trimmed, lineNum))
+                trimmed.startsWith("swipe(") -> commands.add(parseSwipe(trimmed, lineNum))
+                trimmed.startsWith("wait(") -> commands.add(parseWait(trimmed, lineNum))
+                trimmed.startsWith("cond(") -> commands.add(parseCond(trimmed, lineNum))
                 trimmed.startsWith("repeat(") && trimmed.endsWith("{") -> {
                     val count = parseRepeatHeader(trimmed, lineNum)
-                    val bodyLines = lines.drop(i + 1)
-                    val bodyResult = parseBlock(bodyLines, lineNum, untilBrace = true)
+                    val bodyResult = parseBlock(lines.drop(i + 1), lineNum, untilBrace = true)
                     commands.add(ProgramCommand.RepeatCmd(count, bodyResult.commands))
                     i += 1 + bodyResult.consumed
                 }
-                else -> throw ParseException("第${lineNum}行：无法识别的命令", lineNum)
+                else -> throw ParseException("Line $lineNum: unknown command", lineNum)
             }
             i++
         }
-        if (untilBrace) {
-            throw ParseException("第${startLineNum}行：repeat 块缺少 '}'", startLineNum)
-        }
+        if (untilBrace) throw ParseException("Line $startLineNum: repeat block missing '}'", startLineNum)
         return BlockResult(commands, i)
     }
 
     private fun parseTap(line: String, lineNum: Int): ProgramCommand.TapCmd {
-        val args = extractArgs(line, "tap", 3, lineNum)
-        val x = args[0].toIntOrNull() ?: throw ParseException("第${lineNum}行：tap x 必须为整数", lineNum)
-        val y = args[1].toIntOrNull() ?: throw ParseException("第${lineNum}行：tap y 必须为整数", lineNum)
-        val dur = args[2].toLongOrNull() ?: throw ParseException("第${lineNum}行：tap durationMs 必须为整数", lineNum)
-        if (dur < 1) throw ParseException("第${lineNum}行：durationMs 必须 >= 1", lineNum)
+        val args = extractArgs(line, "tap", lineNum, 2, 3)
+        val x = parsePercentCoordinate(args[0], "tap x", lineNum)
+        val y = parsePercentCoordinate(args[1], "tap y", lineNum)
+        val dur = if (args.size >= 3) parsePositiveLong(args[2], "tap durationMs", lineNum) else 1L
         return ProgramCommand.TapCmd(x, y, dur)
     }
 
     private fun parseSwipe(line: String, lineNum: Int): ProgramCommand.SwipeCmd {
-        val args = extractArgs(line, "swipe", 5, lineNum)
-        val sx = args[0].toIntOrNull() ?: throw ParseException("第${lineNum}行：swipe startX 必须为整数", lineNum)
-        val sy = args[1].toIntOrNull() ?: throw ParseException("第${lineNum}行：swipe startY 必须为整数", lineNum)
-        val ex = args[2].toIntOrNull() ?: throw ParseException("第${lineNum}行：swipe endX 必须为整数", lineNum)
-        val ey = args[3].toIntOrNull() ?: throw ParseException("第${lineNum}行：swipe endY 必须为整数", lineNum)
-        val dur = args[4].toLongOrNull() ?: throw ParseException("第${lineNum}行：swipe durationMs 必须为整数", lineNum)
-        if (dur < 1) throw ParseException("第${lineNum}行：durationMs 必须 >= 1", lineNum)
+        val args = extractArgs(line, "swipe", lineNum, 4, 5)
+        val sx = parsePercentCoordinate(args[0], "swipe startX", lineNum)
+        val sy = parsePercentCoordinate(args[1], "swipe startY", lineNum)
+        val ex = parsePercentCoordinate(args[2], "swipe endX", lineNum)
+        val ey = parsePercentCoordinate(args[3], "swipe endY", lineNum)
+        val dur = if (args.size >= 5) parsePositiveLong(args[4], "swipe durationMs", lineNum) else 300L
         return ProgramCommand.SwipeCmd(sx, sy, ex, ey, dur)
     }
 
     private fun parseWait(line: String, lineNum: Int): ProgramCommand.WaitCmd {
-        val args = extractArgs(line, "wait", 1, lineNum)
-        val ms = args[0].toLongOrNull() ?: throw ParseException("第${lineNum}行：wait ms 必须为整数", lineNum)
-        if (ms < 1) throw ParseException("第${lineNum}行：ms 必须 >= 1", lineNum)
-        return ProgramCommand.WaitCmd(ms)
+        val args = extractArgs(line, "wait", lineNum, 1, 1)
+        return ProgramCommand.WaitCmd(parsePositiveLong(args[0], "wait ms", lineNum))
     }
 
     private fun parseRepeatHeader(line: String, lineNum: Int): Int {
         val inner = line.substringAfter("repeat(").substringBefore(")").trim()
-        val count = inner.toIntOrNull() ?: throw ParseException("第${lineNum}行：repeat count 必须为整数", lineNum)
-        if (count < 0) throw ParseException("第${lineNum}行：repeat count 必须 >= 0", lineNum)
+        val count = inner.toIntOrNull() ?: throw ParseException("Line $lineNum: repeat count must be an integer", lineNum)
+        if (count < 0) throw ParseException("Line $lineNum: repeat count must be >= 0", lineNum)
         return count
     }
 
     private fun parseCond(line: String, lineNum: Int): ProgramCommand.ConditionCmd {
-        val start = line.indexOf('(')
-        val end = line.lastIndexOf(')')
-        if (start == -1 || end == -1 || start >= end) {
-            throw ParseException("第${lineNum}行：cond 参数格式错误", lineNum)
-        }
-        val inner = line.substring(start + 1, end)
-        val parts = inner.split(",").map { it.trim().removeSurrounding("\"") }
+        val parts = extractArgs(line, "cond", lineNum, 5, 6).map { it.removeSurrounding("\"") }
+        val condType = parts[0]
 
-        val condType = parts.getOrNull(0)
-            ?: throw ParseException("第${lineNum}行：cond 缺少条件类型", lineNum)
-
-        return when {
-            condType == "text_contains" || condType == "text_not_contains" -> {
-                if (parts.size != 6) throw ParseException(
-                    "第${lineNum}行：$condType 需要 6 个参数 (类型, 文字, left, top, right, bottom), 实际 ${parts.size}", lineNum)
-                val text = parts[1].ifEmpty { throw ParseException("第${lineNum}行：$condType 匹配文字不能为空", lineNum) }
-                val l = parts[2].toIntOrNull() ?: throw ParseException("第${lineNum}行：$condType left 必须为整数", lineNum)
-                val t = parts[3].toIntOrNull() ?: throw ParseException("第${lineNum}行：$condType top 必须为整数", lineNum)
-                val r = parts[4].toIntOrNull() ?: throw ParseException("第${lineNum}行：$condType right 必须为整数", lineNum)
-                val b = parts[5].toIntOrNull() ?: throw ParseException("第${lineNum}行：$condType bottom 必须为整数", lineNum)
-                ProgramCommand.ConditionCmd(condType, text, l, t, r, b, null, null, null, null)
+        return when (condType) {
+            "text_contains", "text_not_contains" -> {
+                if (parts.size != 6) {
+                    throw ParseException("Line $lineNum: $condType needs 6 arguments", lineNum)
+                }
+                val text = parts[1].ifEmpty {
+                    throw ParseException("Line $lineNum: $condType text cannot be empty", lineNum)
+                }
+                ProgramCommand.ConditionCmd(
+                    conditionType = condType,
+                    conditionText = text,
+                    conditionLeft = parsePercentCoordinate(parts[2], "$condType left", lineNum),
+                    conditionTop = parsePercentCoordinate(parts[3], "$condType top", lineNum),
+                    conditionRight = parsePercentCoordinate(parts[4], "$condType right", lineNum),
+                    conditionBottom = parsePercentCoordinate(parts[5], "$condType bottom", lineNum),
+                    conditionColorHex = null,
+                    conditionColorTolerance = null,
+                    conditionColorX = null,
+                    conditionColorY = null
+                )
             }
-            condType == "color_match" || condType == "color_not_match" -> {
-                if (parts.size != 5) throw ParseException(
-                    "第${lineNum}行：$condType 需要 5 个参数 (类型, 颜色值, 容差%, x, y), 实际 ${parts.size}", lineNum)
-                val hex = parts[1].ifEmpty { throw ParseException("第${lineNum}行：$condType 颜色值不能为空", lineNum) }
-                val tol = parts[2].toIntOrNull() ?: throw ParseException("第${lineNum}行：$condType 容差必须为整数", lineNum)
-                val x = parts[3].toIntOrNull() ?: throw ParseException("第${lineNum}行：$condType x 必须为整数", lineNum)
-                val y = parts[4].toIntOrNull() ?: throw ParseException("第${lineNum}行：$condType y 必须为整数", lineNum)
-                ProgramCommand.ConditionCmd(condType, null, null, null, null, null, hex, tol, x, y)
+            "color_match", "color_not_match" -> {
+                if (parts.size != 5) {
+                    throw ParseException("Line $lineNum: $condType needs 5 arguments", lineNum)
+                }
+                val hex = parts[1].ifEmpty {
+                    throw ParseException("Line $lineNum: $condType color cannot be empty", lineNum)
+                }
+                ProgramCommand.ConditionCmd(
+                    conditionType = condType,
+                    conditionText = null,
+                    conditionLeft = null,
+                    conditionTop = null,
+                    conditionRight = null,
+                    conditionBottom = null,
+                    conditionColorHex = hex,
+                    conditionColorTolerance = parseInt(parts[2], "$condType tolerance", lineNum),
+                    conditionColorX = parsePercentCoordinate(parts[3], "$condType x", lineNum),
+                    conditionColorY = parsePercentCoordinate(parts[4], "$condType y", lineNum)
+                )
             }
-            else -> throw ParseException("第${lineNum}行：未知的条件类型 \"$condType\"", lineNum)
+            else -> throw ParseException("Line $lineNum: unknown condition type '$condType'", lineNum)
         }
     }
 
-    private fun extractArgs(line: String, cmdName: String, expectedCount: Int, lineNum: Int): List<String> {
+    private fun extractArgs(
+        line: String,
+        cmdName: String,
+        lineNum: Int,
+        minCount: Int,
+        maxCount: Int
+    ): List<String> {
         val start = line.indexOf('(')
         val end = line.lastIndexOf(')')
         if (start == -1 || end == -1 || start >= end) {
-            throw ParseException("第${lineNum}行：$cmdName 参数格式错误", lineNum)
+            throw ParseException("Line $lineNum: $cmdName arguments are malformed", lineNum)
         }
-        val inner = line.substring(start + 1, end)
-        val parts = inner.split(",").map { it.trim() }
-        if (parts.size != expectedCount) {
-            throw ParseException("第${lineNum}行：$cmdName 需要 $expectedCount 个参数，实际 ${parts.size} 个", lineNum)
+        val parts = line.substring(start + 1, end).split(",").map { it.trim() }
+        if (parts.size !in minCount..maxCount) {
+            val expected = if (minCount == maxCount) "$minCount" else "$minCount-$maxCount"
+            throw ParseException("Line $lineNum: $cmdName needs $expected arguments, got ${parts.size}", lineNum)
         }
         return parts
+    }
+
+    private fun parsePercentCoordinate(value: String, label: String, lineNum: Int): Int {
+        return ProgramCoordinateAdapter.parseStoredPercentArg(value)
+            ?: throw ParseException("Line $lineNum: $label must be a percent number", lineNum)
+    }
+
+    private fun parsePositiveLong(value: String, label: String, lineNum: Int): Long {
+        val parsed = value.toLongOrNull() ?: throw ParseException("Line $lineNum: $label must be an integer", lineNum)
+        if (parsed < 1) throw ParseException("Line $lineNum: $label must be >= 1", lineNum)
+        return parsed
+    }
+
+    private fun parseInt(value: String, label: String, lineNum: Int): Int {
+        return value.toIntOrNull() ?: throw ParseException("Line $lineNum: $label must be an integer", lineNum)
     }
 }

@@ -1,307 +1,293 @@
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/programEditorRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/floating_control_bg"
+    android:background="@drawable/floating_panel_bg"
+    android:elevation="4dp"
     android:orientation="vertical"
-    android:padding="16dp">
-
-    <TextView
-        android:id="@+id/programEditorTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/program_editor_title"
-        android:textColor="@android:color/white"
-        android:textSize="14sp"
-        android:layout_marginBottom="8dp"
-        android:layout_gravity="center" />
+    android:padding="12dp">
 
     <LinearLayout
-        android:id="@+id/programEditToolbar"
+        android:id="@+id/programEditorHeader"
         android:layout_width="match_parent"
-        android:layout_height="34dp"
-        android:layout_marginBottom="8dp"
-        android:gravity="center"
+        android:layout_height="42dp"
+        android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <TextView
-            android:id="@+id/programSelectAllButton"
+            android:id="@+id/programEditorTitle"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="false"
-            android:gravity="center"
-            android:text="@string/program_edit_select_all"
-            android:textColor="#FF2196F3"
-            android:textSize="13sp" />
-
-        <View
-            android:layout_width="1dp"
-            android:layout_height="20dp"
-            android:background="#33FFFFFF" />
+            android:ellipsize="end"
+            android:gravity="center_vertical"
+            android:maxLines="1"
+            android:paddingStart="4dp"
+            android:paddingEnd="12dp"
+            android:text="@string/program_editor_title"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/programCopyButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="false"
-            android:gravity="center"
-            android:text="@string/program_edit_copy"
-            android:textColor="#FF2196F3"
-            android:textSize="13sp" />
-
-        <View
-            android:layout_width="1dp"
-            android:layout_height="20dp"
-            android:background="#33FFFFFF" />
-
-        <TextView
-            android:id="@+id/programCutButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="false"
-            android:gravity="center"
-            android:text="@string/program_edit_cut"
-            android:textColor="#FFFFC107"
-            android:textSize="13sp" />
-
-        <View
-            android:layout_width="1dp"
-            android:layout_height="20dp"
-            android:background="#33FFFFFF" />
-
-        <TextView
-            android:id="@+id/programPasteButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="false"
-            android:gravity="center"
-            android:text="@string/program_edit_paste"
-            android:textColor="#FF4CAF50"
-            android:textSize="13sp" />
-
+            android:id="@+id/programCloseButton"
+            style="@style/FloatingControlDangerPill"
+            android:text="@string/close_button" />
     </LinearLayout>
 
-    <LinearLayout
+    <ScrollView
+        android:id="@+id/programEditorScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginBottom="8dp"
-        android:orientation="horizontal">
+        android:fillViewport="true"
+        android:overScrollMode="ifContentScrolls">
 
-        <EditText
-            android:id="@+id/programCodeInput"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:textColor="@android:color/black"
-            android:textColorHint="#888888"
-            android:hint="@string/program_code_hint"
-            android:textSize="12sp"
-            android:background="#FFFFFF"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:gravity="top|start"
-            android:inputType="textMultiLine|textNoSuggestions"
-            android:scrollbars="none"
-            android:overScrollMode="always"
-            android:maxLength="4096" />
+        <LinearLayout
+            android:id="@+id/programEditorContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
-        <com.fffcccdfgh.androidclicker.ProgramCodeScrollBar
-            android:id="@+id/programCodeScrollBar"
-            android:layout_width="16dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="6dp" />
+            <LinearLayout
+                android:id="@+id/programEditToolbar"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/floating_control_bg"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp">
 
-    </LinearLayout>
+                <TextView
+                    android:id="@+id/programSelectAllButton"
+                    style="@style/FloatingControlSecondaryPill"
+                    android:layout_width="0dp"
+                    android:layout_height="30dp"
+                    android:layout_weight="1"
+                    android:minWidth="0dp"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:text="@string/program_edit_select_all"
+                    android:textSize="12sp" />
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:layout_marginBottom="8dp">
+                <TextView
+                    android:id="@+id/programCopyButton"
+                    style="@style/FloatingControlSecondaryPill"
+                    android:layout_width="0dp"
+                    android:layout_height="30dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:minWidth="0dp"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:text="@string/program_edit_copy"
+                    android:textSize="12sp" />
 
-        <TextView
-            android:id="@+id/templateButton"
-            android:layout_width="0dp"
-            android:layout_height="34dp"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/insert_template"
-            android:textColor="#FF2196F3"
-            android:textSize="13sp" />
+                <TextView
+                    android:id="@+id/programCutButton"
+                    style="@style/FloatingControlWarningPill"
+                    android:layout_width="0dp"
+                    android:layout_height="30dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:minWidth="0dp"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:text="@string/program_edit_cut"
+                    android:textSize="12sp" />
 
-        <View
-            android:layout_width="1dp"
-            android:layout_height="20dp"
-            android:background="#33FFFFFF" />
+                <TextView
+                    android:id="@+id/programPasteButton"
+                    style="@style/FloatingControlSuccessPill"
+                    android:layout_width="0dp"
+                    android:layout_height="30dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:minWidth="0dp"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:text="@string/program_edit_paste"
+                    android:textSize="12sp" />
 
-        <TextView
-            android:id="@+id/testParseButton"
-            android:layout_width="0dp"
-            android:layout_height="34dp"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/test_parse"
-            android:textColor="#FFFFC107"
-            android:textSize="13sp" />
+                <TextView
+                    android:id="@+id/templateButton"
+                    style="@style/FloatingControlPrimaryPill"
+                    android:layout_width="0dp"
+                    android:layout_height="30dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:minWidth="0dp"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:text="@string/insert_template"
+                    android:textSize="12sp" />
+            </LinearLayout>
 
-    </LinearLayout>
+            <LinearLayout
+                android:id="@+id/programCodePanel"
+                android:layout_width="match_parent"
+                android:layout_height="240dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/floating_control_bg"
+                android:orientation="horizontal"
+                android:padding="8dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:layout_marginBottom="8dp">
+                <com.fffcccdfgh.androidclicker.ProgramLineNumberView
+                    android:id="@+id/programLineNumbers"
+                    android:layout_width="36dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="6dp" />
 
-        <TextView
-            android:id="@+id/programPickTapButton"
-            android:layout_width="0dp"
-            android:layout_height="34dp"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/program_pick_tap"
-            android:textColor="#FF2196F3"
-            android:textSize="13sp" />
+                <EditText
+                    android:id="@+id/programCodeInput"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="#0B1020"
+                    android:gravity="top|start"
+                    android:hint="@string/program_code_hint"
+                    android:inputType="textMultiLine|textNoSuggestions"
+                    android:maxLength="4096"
+                    android:overScrollMode="always"
+                    android:paddingStart="10dp"
+                    android:paddingTop="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="10dp"
+                    android:scrollbars="none"
+                    android:textColor="#DBEAFE"
+                    android:textColorHint="#64748B"
+                    android:textSize="12sp" />
 
-        <View
-            android:layout_width="1dp"
-            android:layout_height="20dp"
-            android:background="#33FFFFFF" />
+                <com.fffcccdfgh.androidclicker.ProgramCodeScrollBar
+                    android:id="@+id/programCodeScrollBar"
+                    android:layout_width="12dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="6dp" />
+            </LinearLayout>
 
-        <TextView
-            android:id="@+id/programPickCoordButton"
-            android:layout_width="0dp"
-            android:layout_height="34dp"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/program_pick_coord"
-            android:textColor="#FF2196F3"
-            android:textSize="13sp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="插入工具"
+                android:textColor="#94A3B8"
+                android:textSize="12sp" />
 
-        <View
-            android:layout_width="1dp"
-            android:layout_height="20dp"
-            android:background="#33FFFFFF" />
+            <LinearLayout
+                android:id="@+id/programInsertTools"
+                android:layout_width="match_parent"
+                android:layout_height="86dp"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/floating_control_bg"
+                android:orientation="vertical"
+                android:padding="6dp">
 
-        <TextView
-            android:id="@+id/programPickSwipeButton"
-            android:layout_width="0dp"
-            android:layout_height="34dp"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/program_pick_swipe"
-            android:textColor="#FF2196F3"
-            android:textSize="13sp" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:orientation="horizontal">
 
-        <View
-            android:layout_width="1dp"
-            android:layout_height="20dp"
-            android:background="#33FFFFFF" />
+                    <TextView
+                        android:id="@+id/programPickTapButton"
+                        style="@style/FloatingControlSecondaryPill"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:minWidth="0dp"
+                        android:paddingStart="0dp"
+                        android:paddingEnd="0dp"
+                        android:text="@string/program_pick_tap"
+                        android:textSize="12sp" />
 
-        <TextView
-            android:id="@+id/programPickAreaButton"
-            android:layout_width="0dp"
-            android:layout_height="34dp"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/program_pick_area"
-            android:textColor="#FF2196F3"
-            android:textSize="13sp" />
+                    <TextView
+                        android:id="@+id/programPickCoordButton"
+                        style="@style/FloatingControlSecondaryPill"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:minWidth="0dp"
+                        android:paddingStart="0dp"
+                        android:paddingEnd="0dp"
+                        android:text="@string/program_pick_coord"
+                        android:textSize="12sp" />
 
-        <View
-            android:layout_width="1dp"
-            android:layout_height="20dp"
-            android:background="#33FFFFFF" />
+                    <TextView
+                        android:id="@+id/programPickSwipeButton"
+                        style="@style/FloatingControlSecondaryPill"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:minWidth="0dp"
+                        android:paddingStart="0dp"
+                        android:paddingEnd="0dp"
+                        android:text="@string/program_pick_swipe"
+                        android:textSize="12sp" />
+                </LinearLayout>
 
-        <TextView
-            android:id="@+id/programPickColorButton"
-            android:layout_width="0dp"
-            android:layout_height="34dp"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/program_pick_color"
-            android:textColor="#FF2196F3"
-            android:textSize="13sp" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_marginTop="6dp"
+                    android:layout_weight="1"
+                    android:orientation="horizontal">
 
-    </LinearLayout>
+                    <TextView
+                        android:id="@+id/programPickAreaButton"
+                        style="@style/FloatingControlSecondaryPill"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:minWidth="0dp"
+                        android:paddingStart="0dp"
+                        android:paddingEnd="0dp"
+                        android:text="@string/program_pick_area"
+                        android:textSize="12sp" />
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#33FFFFFF"
-        android:layout_marginBottom="8dp" />
+                    <TextView
+                        android:id="@+id/programPickColorButton"
+                        style="@style/FloatingControlSecondaryPill"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:minWidth="0dp"
+                        android:paddingStart="0dp"
+                        android:paddingEnd="0dp"
+                        android:text="@string/program_pick_color"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="10dp"
+                android:gravity="center"
+                android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/programCancelButton"
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/cancel"
-            android:textColor="#FFFF8888"
-            android:textSize="14sp" />
+                <TextView
+                    android:id="@+id/testParseButton"
+                    style="@style/FloatingControlWarningPill"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:text="@string/test_parse" />
 
-        <View
-            android:layout_width="1dp"
-            android:layout_height="24dp"
-            android:background="#33FFFFFF" />
-
-        <TextView
-            android:id="@+id/programSaveButton"
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/save"
-            android:textColor="#FF4CAF50"
-            android:textSize="14sp" />
-
-    </LinearLayout>
-
+                <TextView
+                    android:id="@+id/programSaveButton"
+                    style="@style/FloatingControlSuccessPill"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:text="@string/save" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
 </LinearLayout>

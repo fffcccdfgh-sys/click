@@ -8,23 +8,21 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.widget.Button
 import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var statusText: TextView
-    private lateinit var overlayStatusText: TextView
-    private lateinit var screenCaptureStatusText: TextView
-    private lateinit var openSettingsButton: Button
-    private lateinit var openOverlaySettingsButton: Button
-    private lateinit var grantScreenCaptureButton: Button
-    private lateinit var toggleFloatingButton: Button
-    private lateinit var myScriptsButton: Button
+    private lateinit var openSettingsButton: TextView
+    private lateinit var openOverlaySettingsButton: TextView
+    private lateinit var grantScreenCaptureButton: TextView
+    private lateinit var toggleFloatingButton: TextView
+    private lateinit var myScriptsButton: TextView
+    private lateinit var deviceResolutionText: TextView
     private var floatingTogglePending = false
     private val floatingStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -45,32 +43,31 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        statusText = findViewById(R.id.statusText)
-        overlayStatusText = findViewById(R.id.overlayStatusText)
-        screenCaptureStatusText = findViewById(R.id.screenCaptureStatusText)
         openSettingsButton = findViewById(R.id.openSettingsButton)
         openOverlaySettingsButton = findViewById(R.id.openOverlaySettingsButton)
         grantScreenCaptureButton = findViewById(R.id.grantScreenCaptureButton)
         toggleFloatingButton = findViewById(R.id.toggleFloatingButton)
         myScriptsButton = findViewById(R.id.myScriptsButton)
+        deviceResolutionText = findViewById(R.id.deviceResolutionText)
 
         openSettingsButton.setOnClickListener {
-            openAccessibilitySettings()
+            if (!isAccessibilityServiceEnabled()) {
+                openAccessibilitySettings()
+            }
         }
 
         openOverlaySettingsButton.setOnClickListener {
-            openOverlaySettings()
+            if (!isOverlayPermissionGranted()) {
+                openOverlaySettings()
+            }
         }
 
         toggleFloatingButton.setOnClickListener {
-            toggleFloatingControl()
+            startFloatingService()
         }
 
         grantScreenCaptureButton.setOnClickListener {
-            if (ScreenCaptureManager.isReady) {
-                ScreenCaptureForegroundService.stop(this)
-                updateUI()
-            } else {
+            if (!ScreenCaptureManager.isReady) {
                 startActivity(Intent(this, ScreenCapturePermissionActivity::class.java))
             }
         }
@@ -104,50 +101,58 @@ class MainActivity : AppCompatActivity() {
         updateOverlayStatus()
         updateScreenCaptureStatus()
         updateFloatingButtonState()
+        updateDeviceResolution()
     }
 
     private fun updateAccessibilityStatus() {
         val enabled = isAccessibilityServiceEnabled()
-        statusText.text = if (enabled) {
-            getString(R.string.status_enabled)
-        } else {
-            getString(R.string.status_disabled)
-        }
+        updatePermissionButton(openSettingsButton, enabled)
     }
 
     private fun updateOverlayStatus() {
         val granted = isOverlayPermissionGranted()
-        overlayStatusText.text = if (granted) {
-            getString(R.string.overlay_status_granted)
-        } else {
-            getString(R.string.overlay_status_denied)
-        }
-        openOverlaySettingsButton.visibility = if (granted) android.view.View.GONE else android.view.View.VISIBLE
+        updatePermissionButton(openOverlaySettingsButton, granted)
     }
 
     private fun updateScreenCaptureStatus() {
-        val ready = ScreenCaptureManager.isReady
-        screenCaptureStatusText.text = if (ready) {
-            getString(R.string.screen_capture_status_granted)
-        } else {
-            getString(R.string.screen_capture_status_denied)
-        }
-        grantScreenCaptureButton.visibility = android.view.View.VISIBLE
-        grantScreenCaptureButton.text = if (ready) {
-            getString(R.string.close_screen_capture)
-        } else {
-            getString(R.string.grant_screen_capture)
-        }
+        updatePermissionButton(grantScreenCaptureButton, ScreenCaptureManager.isReady)
     }
 
     private fun updateFloatingButtonState() {
-        val serviceRunning = FloatingControlService.isRunning
         toggleFloatingButton.isEnabled = isOverlayPermissionGranted() && !floatingTogglePending
-        toggleFloatingButton.text = if (serviceRunning) {
-            getString(R.string.stop_floating_control)
+        toggleFloatingButton.text = getString(R.string.start_floating_control)
+    }
+
+    private fun updateDeviceResolution() {
+        val info = ScreenCaptureDisplayReader.current(this)
+        deviceResolutionText.text = getString(
+            R.string.main_device_resolution,
+            info.width,
+            info.height
+        )
+    }
+
+    private fun updatePermissionButton(button: TextView, granted: Boolean) {
+        button.text = if (granted) {
+            getString(R.string.main_permission_granted)
         } else {
-            getString(R.string.start_floating_control)
+            getString(R.string.main_permission_open)
         }
+        button.setTextColor(
+            if (granted) {
+                0xFF16A34A.toInt()
+            } else {
+                0xFF2563EB.toInt()
+            }
+        )
+        button.background = ContextCompat.getDrawable(
+            this,
+            if (granted) {
+                R.drawable.main_permission_done_bg
+            } else {
+                R.drawable.main_permission_action_bg
+            }
+        )
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
@@ -180,15 +185,6 @@ class MainActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
-    private fun toggleFloatingControl() {
-        if (floatingTogglePending) return
-        if (FloatingControlService.isRunning) {
-            stopFloatingService()
-        } else {
-            startFloatingService()
-        }
-    }
-
     private fun startFloatingService() {
         floatingTogglePending = true
         updateFloatingButtonState()
@@ -206,14 +202,6 @@ class MainActivity : AppCompatActivity() {
         } else {
             startService(intent)
         }
-        scheduleFloatingStateFallbackRefresh()
-    }
-
-    private fun stopFloatingService() {
-        floatingTogglePending = true
-        updateFloatingButtonState()
-        val intent = Intent(this, FloatingControlService::class.java)
-        stopService(intent)
         scheduleFloatingStateFallbackRefresh()
     }
 

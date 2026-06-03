@@ -19,6 +19,7 @@ data class ActionStep(
     val code: String? = null,
     val conditionType: String? = null,
     val conditionText: String? = null,
+    val conditionOcrFilter: String? = null,
     val conditionUseArea: Boolean? = null,
     val conditionLeft: Int? = null,
     val conditionTop: Int? = null,
@@ -59,6 +60,7 @@ data class ActionStep(
         repeatCount?.let { put("repeatCount", it) }
         conditionType?.let { put("conditionType", it) }
         conditionText?.let { put("conditionText", it) }
+        conditionOcrFilter?.let { put("conditionOcrFilter", OcrFilterMode.normalize(it)) }
         conditionUseArea?.let { put("conditionUseArea", it) }
         conditionLeft?.let { put("conditionLeft", it) }
         conditionTop?.let { put("conditionTop", it) }
@@ -87,6 +89,13 @@ data class ActionStep(
             val repeatCount = if (json.has("repeatCount")) json.getInt("repeatCount").coerceAtLeast(0) else null
             val conditionType = if (json.has("conditionType")) json.getString("conditionType") else null
             val conditionText = if (json.has("conditionText")) json.getString("conditionText") else null
+            val conditionOcrFilter = when {
+                json.has("conditionOcrFilter") -> OcrFilterMode.normalize(json.getString("conditionOcrFilter"))
+                conditionType == CONDITION_TEXT_CONTAINS || conditionType == CONDITION_TEXT_NOT_CONTAINS -> {
+                    OcrFilterMode.DEFAULT
+                }
+                else -> null
+            }
             val conditionUseArea = if (json.has("conditionUseArea")) json.getBoolean("conditionUseArea") else null
             val conditionLeft = if (json.has("conditionLeft")) json.getInt("conditionLeft") else null
             val conditionTop = if (json.has("conditionTop")) json.getInt("conditionTop") else null
@@ -106,6 +115,7 @@ data class ActionStep(
                     repeatCount = repeatCount,
                     conditionType = conditionType,
                     conditionText = conditionText,
+                    conditionOcrFilter = conditionOcrFilter,
                     conditionUseArea = conditionUseArea,
                     conditionLeft = conditionLeft,
                     conditionTop = conditionTop,
@@ -127,6 +137,7 @@ data class ActionStep(
                     repeatCount = repeatCount,
                     conditionType = conditionType,
                     conditionText = conditionText,
+                    conditionOcrFilter = conditionOcrFilter,
                     conditionUseArea = conditionUseArea,
                     conditionLeft = conditionLeft,
                     conditionTop = conditionTop,
@@ -146,6 +157,7 @@ data class ActionStep(
                     markerY = if (json.has("markerY")) json.getInt("markerY") else null,
                     conditionType = conditionType,
                     conditionText = conditionText,
+                    conditionOcrFilter = conditionOcrFilter,
                     conditionUseArea = conditionUseArea,
                     conditionLeft = conditionLeft,
                     conditionTop = conditionTop,
@@ -165,6 +177,7 @@ data class ActionStep(
                     markerY = if (json.has("markerY")) json.getInt("markerY") else null,
                     conditionType = conditionType,
                     conditionText = conditionText,
+                    conditionOcrFilter = conditionOcrFilter,
                     conditionUseArea = conditionUseArea,
                     conditionLeft = conditionLeft,
                     conditionTop = conditionTop,

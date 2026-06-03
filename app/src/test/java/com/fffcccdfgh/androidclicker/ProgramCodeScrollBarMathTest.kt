@@ -47,4 +47,12 @@ class ProgramCodeScrollBarMathTest {
         assertEquals(236, tallMenuHeight)
         assertEquals(148, shortMenuHeight)
     }
+
+    @Test
+    fun countsProgramEditorLines() {
+        assertEquals(1, ProgramLineNumberMath.lineCount(""))
+        assertEquals(1, ProgramLineNumberMath.lineCount("tap(1, 2)"))
+        assertEquals(3, ProgramLineNumberMath.lineCount("while true do\nwait(500)\nend"))
+        assertEquals(2, ProgramLineNumberMath.lineCount("tap(1, 2)\n"))
+    }
 }

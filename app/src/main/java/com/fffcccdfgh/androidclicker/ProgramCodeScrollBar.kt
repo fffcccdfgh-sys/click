@@ -9,6 +9,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.EditText
 import android.widget.ScrollView
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 data class ScrollThumb(
@@ -71,6 +72,75 @@ object ProgramTemplateMenuLayout {
     ): Int {
         val visibleRows = itemCount.coerceAtMost(maxVisibleRows).coerceAtLeast(0)
         return visibleRows * itemHeightPx + verticalPaddingPx
+    }
+}
+
+object ProgramLineNumberMath {
+    fun lineCount(text: CharSequence): Int {
+        if (text.isEmpty()) return 1
+        var count = 1
+        for (char in text) {
+            if (char == '\n') count++
+        }
+        return count
+    }
+}
+
+class ProgramLineNumberView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null
+) : View(context, attrs) {
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF64748B.toInt()
+        textAlign = Paint.Align.RIGHT
+        textSize = 12f * resources.displayMetrics.scaledDensity
+        typeface = android.graphics.Typeface.MONOSPACE
+    }
+    private val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF1F2937.toInt()
+        strokeWidth = resources.displayMetrics.density
+    }
+
+    private var editText: EditText? = null
+
+    fun attachTo(input: EditText) {
+        editText = input
+        input.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                invalidate()
+            }
+            override fun afterTextChanged(s: android.text.Editable?) = Unit
+        })
+        input.viewTreeObserver.addOnScrollChangedListener { invalidate() }
+        input.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> invalidate() }
+        input.post { invalidate() }
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val input = editText ?: return
+        canvas.drawLine(width - 1f, 0f, width - 1f, height.toFloat(), dividerPaint)
+
+        val layout = input.layout
+        val lineCount = max(ProgramLineNumberMath.lineCount(input.text), layout?.lineCount ?: 1)
+        val textX = width - 8f * resources.displayMetrics.density
+        val viewportTop = input.scrollY - input.compoundPaddingTop
+        val viewportBottom = viewportTop + input.height
+
+        for (line in 0 until lineCount) {
+            val baseline = if (layout != null && line < layout.lineCount) {
+                layout.getLineBaseline(line)
+            } else {
+                val lineHeight = input.lineHeight.coerceAtLeast(1)
+                input.compoundPaddingTop + line * lineHeight + input.paint.fontMetricsInt.descent * -1
+            }
+            if (baseline < viewportTop - input.lineHeight || baseline > viewportBottom + input.lineHeight) {
+                continue
+            }
+            val y = (baseline - input.scrollY + input.compoundPaddingTop).toFloat()
+            canvas.drawText((line + 1).toString(), textX, y, textPaint)
+        }
     }
 }
 

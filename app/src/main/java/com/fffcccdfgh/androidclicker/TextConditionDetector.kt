@@ -3,17 +3,13 @@ package com.fffcccdfgh.androidclicker
 object TextConditionDetector {
     fun containsText(
         targetText: String,
-        ocrLookup: () -> Boolean,
-        accessibilityLookup: () -> Boolean
+        ocrLookup: () -> Boolean
     ): Boolean {
         if (targetText.isEmpty()) return true
-        if (ocrLookup()) return true
-        return accessibilityLookup()
+        return ocrLookup()
     }
 
-    fun prefillText(ocrText: String, accessibilityText: String): String {
-        val normalizedOcr = ocrText.trim()
-        if (normalizedOcr.isNotEmpty()) return normalizedOcr
-        return accessibilityText.trim()
+    fun prefillText(ocrText: String): String {
+        return ocrText.trim()
     }
 }

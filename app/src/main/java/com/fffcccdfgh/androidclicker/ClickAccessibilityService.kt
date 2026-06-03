@@ -54,7 +54,7 @@ class ClickAccessibilityService : AccessibilityService() {
             conditionColorX = cmd.conditionColorX,
             conditionColorY = cmd.conditionColorY
         )
-        return checkCondition(action)
+        return checkCondition(ProgramCoordinateAdapter.storedActionToRuntimePx(action, currentScreenSize()))
     }
 
     private suspend fun checkTextCondition(action: ActionStep, invert: Boolean): Boolean {
@@ -72,16 +72,19 @@ class ClickAccessibilityService : AccessibilityService() {
             null
         }
 
-        val foundByOcr = detectConditionTextWithOcr(conditionText, areaRect)
+        val foundByOcr = detectConditionTextWithOcr(conditionText, areaRect, action.conditionOcrFilter)
         val found = TextConditionDetector.containsText(
             targetText = conditionText,
-            ocrLookup = { foundByOcr },
-            accessibilityLookup = { findConditionText(conditionText, areaRect) }
+            ocrLookup = { foundByOcr }
         )
         return if (invert) !found else found
     }
 
-    private suspend fun detectConditionTextWithOcr(text: String, area: Rect?): Boolean {
+    private suspend fun detectConditionTextWithOcr(
+        text: String,
+        area: Rect?,
+        filterMode: String?
+    ): Boolean {
         if (!ScreenCaptureManager.isReady) return false
 
         ScreenCaptureManager.refreshDisplayMetrics(this)
@@ -93,7 +96,8 @@ class ClickAccessibilityService : AccessibilityService() {
                 targetText = text,
                 area = area,
                 screenWidth = screenWidth,
-                screenHeight = screenHeight
+                screenHeight = screenHeight,
+                filterMode = filterMode
             )
         }
     }
@@ -153,30 +157,6 @@ class ClickAccessibilityService : AccessibilityService() {
      * (≥ 25 % area ratio) with the given rect.
      * Joins them with a space for easy pre-filling into the condition editor.
      */
-    fun collectTextInArea(area: Rect): String {
-        val sb = StringBuilder()
-        for (window in windows) {
-            val root = window.root ?: continue
-            try {
-                if (root.packageName?.toString() == packageName) continue
-                collectTextInTree(root, area, sb)
-            } finally {
-                root.recycle()
-            }
-        }
-        if (sb.isEmpty()) {
-            val root = rootInActiveWindow ?: return ""
-            try {
-                if (root.packageName?.toString() != packageName) {
-                    collectTextInTree(root, area, sb)
-                }
-            } finally {
-                root.recycle()
-            }
-        }
-        return sb.toString().trim()
-    }
-
     private fun collectTextInTree(node: AccessibilityNodeInfo, area: Rect, sb: StringBuilder) {
         val nodeRect = Rect()
         node.getBoundsInScreen(nodeRect)
@@ -409,5 +389,16 @@ class ClickAccessibilityService : AccessibilityService() {
             .addStroke(stroke)
             .build()
         return dispatchGesture(gesture, callback, null)
+    }
+
+    private fun currentScreenSize(): ProgramScreenSize {
+        ScreenCaptureManager.refreshDisplayMetrics(this)
+        val captureWidth = ScreenCaptureManager.getCaptureWidth()
+        val captureHeight = ScreenCaptureManager.getCaptureHeight()
+        if (captureWidth > 0 && captureHeight > 0) {
+            return ProgramScreenSize(captureWidth, captureHeight)
+        }
+        val display = ScreenCaptureDisplayReader.current(this)
+        return ProgramScreenSize(display.width, display.height)
     }
 }

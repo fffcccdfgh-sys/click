@@ -8,20 +8,20 @@ class LuaScriptCodecTest {
     @Test
     fun exportsActionSequenceAsReadableLua() {
         val script = ScriptStorage.SavedScript(
-            name = "测试脚本",
+            name = "Test script",
             actions = listOf(
                 ActionStep(
                     type = ActionStep.TYPE_TAP,
-                    x = 100,
-                    y = 200,
+                    x = 2500,
+                    y = 5000,
                     durationMs = 50,
                     conditionType = ActionStep.CONDITION_TEXT_CONTAINS,
-                    conditionText = "重启",
+                    conditionText = "ready",
                     conditionUseArea = true,
-                    conditionLeft = 10,
-                    conditionTop = 20,
-                    conditionRight = 300,
-                    conditionBottom = 400
+                    conditionLeft = 100,
+                    conditionTop = 100,
+                    conditionRight = 3000,
+                    conditionBottom = 2000
                 ),
                 ActionStep(
                     type = ActionStep.TYPE_WAIT,
@@ -35,10 +35,10 @@ class LuaScriptCodecTest {
         val lua = LuaScriptCodec.exportScript(script)
 
         assertTrue(lua.contains("-- AndroidClicker Lua Script"))
-        assertTrue(lua.contains("-- name: 测试脚本"))
+        assertTrue(lua.contains("-- name: Test script"))
         assertTrue(lua.contains("while true do"))
-        assertTrue(lua.contains("if check_text(\"重启\", 10, 20, 300, 400) then"))
-        assertTrue(lua.contains("tap(100, 200, 50)"))
+        assertTrue(lua.contains("if check_text(\"ready\", 1.00, 1.00, 30.00, 20.00) then"))
+        assertTrue(lua.contains("tap(25.00, 50.00, 50)"))
         assertTrue(lua.contains("wait(500)"))
         assertTrue(lua.contains("wait(1000)"))
     }
@@ -47,7 +47,7 @@ class LuaScriptCodecTest {
     fun importsLuaAsSingleProgramAction() {
         val lua = """
             -- AndroidClicker Lua Script
-            -- name: 外部脚本
+            -- name: External script
 
             while true do
                 tap(100, 200)
@@ -55,9 +55,9 @@ class LuaScriptCodecTest {
             end
         """.trimIndent()
 
-        val script = LuaScriptCodec.importScript(lua, fallbackName = "默认名")
+        val script = LuaScriptCodec.importScript(lua, fallbackName = "Default name")
 
-        assertEquals("外部脚本", script.name)
+        assertEquals("External script", script.name)
         assertEquals(1, script.actions.size)
         assertEquals(ActionStep.TYPE_PROGRAM, script.actions.single().type)
         assertTrue(script.actions.single().code!!.contains("tap(100, 200)"))
@@ -67,9 +67,9 @@ class LuaScriptCodecTest {
 
     @Test
     fun importsLuaWithFallbackNameWhenMetadataIsMissing() {
-        val script = LuaScriptCodec.importScript("tap(1, 2)", fallbackName = "导入脚本")
+        val script = LuaScriptCodec.importScript("tap(1, 2)", fallbackName = "Imported script")
 
-        assertEquals("导入脚本", script.name)
+        assertEquals("Imported script", script.name)
         assertEquals(ActionStep.TYPE_PROGRAM, script.actions.single().type)
         assertEquals("tap(1, 2)", script.actions.single().code)
     }

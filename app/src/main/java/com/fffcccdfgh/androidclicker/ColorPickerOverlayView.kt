@@ -29,7 +29,7 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
         private const val IDLE_SHOW_BUTTONS_MS = 500L
         private const val SAMPLE_THROTTLE_MS = 80L
         private const val BUTTON_BOTTOM_MARGIN_DP = 48f
-        private const val BUTTON_SPACING_DP = 28f
+        private const val BUTTON_SPACING_DP = 12f
     }
 
     private var markerCx = 0f
@@ -75,8 +75,7 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
 
     private val idleHandler = Handler(Looper.getMainLooper())
     private val showButtonsRunnable = Runnable {
-        buttonsVisible = true
-        buttonContainer.visibility = View.VISIBLE
+        showButtons()
     }
 
     private var lastSampleTime = 0L
@@ -148,29 +147,31 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
             typeface = Typeface.DEFAULT_BOLD
         }
 
-        val btnPadH = (16 * density).toInt()
+        val btnPadH = (22 * density).toInt()
         val btnPadV = (10 * density).toInt()
-        val btnCorner = 8f * density
+        val btnCorner = 19f * density
 
         confirmBtn = TextView(context).apply {
             text = "确认"
             setTextColor(Color.WHITE)
-            textSize = 15f
+            textSize = 14f
             gravity = Gravity.CENTER
             setPadding(btnPadH, btnPadV, btnPadH, btnPadV)
             background = GradientDrawable().apply {
-                setColor(0xEE4CAF50.toInt())
+                setColor(0xFF166534.toInt())
+                setStroke((1f * density).toInt(), 0xFF22C55E.toInt())
                 cornerRadius = btnCorner
             }
         }
         cancelBtn = TextView(context).apply {
             text = "取消"
-            setTextColor(Color.WHITE)
-            textSize = 15f
+            setTextColor(0xFFFDA4AF.toInt())
+            textSize = 14f
             gravity = Gravity.CENTER
             setPadding(btnPadH, btnPadV, btnPadH, btnPadV)
             background = GradientDrawable().apply {
-                setColor(0xEEF44336.toInt())
+                setColor(0xFF3F1824.toInt())
+                setStroke((1f * density).toInt(), 0xFFFB7185.toInt())
                 cornerRadius = btnCorner
             }
         }
@@ -178,6 +179,17 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
         buttonContainer = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
+            setPadding(
+                (10 * density).toInt(),
+                (10 * density).toInt(),
+                (10 * density).toInt(),
+                (10 * density).toInt()
+            )
+            background = GradientDrawable().apply {
+                setColor(0xF2121826.toInt())
+                setStroke((1f * density).toInt(), 0xFF334155.toInt())
+                cornerRadius = 18f * density
+            }
         }
         buttonContainer.addView(confirmBtn, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
@@ -333,9 +345,13 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
                 val dy = event.rawY - startTouchRawY
                 dragMoveDistance = Math.abs(dx) + Math.abs(dy)
 
-                if (dragMoveDistance > touchSlop && buttonsVisible) {
-                    buttonsVisible = false
-                    buttonContainer.visibility = View.GONE
+                if (buttonsVisible &&
+                    PickerActionButtonsVisibilityPolicy.shouldHideWhileChanging(
+                        dragMoveDistance,
+                        touchSlop
+                    )
+                ) {
+                    hideButtons()
                 }
 
                 val newX = startMarkerX + dx
@@ -343,23 +359,43 @@ class ColorPickerOverlayView(context: Context) : FrameLayout(context) {
                 updateMarkerPosition(newX, newY)
                 return true
             }
-            MotionEvent.ACTION_UP -> {
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 if (touchStartedOnButton) {
-                    if (confirmHitRect.contains(event.x.toInt(), event.y.toInt())) {
-                        onConfirm?.invoke(markerScreenX, markerScreenY, currentHex)
-                    } else if (cancelHitRect.contains(event.x.toInt(), event.y.toInt())) {
-                        onCancel?.invoke()
+                    if (event.action == MotionEvent.ACTION_UP) {
+                        if (confirmHitRect.contains(event.x.toInt(), event.y.toInt())) {
+                            onConfirm?.invoke(markerScreenX, markerScreenY, currentHex)
+                        } else if (cancelHitRect.contains(event.x.toInt(), event.y.toInt())) {
+                            onCancel?.invoke()
+                        }
                     }
                     return true
                 }
 
-                if (dragMoveDistance >= touchSlop) {
-                    idleHandler.postDelayed(showButtonsRunnable, IDLE_SHOW_BUTTONS_MS)
+                when (
+                    PickerActionButtonsVisibilityPolicy.showTimingAfterTouchEnd(
+                        dragMoveDistance,
+                        touchSlop
+                    )
+                ) {
+                    PickerActionButtonsVisibilityPolicy.ShowTiming.NOW -> showButtons()
+                    PickerActionButtonsVisibilityPolicy.ShowTiming.AFTER_IDLE_DELAY -> {
+                        idleHandler.postDelayed(showButtonsRunnable, IDLE_SHOW_BUTTONS_MS)
+                    }
                 }
                 return true
             }
         }
         return false
+    }
+
+    private fun showButtons() {
+        buttonsVisible = true
+        buttonContainer.visibility = View.VISIBLE
+    }
+
+    private fun hideButtons() {
+        buttonsVisible = false
+        buttonContainer.visibility = View.GONE
     }
 
     private fun isPointOnButtons(x: Float, y: Float): Boolean {

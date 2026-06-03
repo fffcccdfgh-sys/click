@@ -2,8 +2,6 @@ package com.fffcccdfgh.androidclicker
 
 object LuaScriptCodec {
     private const val HEADER = "-- AndroidClicker Lua Script"
-    private const val FULLSCREEN_RIGHT = 99999
-    private const val FULLSCREEN_BOTTOM = 99999
 
     fun exportScript(script: ScriptStorage.SavedScript): String {
         val body = exportActions(script.actions, "")
@@ -106,13 +104,17 @@ object LuaScriptCodec {
         when (action.type) {
             ActionStep.TYPE_TAP -> {
                 val duration = action.durationMs ?: 1L
-                appendLine("${indent}tap(${action.x}, ${action.y}, $duration)")
+                appendLine(
+                    "${indent}tap(" +
+                        "${percentArg(action.x)}, ${percentArg(action.y)}, $duration)"
+                )
             }
             ActionStep.TYPE_SWIPE -> {
                 val duration = action.durationMs ?: 300L
                 appendLine(
-                    "${indent}swipe(${action.startX}, ${action.startY}, " +
-                        "${action.endX}, ${action.endY}, $duration)"
+                    "${indent}swipe(" +
+                        "${percentArg(action.startX)}, ${percentArg(action.startY)}, " +
+                        "${percentArg(action.endX)}, ${percentArg(action.endY)}, $duration)"
                 )
             }
             ActionStep.TYPE_WAIT -> {
@@ -146,9 +148,9 @@ object LuaScriptCodec {
         val text = luaString(action.conditionText.orEmpty())
         val left = action.conditionLeft ?: 0
         val top = action.conditionTop ?: 0
-        val right = action.conditionRight ?: FULLSCREEN_RIGHT
-        val bottom = action.conditionBottom ?: FULLSCREEN_BOTTOM
-        return "$functionName($text, $left, $top, $right, $bottom)"
+        val right = action.conditionRight ?: ProgramCoordinateAdapter.STORED_PERCENT_FULL
+        val bottom = action.conditionBottom ?: ProgramCoordinateAdapter.STORED_PERCENT_FULL
+        return "$functionName($text, ${percentArg(left)}, ${percentArg(top)}, ${percentArg(right)}, ${percentArg(bottom)})"
     }
 
     private fun colorCondition(functionName: String, action: ActionStep): String {
@@ -156,7 +158,11 @@ object LuaScriptCodec {
         val tolerance = action.conditionColorTolerance ?: 10
         val x = action.conditionColorX ?: 0
         val y = action.conditionColorY ?: 0
-        return "$functionName($color, $tolerance, $x, $y)"
+        return "$functionName($color, $tolerance, ${percentArg(x)}, ${percentArg(y)})"
+    }
+
+    private fun percentArg(value: Int?): String {
+        return ProgramCoordinateAdapter.formatStoredPercentArg(value ?: 0)
     }
 
     private fun luaString(value: String): String {
