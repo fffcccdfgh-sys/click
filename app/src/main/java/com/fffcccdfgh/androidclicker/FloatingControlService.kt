@@ -193,8 +193,9 @@ class FloatingControlService : Service() {
         floatingView = view
 
         val wm = windowManager ?: return
-        screenWidthPx = resources.displayMetrics.widthPixels
-        screenHeightPx = resources.displayMetrics.heightPixels
+        val display = ScreenCaptureDisplayReader.current(this)
+        screenWidthPx = display.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+        screenHeightPx = display.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -592,6 +593,23 @@ class FloatingControlService : Service() {
         } else {
             @Suppress("DEPRECATION")
             WindowManager.LayoutParams.TYPE_PHONE
+        }
+    }
+
+    private fun createFullScreenPickerParams(): WindowManager.LayoutParams {
+        return WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            overlayType(),
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
         }
     }
 
@@ -1006,20 +1024,7 @@ class FloatingControlService : Service() {
         val view = inflater.inflate(R.layout.activity_position_picker, null)
         pickerView = view
 
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
-        }
-
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            type,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
-        )
+        val params = createFullScreenPickerParams()
 
         val instructionRes = when (mode) {
             PICKER_TAP_POINT -> R.string.pick_position_instruction
@@ -1133,8 +1138,9 @@ class FloatingControlService : Service() {
         val markerSizePx = (48 * density).toInt()
         val labelHeightPx = (18 * density).toInt()
         val strokePx = (2.5f * density).toInt()
-        screenWidthPx = resources.displayMetrics.widthPixels
-        screenHeightPx = resources.displayMetrics.heightPixels
+        val screen = programScreenSize()
+        screenWidthPx = screen.width
+        screenHeightPx = screen.height
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -1307,10 +1313,15 @@ class FloatingControlService : Service() {
     ): WindowManager.LayoutParams {
         return WindowManager.LayoutParams(
             widthPx, heightPx, type,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
             x = (coordX - widthPx / 2).coerceIn(0, screenW - widthPx)
             y = (coordY - widthPx / 2).coerceIn(0, screenH - heightPx)
         }
@@ -2792,21 +2803,7 @@ class FloatingControlService : Service() {
         val view = inflater.inflate(R.layout.area_picker, null)
         pickerView = view
 
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
-        }
-
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            type,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT
-        )
+        val params = createFullScreenPickerParams()
 
         val selectionView = view.findViewById<AreaSelectionView>(R.id.areaSelectionView)
         val buttonsRow = view.findViewById<View>(R.id.areaPickerButtons)

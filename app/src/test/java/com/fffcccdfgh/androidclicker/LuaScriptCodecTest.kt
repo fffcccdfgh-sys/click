@@ -1,6 +1,7 @@
 package com.fffcccdfgh.androidclicker
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -34,8 +35,10 @@ class LuaScriptCodecTest {
 
         val lua = LuaScriptCodec.exportScript(script)
 
-        assertTrue(lua.contains("-- AndroidClicker Lua Script"))
-        assertTrue(lua.contains("-- name: Test script"))
+        assertFalse(lua.contains("-- AndroidClicker Lua Script"))
+        assertFalse(lua.contains("-- name: Test script"))
+        assertFalse(lua.contains("-- loopCount:"))
+        assertFalse(lua.contains("-- loopGapMs:"))
         assertTrue(lua.contains("while true do"))
         assertTrue(lua.contains("if check_text(\"ready\", 1.00, 1.00, 30.00, 20.00) then"))
         assertTrue(lua.contains("tap(25.00, 50.00, 50)"))

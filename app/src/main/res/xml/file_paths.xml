@@ -3,4 +3,7 @@
     <cache-path
         name="shared_scripts"
         path="shared_scripts/" />
+    <cache-path
+        name="shared_pvz_scripts"
+        path="shared_pvz_scripts/" />
 </paths>

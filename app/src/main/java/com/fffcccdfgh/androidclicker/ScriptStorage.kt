@@ -91,7 +91,10 @@ object ScriptStorage {
         return if (trimmed.startsWith("{")) {
             importScriptFromJson(context, text)
         } else {
-            val fallback = fallbackName?.substringBeforeLast('.')?.takeIf { it.isNotBlank() }
+            val fallback = fallbackName
+                ?.substringBeforeLast('.')
+                ?.removePrefix("脚本_")
+                ?.takeIf { it.isNotBlank() }
                 ?: nextAutoName(context)
             val imported = LuaScriptCodec.importScript(text, fallback)
             saveNamedScript(

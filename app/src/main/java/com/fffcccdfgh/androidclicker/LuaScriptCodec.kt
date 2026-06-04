@@ -7,11 +7,6 @@ object LuaScriptCodec {
         val body = exportActions(script.actions, "")
         val wrappedBody = wrapScriptLoop(body, script.loopCount, script.loopGapMs)
         return buildString {
-            appendLine(HEADER)
-            appendLine("-- name: ${script.name}")
-            appendLine("-- loopCount: ${script.loopCount}")
-            appendLine("-- loopGapMs: ${script.loopGapMs}")
-            appendLine()
             append(wrappedBody)
             if (!endsWith("\n")) appendLine()
         }

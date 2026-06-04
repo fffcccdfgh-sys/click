@@ -5,11 +5,11 @@ import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
-import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
@@ -23,7 +23,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import java.io.File
 
-class ScriptListActivity : AppCompatActivity() {
+class PvzScriptListActivity : AppCompatActivity() {
 
     private lateinit var scriptListContainer: LinearLayout
 
@@ -42,23 +42,23 @@ class ScriptListActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContentView(R.layout.activity_script_list)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { v, insets ->
+        setContentView(R.layout.activity_pvz_script_list)
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { view, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
 
-        scriptListContainer = findViewById(R.id.scriptListContainer)
+        scriptListContainer = findViewById(R.id.pvzScriptListContainer)
 
-        findViewById<TextView>(R.id.importScriptButton).setOnClickListener {
+        findViewById<TextView>(R.id.importPvzScriptButton).setOnClickListener {
             importLauncher.launch(arrayOf("text/x-lua", "text/plain", "application/json", "*/*"))
         }
     }
 
     override fun onResume() {
         super.onResume()
-        val filter = IntentFilter(ScriptStorage.ACTION_SCRIPTS_CHANGED)
+        val filter = IntentFilter(PvzScriptStorage.ACTION_SCRIPTS_CHANGED)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(scriptsChangedReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
@@ -77,11 +77,11 @@ class ScriptListActivity : AppCompatActivity() {
 
     private fun renderScriptList() {
         scriptListContainer.removeAllViews()
-        val scripts = ScriptStorage.listScripts(this)
+        val scripts = PvzScriptStorage.listScripts(this)
 
         if (scripts.isEmpty()) {
             val emptyText = TextView(this).apply {
-                text = getString(R.string.no_saved_scripts)
+                text = getString(R.string.no_saved_pvz_scripts)
                 textSize = 16f
                 setTextColor(0xFF64748B.toInt())
                 gravity = Gravity.CENTER
@@ -97,8 +97,7 @@ class ScriptListActivity : AppCompatActivity() {
         }
 
         for (script in scripts) {
-            val card = createScriptCard(script)
-            scriptListContainer.addView(card)
+            scriptListContainer.addView(createScriptCard(script))
         }
     }
 
@@ -115,25 +114,23 @@ class ScriptListActivity : AppCompatActivity() {
             background = roundedRect(0xFFFFFFFF.toInt(), 0xFFE5E7EB.toInt(), 18f)
         }
 
-        val nameText = TextView(this).apply {
+        card.addView(TextView(this).apply {
             text = script.name
             textSize = 20f
             setTextColor(0xFF111827.toInt())
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
-        }
-        card.addView(nameText)
+        })
 
-        val detailText = TextView(this).apply {
+        card.addView(TextView(this).apply {
             text = scriptSummary(script)
             textSize = 13f
             setTextColor(0xFF64748B.toInt())
             setPadding(0, dp(6f), 0, dp(14f))
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
-        }
-        card.addView(detailText)
+        })
 
         val buttonRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -183,33 +180,39 @@ class ScriptListActivity : AppCompatActivity() {
     }
 
     private fun scriptSummary(script: ScriptStorage.SavedScript): String {
-        val loopText = if (script.loopCount == 0) "\u65E0\u9650\u5FAA\u73AF" else "\u5FAA\u73AF ${script.loopCount} \u6B21"
-        return "$loopText \u00B7 \u95F4\u9694 ${script.loopGapMs} ms \u00B7 ${script.actions.size} \u4E2A\u52A8\u4F5C"
+        return getString(R.string.pvz_script_summary, script.actions.size)
     }
 
-    private fun roundedRect(fillColor: Int, strokeColor: Int, radiusDp: Float): GradientDrawable {
-        return GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(fillColor)
-            setStroke(dp(1f), strokeColor)
-            cornerRadius = dp(radiusDp).toFloat()
+    private fun runScript(script: ScriptStorage.SavedScript) {
+        val intent = Intent(this, RunFloatingControlService::class.java).apply {
+            putExtra(RunFloatingControlService.EXTRA_SCRIPT_JSON, ActionStep.listToJson(script.actions))
+            putExtra(RunFloatingControlService.EXTRA_SCRIPT_NAME, script.name)
+            putExtra(RunFloatingControlService.EXTRA_LOOP_COUNT, script.loopCount)
+            putExtra(RunFloatingControlService.EXTRA_LOOP_GAP_MS, script.loopGapMs)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
         }
     }
 
-    private fun dp(value: Float): Int {
-        return (value * resources.displayMetrics.density + 0.5f).toInt()
+    private fun editScript(script: ScriptStorage.SavedScript) {
+        loadScriptIntoPvzFloating(script)
+        startPvzFloating()
     }
 
-    private fun editScript(script: ScriptStorage.SavedScript) {
-        val prefs = getSharedPreferences("tap_config", MODE_PRIVATE)
-        prefs.edit()
-            .putString("action_sequence", ActionStep.listToJson(script.actions))
-            .putString("current_editing_script_name", script.name)
-            .putInt("loop_count", script.loopCount)
-            .putLong("loop_gap_ms", script.loopGapMs)
-            .putBoolean("loop_settings_saved", true)
+    private fun loadScriptIntoPvzFloating(script: ScriptStorage.SavedScript) {
+        val programCode = script.actions.firstOrNull { it.type == ActionStep.TYPE_PROGRAM }?.code.orEmpty()
+        getSharedPreferences(PvzFloatingControlService.PREFS_NAME, MODE_PRIVATE)
+            .edit()
+            .putString(PvzFloatingControlService.KEY_PROGRAM_CODE, programCode)
+            .putString(PvzFloatingControlService.KEY_SCRIPT_NAME, script.name)
             .apply()
-        val intent = Intent(this, FloatingControlService::class.java)
+    }
+
+    private fun startPvzFloating() {
+        val intent = Intent(this, PvzFloatingControlService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
         } else {
@@ -225,21 +228,19 @@ class ScriptListActivity : AppCompatActivity() {
             background = roundedRect(0xFFFFFFFF.toInt(), 0xFFDDE3EA.toInt(), 20f)
         }
 
-        val title = TextView(this).apply {
-            text = getString(R.string.rename_script_title)
+        content.addView(TextView(this).apply {
+            text = getString(R.string.rename_pvz_script_title)
             textSize = 20f
             setTextColor(0xFF111827.toInt())
             setTypeface(typeface, android.graphics.Typeface.BOLD)
-        }
-        content.addView(title)
+        })
 
-        val hint = TextView(this).apply {
+        content.addView(TextView(this).apply {
             text = getString(R.string.rename_script_hint)
             textSize = 13f
             setTextColor(0xFF64748B.toInt())
             setPadding(0, dp(6f), 0, dp(10f))
-        }
-        content.addView(hint)
+        })
 
         val input = android.widget.EditText(this).apply {
             setText(script.name)
@@ -286,37 +287,27 @@ class ScriptListActivity : AppCompatActivity() {
             buttonRow.addView(button)
         }
 
-        addDialogButton(
-            getString(R.string.cancel),
-            0xFF475569.toInt(),
-            0xFFF8FAFC.toInt(),
-            0xFFCBD5E1.toInt()
-        ) {
+        addDialogButton(getString(R.string.cancel), 0xFF475569.toInt(), 0xFFF8FAFC.toInt(), 0xFFCBD5E1.toInt()) {
             dialog.dismiss()
         }
-        addDialogButton(
-            getString(R.string.save),
-            0xFFFFFFFF.toInt(),
-            0xFF111827.toInt(),
-            0xFF111827.toInt()
-        ) {
-                val newName = input.text.toString().trim()
-                if (newName.isEmpty()) {
-                    Toast.makeText(this, R.string.script_name_empty, Toast.LENGTH_SHORT).show()
-                    return@addDialogButton
-                }
-                if (newName != script.name && ScriptStorage.getScript(this, newName) != null) {
-                    Toast.makeText(this, R.string.script_name_exists, Toast.LENGTH_SHORT).show()
-                    return@addDialogButton
-                }
-                ScriptStorage.deleteScript(this, script.name)
-                ScriptStorage.saveNamedScript(this, newName, script.actions, script.loopCount, script.loopGapMs)
-                val prefs = getSharedPreferences("tap_config", MODE_PRIVATE)
-                if (prefs.getString("current_editing_script_name", null) == script.name) {
-                    prefs.edit().putString("current_editing_script_name", newName).apply()
-                }
-                renderScriptList()
-                dialog.dismiss()
+        addDialogButton(getString(R.string.save), 0xFFFFFFFF.toInt(), 0xFF111827.toInt(), 0xFF111827.toInt()) {
+            val newName = input.text.toString().trim()
+            if (newName.isEmpty()) {
+                Toast.makeText(this, R.string.script_name_empty, Toast.LENGTH_SHORT).show()
+                return@addDialogButton
+            }
+            if (newName != script.name && PvzScriptStorage.getScript(this, newName) != null) {
+                Toast.makeText(this, R.string.script_name_exists, Toast.LENGTH_SHORT).show()
+                return@addDialogButton
+            }
+            PvzScriptStorage.deleteScript(this, script.name)
+            PvzScriptStorage.saveNamedScript(this, newName, script.actions, script.loopCount, script.loopGapMs)
+            val prefs = getSharedPreferences(PvzFloatingControlService.PREFS_NAME, MODE_PRIVATE)
+            if (prefs.getString(PvzFloatingControlService.KEY_SCRIPT_NAME, null) == script.name) {
+                prefs.edit().putString(PvzFloatingControlService.KEY_SCRIPT_NAME, newName).apply()
+            }
+            renderScriptList()
+            dialog.dismiss()
         }
 
         content.addView(buttonRow)
@@ -331,22 +322,8 @@ class ScriptListActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun runScript(script: ScriptStorage.SavedScript) {
-        val intent = Intent(this, RunFloatingControlService::class.java).apply {
-            putExtra(RunFloatingControlService.EXTRA_SCRIPT_JSON, ActionStep.listToJson(script.actions))
-            putExtra(RunFloatingControlService.EXTRA_SCRIPT_NAME, script.name)
-            putExtra(RunFloatingControlService.EXTRA_LOOP_COUNT, script.loopCount)
-            putExtra(RunFloatingControlService.EXTRA_LOOP_GAP_MS, script.loopGapMs)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
-    }
-
     private fun deleteScript(script: ScriptStorage.SavedScript) {
-        ScriptStorage.deleteScript(this, script.name)
+        PvzScriptStorage.deleteScript(this, script.name)
         Toast.makeText(this, getString(R.string.script_deleted, script.name), Toast.LENGTH_SHORT).show()
         renderScriptList()
     }
@@ -354,11 +331,7 @@ class ScriptListActivity : AppCompatActivity() {
     private fun shareScript(script: ScriptStorage.SavedScript) {
         try {
             val file = writeScriptShareFile(script)
-            val uri = FileProvider.getUriForFile(
-                this,
-                "$packageName.fileprovider",
-                file
-            )
+            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/x-lua"
                 putExtra(Intent.EXTRA_STREAM, uri)
@@ -368,41 +341,39 @@ class ScriptListActivity : AppCompatActivity() {
             }
             startActivity(Intent.createChooser(intent, getString(R.string.share_script)))
         } catch (e: Exception) {
-            Toast.makeText(this, e.message ?: "\u5206\u4eab\u5931\u8d25", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, e.message ?: "分享失败", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun writeScriptShareFile(script: ScriptStorage.SavedScript): File {
-        val dir = File(cacheDir, "shared_scripts").apply { mkdirs() }
+        val dir = File(cacheDir, "shared_pvz_scripts").apply { mkdirs() }
         val file = File(dir, safeScriptFilename(script))
-        file.writeText(ScriptStorage.exportScriptToLua(script), Charsets.UTF_8)
+        file.writeText(PvzScriptStorage.exportScriptToLua(script), Charsets.UTF_8)
         return file
     }
 
     private fun safeScriptFilename(script: ScriptStorage.SavedScript): String {
-        val filename = getString(R.string.script_export_filename, script.name).ifBlank {
-            "script.lua"
-        }
-        return filename.replace(Regex("""[\\/:*?"<>|]"""), "_")
+        val base = script.name.replace(Regex("""[\\/:*?"<>|]"""), "_")
+        return "pvz2_$base.lua"
     }
 
     private fun importScriptFromUri(uri: Uri) {
         try {
             val displayName = getDisplayName(uri)
             if (!hasExpectedScriptPrefix(displayName)) {
-                Toast.makeText(this, getString(R.string.script_import_prefix_mismatch), Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.pvz_script_import_prefix_mismatch), Toast.LENGTH_SHORT).show()
                 return
             }
-            val json = contentResolver.openInputStream(uri)?.use { stream ->
+            val text = contentResolver.openInputStream(uri)?.use { stream ->
                 stream.bufferedReader().readText()
             } ?: run {
                 Toast.makeText(this, getString(R.string.script_import_failed), Toast.LENGTH_SHORT).show()
                 return
             }
-            val name = ScriptStorage.importScriptFromText(this, json, displayName)
+            val name = PvzScriptStorage.importScriptFromText(this, text, displayName)
             Toast.makeText(this, getString(R.string.script_imported, name), Toast.LENGTH_SHORT).show()
             renderScriptList()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Toast.makeText(this, getString(R.string.script_import_failed), Toast.LENGTH_SHORT).show()
         }
     }
@@ -410,7 +381,7 @@ class ScriptListActivity : AppCompatActivity() {
     private fun hasExpectedScriptPrefix(displayName: String?): Boolean {
         return displayName
             ?.substringAfterLast('/')
-            ?.startsWith("脚本_") == true
+            ?.startsWith("pvz2_") == true
     }
 
     private fun getDisplayName(uri: Uri): String? {
@@ -422,5 +393,18 @@ class ScriptListActivity : AppCompatActivity() {
                     null
                 }
             }
+    }
+
+    private fun roundedRect(fillColor: Int, strokeColor: Int, radiusDp: Float): GradientDrawable {
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(fillColor)
+            setStroke(dp(1f), strokeColor)
+            cornerRadius = dp(radiusDp).toFloat()
+        }
+    }
+
+    private fun dp(value: Float): Int {
+        return (value * resources.displayMetrics.density + 0.5f).toInt()
     }
 }

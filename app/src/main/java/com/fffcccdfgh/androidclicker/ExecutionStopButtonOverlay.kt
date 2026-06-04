@@ -310,10 +310,15 @@ class ExecutionStopButtonOverlay(
             buttonSizePx,
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
         }
     }
 

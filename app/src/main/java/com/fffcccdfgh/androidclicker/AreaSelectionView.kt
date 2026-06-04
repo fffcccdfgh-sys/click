@@ -33,7 +33,7 @@ class AreaSelectionView @JvmOverloads constructor(
     private var buttonsHiddenForCurrentDrag = false
 
     private val idleHandler = Handler(Looper.getMainLooper())
-    private val showButtonsRunnable = Runnable { onInteractionFinished?.invoke() }
+    private val showButtonsRunnable = Runnable { finishInteraction() }
 
     private val fillPaint = Paint().apply {
         color = Color.parseColor("#3360A5FA")
@@ -52,6 +52,19 @@ class AreaSelectionView @JvmOverloads constructor(
         strokeWidth = 1f * resources.displayMetrics.density
         isAntiAlias = true
     }
+    private val divisionLinePaint = Paint().apply {
+        color = Color.parseColor("#E5FFFFFF")
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f * resources.displayMetrics.density
+        pathEffect = android.graphics.DashPathEffect(
+            floatArrayOf(
+                8f * resources.displayMetrics.density,
+                6f * resources.displayMetrics.density
+            ),
+            0f
+        )
+        isAntiAlias = true
+    }
     private val handlePaint = Paint().apply {
         color = Color.parseColor("#FFBFDBFE")
         style = Paint.Style.FILL
@@ -66,6 +79,31 @@ class AreaSelectionView @JvmOverloads constructor(
 
     var onInteractionStarted: (() -> Unit)? = null
     var onInteractionFinished: (() -> Unit)? = null
+    var divisionCount: Int = 0
+        set(value) {
+            field = value.coerceAtLeast(0)
+            invalidate()
+        }
+    var divisionOrientation: DivisionOrientation = DivisionOrientation.VERTICAL
+        set(value) {
+            field = value
+            invalidate()
+        }
+    var divisionRows: Int = 0
+        set(value) {
+            field = value.coerceAtLeast(0)
+            invalidate()
+        }
+    var divisionColumns: Int = 0
+        set(value) {
+            field = value.coerceAtLeast(0)
+            invalidate()
+        }
+
+    enum class DivisionOrientation {
+        VERTICAL,
+        HORIZONTAL
+    }
 
     private enum class TouchMode {
         NONE, MOVE,
@@ -143,6 +181,7 @@ class AreaSelectionView @JvmOverloads constructor(
                 ) {
                     buttonsHiddenForCurrentDrag = true
                     onInteractionStarted?.invoke()
+                    invalidate()
                 }
                 applyMove(dx, dy)
                 lastTouchX = x
@@ -158,7 +197,7 @@ class AreaSelectionView @JvmOverloads constructor(
                         touchSlop.toFloat()
                     )
                 ) {
-                    PickerActionButtonsVisibilityPolicy.ShowTiming.NOW -> onInteractionFinished?.invoke()
+                    PickerActionButtonsVisibilityPolicy.ShowTiming.NOW -> finishInteraction()
                     PickerActionButtonsVisibilityPolicy.ShowTiming.AFTER_IDLE_DELAY -> {
                         idleHandler.postDelayed(showButtonsRunnable, IDLE_SHOW_BUTTONS_MS)
                     }
@@ -249,6 +288,7 @@ class AreaSelectionView @JvmOverloads constructor(
             corner,
             innerStrokePaint
         )
+        drawDivisionLines(canvas)
 
         // Corner handles
         val r = edgeHitSize / 3
@@ -261,6 +301,51 @@ class AreaSelectionView @JvmOverloads constructor(
     private fun drawHandle(canvas: Canvas, cx: Float, cy: Float, radius: Float) {
         canvas.drawCircle(cx, cy, radius, handlePaint)
         canvas.drawCircle(cx, cy, radius, handleStrokePaint)
+    }
+
+    private fun finishInteraction() {
+        buttonsHiddenForCurrentDrag = false
+        onInteractionFinished?.invoke()
+        invalidate()
+    }
+
+    private fun drawDivisionLines(canvas: Canvas) {
+        if (buttonsHiddenForCurrentDrag || touchMode != TouchMode.NONE) return
+        if (divisionRows > 1 || divisionColumns > 1) {
+            drawGridDivisionLines(canvas)
+            return
+        }
+        if (divisionCount <= 1) return
+        if (divisionOrientation == DivisionOrientation.HORIZONTAL) {
+            val step = rect.height() / divisionCount.toFloat()
+            for (index in 1 until divisionCount) {
+                val y = rect.top + step * index
+                canvas.drawLine(rect.left, y, rect.right, y, divisionLinePaint)
+            }
+        } else {
+            val step = rect.width() / divisionCount.toFloat()
+            for (index in 1 until divisionCount) {
+                val x = rect.left + step * index
+                canvas.drawLine(x, rect.top, x, rect.bottom, divisionLinePaint)
+            }
+        }
+    }
+
+    private fun drawGridDivisionLines(canvas: Canvas) {
+        if (divisionRows > 1) {
+            val rowHeight = rect.height() / divisionRows.toFloat()
+            for (row in 1 until divisionRows) {
+                val y = rect.top + rowHeight * row
+                canvas.drawLine(rect.left, y, rect.right, y, divisionLinePaint)
+            }
+        }
+        if (divisionColumns > 1) {
+            val columnWidth = rect.width() / divisionColumns.toFloat()
+            for (column in 1 until divisionColumns) {
+                val x = rect.left + columnWidth * column
+                canvas.drawLine(x, rect.top, x, rect.bottom, divisionLinePaint)
+            }
+        }
     }
 
     companion object {

@@ -21,6 +21,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var openOverlaySettingsButton: TextView
     private lateinit var grantScreenCaptureButton: TextView
     private lateinit var toggleFloatingButton: TextView
+    private lateinit var gameScriptsButton: TextView
     private lateinit var myScriptsButton: TextView
     private lateinit var deviceResolutionText: TextView
     private var floatingTogglePending = false
@@ -47,6 +48,7 @@ class MainActivity : AppCompatActivity() {
         openOverlaySettingsButton = findViewById(R.id.openOverlaySettingsButton)
         grantScreenCaptureButton = findViewById(R.id.grantScreenCaptureButton)
         toggleFloatingButton = findViewById(R.id.toggleFloatingButton)
+        gameScriptsButton = findViewById(R.id.gameScriptsButton)
         myScriptsButton = findViewById(R.id.myScriptsButton)
         deviceResolutionText = findViewById(R.id.deviceResolutionText)
 
@@ -74,6 +76,10 @@ class MainActivity : AppCompatActivity() {
 
         myScriptsButton.setOnClickListener {
             startActivity(Intent(this, ScriptListActivity::class.java))
+        }
+
+        gameScriptsButton.setOnClickListener {
+            startActivity(Intent(this, PvzGameScriptActivity::class.java))
         }
     }
 
