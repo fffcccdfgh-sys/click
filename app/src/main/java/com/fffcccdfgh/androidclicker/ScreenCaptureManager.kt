@@ -58,10 +58,11 @@ object ScreenCaptureManager {
         virtualDisplay = mediaProjection?.createVirtualDisplay(
             "ScreenCapture",
             captureWidth, captureHeight, captureDensityDpi,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+            0,  // No flags — use exact requested dimensions
             imageReader!!.surface, null, backgroundHandler
         )
 
+        Log.d(TAG, "VirtualDisplay created: requested=${captureWidth}x${captureHeight} dpi=$captureDensityDpi")
         isReady = virtualDisplay != null
         Log.d(TAG, "Initialized: ${captureWidth}x${captureHeight} dpi=$captureDensityDpi ready=$isReady")
     }
@@ -101,7 +102,7 @@ object ScreenCaptureManager {
                     current.width,
                     current.height,
                     current.densityDpi,
-                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                    0,  // No flags — use exact requested dimensions
                     newReader.surface,
                     null,
                     handler
@@ -139,7 +140,11 @@ object ScreenCaptureManager {
             try {
                 val image = reader.acquireLatestImage()
                 if (image != null) {
-                    Log.d(TAG, "captureFrameSync: acquired frame ${image.width}x${image.height}")
+                    if (image.width != captureWidth || image.height != captureHeight) {
+                        Log.w(TAG, "Frame resolution MISMATCH: image=${image.width}x${image.height} configured=${captureWidth}x${captureHeight} — AUTO_MIRROR may be the cause")
+                    } else {
+                        Log.d(TAG, "Frame acquired: image=${image.width}x${image.height} configured=${captureWidth}x${captureHeight}")
+                    }
                     return image
                 }
             } catch (e: IllegalStateException) {

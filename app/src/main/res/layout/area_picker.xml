@@ -4,6 +4,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <ImageView
+        android:id="@+id/areaPickerBackground"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY" />
+
     <com.fffcccdfgh.androidclicker.AreaSelectionView
         android:id="@+id/areaSelectionView"
         android:layout_width="match_parent"

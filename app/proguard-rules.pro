@@ -19,3 +19,7 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep tess-two JNI entry points stable in minified release builds.
+-keep class com.googlecode.tesseract.android.** { *; }
+-dontwarn com.googlecode.tesseract.android.**

@@ -10,6 +10,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Rect
@@ -26,6 +27,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -45,6 +47,7 @@ class PvzFloatingControlService : Service() {
     private var calibrationPanelView: View? = null
     private var calibrationPanelParams: WindowManager.LayoutParams? = null
     private var calibrationPickerView: View? = null
+    private var areaPickerBackgroundBitmap: Bitmap? = null
     private var executionStopButton: ExecutionStopButtonOverlay? = null
     private var floatingTouchThrough = false
     private var stopButtonPositioning = false
@@ -680,9 +683,35 @@ class PvzFloatingControlService : Service() {
         hideCalibrationPanel()
         hideCalibrationPickerOverlay(revealOverlays = false)
 
+        // Capture screenshot before hiding overlays (overlays are system windows,
+        // so they won't appear in the capture)
+        val capturedImage = if (ScreenCaptureManager.isReady) {
+            ScreenCaptureManager.refreshDisplayMetrics(this)
+            ScreenCaptureManager.captureFrameSync()
+        } else {
+            null
+        }
+        val backgroundBitmap: Bitmap? = capturedImage?.let { image ->
+            try {
+                ScreenCaptureManager.imageToBitmap(image)
+            } finally {
+                try { image.close() } catch (_: Exception) {}
+            }
+        }
+        // Recycle previous bitmap if any
+        areaPickerBackgroundBitmap?.let {
+            if (!it.isRecycled) it.recycle()
+        }
+        areaPickerBackgroundBitmap = backgroundBitmap
+
         ScreenshotHider.hideAll()
         val view = LayoutInflater.from(this).inflate(R.layout.area_picker, null)
         calibrationPickerView = view
+
+        // Set screenshot as background if available
+        if (backgroundBitmap != null) {
+            view.findViewById<ImageView>(R.id.areaPickerBackground)?.setImageBitmap(backgroundBitmap)
+        }
 
         val params = createFullScreenPickerParams()
 
@@ -730,6 +759,11 @@ class PvzFloatingControlService : Service() {
             wm.addView(view, params)
         } catch (e: Exception) {
             calibrationPickerView = null
+            // Recycle the background bitmap on failure
+            areaPickerBackgroundBitmap?.let {
+                if (!it.isRecycled) it.recycle()
+            }
+            areaPickerBackgroundBitmap = null
             ScreenshotHider.revealAll()
             Log.w(stopDebugTag, "Failed to show PVZ2 program text area picker", e)
             restoreProgramEditorWithSnippet(null)
@@ -743,6 +777,11 @@ class PvzFloatingControlService : Service() {
         } catch (_: Exception) {
         }
         calibrationPickerView = null
+        // Recycle the background bitmap to free memory
+        areaPickerBackgroundBitmap?.let {
+            if (!it.isRecycled) it.recycle()
+        }
+        areaPickerBackgroundBitmap = null
         ScreenshotHider.revealAll()
     }
 
@@ -842,6 +881,7 @@ class PvzFloatingControlService : Service() {
         codeInput.inputType = InputType.TYPE_CLASS_TEXT or
             InputType.TYPE_TEXT_FLAG_MULTI_LINE or
             InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        codeInput.filters = codeInput.filters.filterNot { it is android.text.InputFilter.LengthFilter }.toTypedArray()
         codeInput.setSelectAllOnFocus(false)
     }
 
@@ -1040,6 +1080,11 @@ class PvzFloatingControlService : Service() {
                 id = "pvz_other",
                 title = getString(R.string.pvz_calibration_other),
                 snippet = "other_.x, other_.y"
+            ),
+            ProgramLuaTemplate(
+                id = "pvz_endless_supply",
+                title = getString(R.string.pvz_calibration_endless_supply),
+                snippet = "endless_supply_.x, endless_supply_.y"
             )
         )
     }
@@ -1191,6 +1236,11 @@ class PvzFloatingControlService : Service() {
             R.id.pvzCalibrationOtherStatus,
             PvzCalibrationStorage.OTHER
         )
+        bindCalibrationStatusButton(
+            panel,
+            R.id.pvzCalibrationEndlessSupplyStatus,
+            PvzCalibrationStorage.ENDLESS_SUPPLY
+        )
     }
 
     private fun bindCalibrationStatusButton(panel: View, viewId: Int, key: String) {
@@ -1262,6 +1312,10 @@ class PvzFloatingControlService : Service() {
         }
         if (key == PvzCalibrationStorage.OTHER) {
             showOtherCalibrationPicker()
+            return
+        }
+        if (key == PvzCalibrationStorage.ENDLESS_SUPPLY) {
+            showEndlessSupplyCalibrationPicker()
             return
         }
         Log.d(stopDebugTag, "PVZ2 calibration entry clicked: $key")
@@ -2047,6 +2101,140 @@ class PvzFloatingControlService : Service() {
         )
     }
 
+    private fun showEndlessSupplyCalibrationPicker() {
+        val wm = windowManager ?: return
+        if (calibrationPickerView != null) return
+
+        ScreenshotHider.hideAll()
+        val view = PvzEndlessSupplyCalibrationView(this)
+        calibrationPickerView = view
+
+        val params = createFullScreenPickerParams()
+
+        view.setCalibration(endlessSupplyCalibrationArea(), endlessSupplyCalibrationPoints())
+        view.onSave = { area, points ->
+            saveEndlessSupplyCalibration(area, points)
+            hideCalibrationPickerOverlay(revealOverlays = true)
+            refreshCalibrationPanelStatuses()
+            Toast.makeText(this, R.string.pvz_endless_supply_calibration_saved, Toast.LENGTH_SHORT).show()
+        }
+        view.onCancel = {
+            hideCalibrationPickerOverlay(revealOverlays = true)
+        }
+
+        try {
+            wm.addView(view, params)
+        } catch (e: Exception) {
+            calibrationPickerView = null
+            ScreenshotHider.revealAll()
+            Log.w(stopDebugTag, "Failed to show PVZ2 endless supply calibration picker", e)
+        }
+    }
+
+    private fun endlessSupplyCalibrationArea(): PvzCalibrationArea {
+        val saved = PvzCalibrationStorage.getEndlessSupplyTextArea(this)
+        val screen = currentProgramScreenSize()
+        val rect = if (saved != null) {
+            Rect(
+                storedPercentXToEdgePx(saved.left),
+                storedPercentYToEdgePx(saved.top),
+                storedPercentXToEdgePx(saved.right),
+                storedPercentYToEdgePx(saved.bottom)
+            )
+        } else {
+            Rect(
+                (screen.width * 0.38f).toInt(),
+                (screen.height * 0.22f).toInt(),
+                (screen.width * 0.62f).toInt(),
+                (screen.height * 0.34f).toInt()
+            )
+        }
+        return PvzCalibrationArea(
+            label = getString(R.string.pvz_endless_supply_text_area),
+            rect = android.graphics.RectF(rect)
+        )
+    }
+
+    private fun endlessSupplyCalibrationPoints(): List<PvzCalibrationPoint> {
+        val saved = PvzCalibrationStorage.getEndlessSupplyPoints(this).associateBy { it.key }
+        if (saved.isNotEmpty()) {
+            return endlessSupplyPointSpecs().map { spec ->
+                val point = saved[spec.key]
+                PvzCalibrationPoint(
+                    key = spec.key,
+                    label = spec.label,
+                    x = point?.x?.let { storedPercentXToPointPx(it).toFloat() } ?: spec.defaultX,
+                    y = point?.y?.let { storedPercentYToPointPx(it).toFloat() } ?: spec.defaultY
+                )
+            }
+        }
+        return endlessSupplyPointSpecs().map { spec ->
+            PvzCalibrationPoint(
+                key = spec.key,
+                label = spec.label,
+                x = spec.defaultX,
+                y = spec.defaultY
+            )
+        }
+    }
+
+    private data class EndlessSupplyPointSpec(
+        val key: String,
+        val label: String,
+        val defaultX: Float,
+        val defaultY: Float
+    )
+
+    private fun endlessSupplyPointSpecs(): List<EndlessSupplyPointSpec> {
+        val screen = currentProgramScreenSize()
+        val labels = listOf(
+            PvzCalibrationStorage.ENDLESS_SUPPLY_ABILITY to getString(R.string.pvz_endless_supply_ability),
+            PvzCalibrationStorage.ENDLESS_SUPPLY_BLUE_CONFIRM to getString(R.string.pvz_endless_supply_blue_confirm),
+            PvzCalibrationStorage.ENDLESS_SUPPLY_GREEN_CONFIRM to getString(R.string.pvz_endless_supply_green_confirm),
+            PvzCalibrationStorage.ENDLESS_SUPPLY_FINAL_CONFIRM to getString(R.string.pvz_endless_supply_final_confirm),
+            PvzCalibrationStorage.ENDLESS_SUPPLY_PAIR to getString(R.string.pvz_endless_supply_pair),
+            PvzCalibrationStorage.ENDLESS_SUPPLY_1 to getString(R.string.pvz_endless_supply_1),
+            PvzCalibrationStorage.ENDLESS_SUPPLY_2 to getString(R.string.pvz_endless_supply_2),
+            PvzCalibrationStorage.ENDLESS_SUPPLY_3 to getString(R.string.pvz_endless_supply_3),
+            PvzCalibrationStorage.ENDLESS_SUPPLY_CONTINUE_CHALLENGE to getString(R.string.pvz_endless_supply_continue_challenge)
+        )
+        val columns = 5
+        val rows = (labels.size + columns - 1) / columns
+        return labels.mapIndexed { index, (key, label) ->
+            val column = index % columns
+            val row = index / columns
+            EndlessSupplyPointSpec(
+                key = key,
+                label = label,
+                defaultX = screen.width * (column + 1).toFloat() / (columns + 1).toFloat(),
+                defaultY = screen.height * (row + 1).toFloat() / (rows + 1).toFloat()
+            )
+        }
+    }
+
+    private fun saveEndlessSupplyCalibration(
+        area: PvzCalibrationArea,
+        points: List<PvzCalibrationPoint>
+    ) {
+        val rect = area.rect
+        PvzCalibrationStorage.saveEndlessSupply(
+            this,
+            textArea = PvzCalibrationStorage.Area(
+                left = pixelXToStoredPercent(rect.left.toInt()),
+                top = pixelYToStoredPercent(rect.top.toInt()),
+                right = pixelXToStoredPercent(rect.right.toInt()),
+                bottom = pixelYToStoredPercent(rect.bottom.toInt())
+            ),
+            points = points.map { point ->
+                PvzCalibrationStorage.NamedPoint(
+                    key = point.key,
+                    x = pixelXToStoredPercent(point.x.toInt()),
+                    y = pixelYToStoredPercent(point.y.toInt())
+                )
+            }
+        )
+    }
+
     private fun restorePlantSlotsCalibrationArea(selectionView: AreaSelectionView) {
         val area = PvzCalibrationStorage.getPlantSlotsArea(this) ?: return
         selectionView.setInitialRect(
@@ -2087,11 +2275,19 @@ class PvzFloatingControlService : Service() {
         if (view is PvzPointCalibrationView) {
             view.cleanup()
         }
+        if (view is PvzEndlessSupplyCalibrationView) {
+            view.cleanup()
+        }
         try {
             windowManager?.removeView(view)
         } catch (_: Exception) {
         }
         calibrationPickerView = null
+        // Recycle the background bitmap if present
+        areaPickerBackgroundBitmap?.let {
+            if (!it.isRecycled) it.recycle()
+        }
+        areaPickerBackgroundBitmap = null
         if (revealOverlays) {
             ScreenshotHider.revealAll()
         }

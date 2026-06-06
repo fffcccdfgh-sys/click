@@ -72,7 +72,7 @@ class ClickAccessibilityService : AccessibilityService() {
             null
         }
 
-        val foundByOcr = detectConditionTextWithOcr(conditionText, areaRect, action.conditionOcrFilter)
+        val foundByOcr = detectConditionTextWithOcr(conditionText, areaRect)
         val found = TextConditionDetector.containsText(
             targetText = conditionText,
             ocrLookup = { foundByOcr }
@@ -82,23 +82,34 @@ class ClickAccessibilityService : AccessibilityService() {
 
     private suspend fun detectConditionTextWithOcr(
         text: String,
-        area: Rect?,
-        filterMode: String?
+        area: Rect?
     ): Boolean {
-        if (!ScreenCaptureManager.isReady) return false
-
         ScreenCaptureManager.refreshDisplayMetrics(this)
-        if (!ScreenCaptureManager.isReady) return false
+        val display = ScreenCaptureDisplayReader.current(this)
         val screenWidth = ScreenCaptureManager.getCaptureWidth()
+            .takeIf { it > 0 }
+            ?: display.width
         val screenHeight = ScreenCaptureManager.getCaptureHeight()
+            .takeIf { it > 0 }
+            ?: display.height
+        if (screenWidth <= 0 || screenHeight <= 0) {
+            Log.d(TAG, "detectConditionTextWithOcr skipped: invalid screen size")
+            return false
+        }
+        Log.d(
+            TAG,
+            "detectConditionTextWithOcr start: targetLength=${text.length} " +
+                "area=${area?.toShortString() ?: "full"} screen=${screenWidth}x${screenHeight}"
+        )
         return withContext(Dispatchers.Default) {
-            OcrHelper.detectText(
+            val found = OcrHelper.detectText(
                 targetText = text,
                 area = area,
                 screenWidth = screenWidth,
-                screenHeight = screenHeight,
-                filterMode = filterMode
+                screenHeight = screenHeight
             )
+            Log.d(TAG, "detectConditionTextWithOcr result: found=$found")
+            found
         }
     }
 

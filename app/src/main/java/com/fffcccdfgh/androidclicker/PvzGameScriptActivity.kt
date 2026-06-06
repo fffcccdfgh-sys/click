@@ -59,6 +59,7 @@ class PvzGameScriptActivity : AppCompatActivity() {
         updateCalibrationStatus(R.id.pvzRechargeCalibrationStatus, PvzCalibrationStorage.RECHARGE)
         updateCalibrationStatus(R.id.pvzCardsCalibrationStatus, PvzCalibrationStorage.CARDS)
         updateCalibrationStatus(R.id.pvzOtherCalibrationStatus, PvzCalibrationStorage.OTHER)
+        updateCalibrationStatus(R.id.pvzEndlessSupplyCalibrationStatus, PvzCalibrationStorage.ENDLESS_SUPPLY)
     }
 
     private fun updateCalibrationStatus(viewId: Int, key: String) {

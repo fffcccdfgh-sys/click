@@ -79,7 +79,6 @@ class FloatingControlService : Service() {
     private var condEditType: String? = null
     private var condEditInvert: Boolean = false
     private var condEditText: String? = null
-    private var condEditOcrFilter: String = OcrFilterMode.DEFAULT
     private var condEditUseArea: Boolean = false
     private var condEditLeft: Int? = null
     private var condEditTop: Int? = null
@@ -593,6 +592,19 @@ class FloatingControlService : Service() {
         } else {
             @Suppress("DEPRECATION")
             WindowManager.LayoutParams.TYPE_PHONE
+        }
+    }
+
+    private fun requestScreenCapturePermissionForOcr() {
+        Log.i(tag, "requestScreenCapturePermissionForOcr: starting permission activity")
+        Toast.makeText(this, getString(R.string.screen_capture_not_ready), Toast.LENGTH_SHORT).show()
+        try {
+            startActivity(Intent(this, ScreenCapturePermissionActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        } catch (e: Exception) {
+            Log.w(tag, "Failed to request screen capture permission for OCR", e)
+            Toast.makeText(this, R.string.screen_capture_not_supported, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1800,6 +1812,7 @@ class FloatingControlService : Service() {
         codeInput.inputType = InputType.TYPE_CLASS_TEXT or
             InputType.TYPE_TEXT_FLAG_MULTI_LINE or
             InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        codeInput.filters = codeInput.filters.filterNot { it is android.text.InputFilter.LengthFilter }.toTypedArray()
         codeInput.setSelectAllOnFocus(false)
     }
 
@@ -2292,7 +2305,6 @@ class FloatingControlService : Service() {
                 }
             }
             condEditText = action.conditionText
-            condEditOcrFilter = OcrFilterMode.normalize(action.conditionOcrFilter)
             condEditUseArea = action.conditionUseArea == true
             condEditLeft = action.conditionLeft
             condEditTop = action.conditionTop
@@ -2308,7 +2320,6 @@ class FloatingControlService : Service() {
     private fun showConditionPicker() {
         val wm = windowManager ?: return
         if (pickerView != null) hidePickerOverlay()
-        OcrHelper.warmUpAsync()
 
         val inflater = LayoutInflater.from(this)
         val picker = inflater.inflate(R.layout.condition_picker, null)
@@ -2369,22 +2380,14 @@ class FloatingControlService : Service() {
         val colorPosText = picker.findViewById<TextView>(R.id.condColorPosText)
         val selectAreaBtn = picker.findViewById<TextView>(R.id.condSelectAreaBtn)
         val areaRangeText = picker.findViewById<TextView>(R.id.condAreaRangeText)
-        val ocrFilterRow = picker.findViewById<View>(R.id.conditionOcrFilterRow)
-        val ocrFilterDropdown = picker.findViewById<TextView>(R.id.condOcrFilterDropdown)
         val colorToleranceRow = picker.findViewById<View>(R.id.conditionColorToleranceRow)
         val colorToleranceInput = picker.findViewById<EditText>(R.id.conditionColorToleranceInput)
+        val saveBtn = picker.findViewById<View>(R.id.condSaveBtn)
 
         fun condTypeToLabel(type: String?): String = when (type) {
             ActionStep.CONDITION_TEXT_CONTAINS -> getString(R.string.condition_type_text_contains)
             ActionStep.CONDITION_COLOR_MATCH -> getString(R.string.condition_type_color_match)
             else -> getString(R.string.condition_type_none)
-        }
-
-        fun ocrFilterToLabel(filter: String?): String = when (OcrFilterMode.normalize(filter)) {
-            OcrFilterMode.GRAYSCALE -> getString(R.string.condition_ocr_filter_grayscale)
-            OcrFilterMode.THRESHOLD -> getString(R.string.condition_ocr_filter_threshold)
-            OcrFilterMode.THRESHOLD_INVERT -> getString(R.string.condition_ocr_filter_threshold_invert)
-            else -> getString(R.string.condition_ocr_filter_original)
         }
 
         fun updateInvertUI() {
@@ -2464,12 +2467,11 @@ class FloatingControlService : Service() {
                         R.string.condition_text_hint
                     }
                 )
+                if (conditionOcrPrefillRunning) {
+                    textInput.setText("")
+                }
             }
             selectAreaBtn.visibility = if (isText) View.VISIBLE else View.GONE
-            ocrFilterRow.visibility = if (isText) View.VISIBLE else View.GONE
-            if (isText) {
-                ocrFilterDropdown.text = ocrFilterToLabel(condEditOcrFilter)
-            }
             // Area range display (text type only, after area is set)
             if (isText && condEditUseArea && condEditLeft != null && condEditRight != null
                 && condEditTop != null && condEditBottom != null) {
@@ -2510,7 +2512,6 @@ class FloatingControlService : Service() {
                     ActionStep.CONDITION_COLOR_MATCH -> {
                         // Switching to color: clear text-related state
                         condEditText = null
-                        condEditOcrFilter = OcrFilterMode.DEFAULT
                         condEditUseArea = false
                         condEditLeft = null
                         condEditTop = null
@@ -2519,7 +2520,6 @@ class FloatingControlService : Service() {
                     }
                     ActionStep.CONDITION_TEXT_CONTAINS -> {
                         // Switching to text: clear color-related state
-                        condEditOcrFilter = OcrFilterMode.DEFAULT
                         condEditColorHex = null
                         condEditColorTolerance = null
                         condEditColorX = null
@@ -2529,7 +2529,6 @@ class FloatingControlService : Service() {
                         // Switching to unconditional: clear everything
                         condEditInvert = false
                         condEditText = null
-                        condEditOcrFilter = OcrFilterMode.DEFAULT
                         condEditUseArea = false
                         condEditLeft = null
                         condEditTop = null
@@ -2603,60 +2602,6 @@ class FloatingControlService : Service() {
             popup.showAsDropDown(condTypeDropdown, 0, 4)
         }
 
-        fun showOcrFilterPopup() {
-            val popupContent = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setBackgroundColor(0xFF3A3A3A.toInt())
-                setPadding(2, 2, 2, 2)
-            }
-
-            val options = listOf(
-                OcrFilterMode.ORIGINAL to getString(R.string.condition_ocr_filter_original),
-                OcrFilterMode.GRAYSCALE to getString(R.string.condition_ocr_filter_grayscale),
-                OcrFilterMode.THRESHOLD to getString(R.string.condition_ocr_filter_threshold),
-                OcrFilterMode.THRESHOLD_INVERT to getString(R.string.condition_ocr_filter_threshold_invert)
-            )
-
-            val popup = PopupWindow(
-                popupContent,
-                ocrFilterDropdown.width,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                true
-            )
-            popup.setBackgroundDrawable(ColorDrawable(0xFF3A3A3A.toInt()))
-            popup.elevation = 12f
-
-            for ((index, option) in options.withIndex()) {
-                val item = TextView(this).apply {
-                    text = option.second
-                    textSize = 15f
-                    setTextColor(Color.WHITE)
-                    gravity = Gravity.CENTER_VERTICAL
-                    setPadding(14, 12, 14, 12)
-                    setBackgroundColor(Color.TRANSPARENT)
-                    isClickable = true
-                    isFocusable = true
-                    setOnClickListener {
-                        condEditOcrFilter = option.first
-                        ocrFilterDropdown.text = option.second
-                        popup.dismiss()
-                    }
-                }
-                popupContent.addView(item)
-
-                if (index < options.size - 1) {
-                    val divider = View(this).apply {
-                        layoutParams = LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT, 1)
-                        setBackgroundColor(0x33FFFFFF.toInt())
-                    }
-                    popupContent.addView(divider)
-                }
-            }
-
-            popup.showAsDropDown(ocrFilterDropdown, 0, 4)
-        }
-
         textInput.setText(condEditText ?: "")
         colorToleranceInput.setText((condEditColorTolerance ?: 10).toString())
         updateCondTypeDropdown()
@@ -2666,16 +2611,27 @@ class FloatingControlService : Service() {
             showCondTypePopup()
         }
 
-        ocrFilterDropdown.setOnClickListener {
-            showOcrFilterPopup()
-        }
-
         invertBtn.setOnClickListener {
             condEditInvert = !condEditInvert
             updateInvertUI()
         }
 
         selectAreaBtn.setOnClickListener {
+            Log.i(
+                tag,
+                "condition select area clicked: type=${condEditType ?: "none"} " +
+                    "screen=${programScreenSize().width}x${programScreenSize().height} " +
+                    "captureReady=${ScreenCaptureManager.isReady}"
+            )
+            if (
+                OcrScreenCaptureReadinessPolicy.shouldRequestPermissionBeforeTextAreaSelection(
+                    conditionType = condEditType,
+                    captureReady = ScreenCaptureManager.isReady
+                )
+            ) {
+                requestScreenCapturePermissionForOcr()
+                return@setOnClickListener
+            }
             hidePickerOverlay()
             showAreaPicker()
         }
@@ -2691,7 +2647,7 @@ class FloatingControlService : Service() {
             showColorPickerOverlay()
         }
 
-        picker.findViewById<View>(R.id.condSaveBtn).setOnClickListener {
+        saveBtn.setOnClickListener {
             val isColor = condEditType == ActionStep.CONDITION_COLOR_MATCH
 
             if (condEditType != null) {
@@ -2748,11 +2704,6 @@ class FloatingControlService : Service() {
                 sequence[settingsActionIndex] = oldAction.copy(
                     conditionType = savedType,
                     conditionText = if (savedType != null && !isSavedColor) condEditText else null,
-                    conditionOcrFilter = if (savedType != null && !isSavedColor) {
-                        OcrFilterMode.normalize(condEditOcrFilter)
-                    } else {
-                        null
-                    },
                     conditionUseArea = if (savedType != null) condEditUseArea else null,
                     conditionLeft = if (condEditUseArea && savedType != null) condEditLeft else null,
                     conditionTop = if (condEditUseArea && savedType != null) condEditTop else null,
@@ -2767,8 +2718,13 @@ class FloatingControlService : Service() {
                 if (actionListVisible) renderActionList()
                 refreshMarkers()
             }
+            val actionIndex = settingsActionIndex
             hidePickerOverlay()
-            settingsActionIndex = -1
+            if (actionIndex >= 0) {
+                showActionSettings(actionIndex)
+            } else {
+                settingsActionIndex = -1
+            }
             Toast.makeText(this, getString(R.string.condition_saved), Toast.LENGTH_SHORT).show()
         }
 
@@ -2789,6 +2745,13 @@ class FloatingControlService : Service() {
         onCancelled: (() -> Unit)? = null
     ) {
         val wm = windowManager ?: return
+
+        Log.i(
+            tag,
+            "showAreaPicker start: callback=${onAreaSelected != null} " +
+                "type=${condEditType ?: "none"} screen=${programScreenSize().width}x${programScreenSize().height} " +
+                "captureReady=${ScreenCaptureManager.isReady}"
+        )
 
         var overlaysHiddenForAreaPicker = true
         ScreenshotHider.hideAll()
@@ -2831,6 +2794,11 @@ class FloatingControlService : Service() {
 
         saveBtn.setOnClickListener {
             val rect = selectionView.getSelectionRect()
+            Log.i(
+                tag,
+                "areaPicker save clicked: hasRect=${rect != null} " +
+                    "type=${condEditType ?: "none"} captureReady=${ScreenCaptureManager.isReady}"
+            )
             var areaRect: Rect? = null
             var shouldPrefillText = false
             if (rect != null) {
@@ -2849,10 +2817,21 @@ class FloatingControlService : Service() {
                 condEditUseArea = true
                 areaRect = Rect(screenLeft, screenTop, screenRight, screenBottom)
                 shouldPrefillText = condEditType == ActionStep.CONDITION_TEXT_CONTAINS
+                Log.i(
+                    tag,
+                    "areaPicker selected: rect=${areaRect.toShortString()} " +
+                        "stored=[${condEditLeft},${condEditTop}][${condEditRight},${condEditBottom}] " +
+                        "prefill=$shouldPrefillText"
+                )
             }
-            selectionView.cleanup()
-            wm.removeView(view)
-            pickerView = null
+            if (shouldPrefillText && areaRect != null && onAreaSelected == null) {
+                removeAreaPickerView(view, selectionView)
+                revealAreaPickerOverlays()
+                prefillTextConditionFromArea(areaRect)
+                return@setOnClickListener
+            }
+
+            removeAreaPickerView(view, selectionView)
 
             if (onAreaSelected != null) {
                 revealAreaPickerOverlays()
@@ -2868,6 +2847,11 @@ class FloatingControlService : Service() {
                 overlaysHiddenForAreaPicker = false
                 prefillTextConditionFromArea(areaRect)
             } else {
+                Log.i(
+                    tag,
+                    "areaPicker finished without OCR prefill: shouldPrefill=$shouldPrefillText " +
+                        "hasArea=${areaRect != null}"
+                )
                 revealAreaPickerOverlays()
                 showConditionPicker()
             }
@@ -2899,82 +2883,204 @@ class FloatingControlService : Service() {
         }
     }
 
+    private fun removeAreaPickerView(
+        view: View,
+        selectionView: AreaSelectionView
+    ) {
+        selectionView.cleanup()
+        try {
+            windowManager?.removeView(view)
+        } catch (e: Exception) {
+            Log.w(tag, "Failed to remove area picker", e)
+        }
+        if (pickerView === view) {
+            pickerView = null
+        }
+    }
+
     private fun prefillTextConditionFromArea(area: Rect) {
+        Log.i(
+            tag,
+            "prefillTextConditionFromArea start: area=${area.toShortString()} " +
+                "captureReady=${ScreenCaptureManager.isReady} " +
+                "screen=${programScreenSize().width}x${programScreenSize().height}"
+        )
         if (!ScreenCaptureManager.isReady) {
+            Log.i(tag, "prefillTextConditionFromArea skipped: screen capture is not ready")
             ScreenshotHider.revealAll()
             showConditionPicker()
-            Toast.makeText(this, getString(R.string.screen_capture_not_ready), Toast.LENGTH_SHORT).show()
+            requestScreenCapturePermissionForOcr()
             return
         }
 
         conditionOcrPrefillGeneration++
         val generation = conditionOcrPrefillGeneration
-        val filterMode = OcrFilterMode.normalize(condEditOcrFilter)
         conditionOcrPrefillRunning = true
         condEditText = null
         showConditionPicker()
-        ScreenshotHider.hideAll()
 
         Thread {
             val handler = android.os.Handler(mainLooper)
             val startedAt = SystemClock.uptimeMillis()
-            var afterHideDelay = startedAt
-            var beforeCapture = startedAt
-            var afterCapture = startedAt
-            var ocrBitmap: Bitmap? = null
+            var initialDelayMs = 0L
+            var totalCaptureMs = 0L
+            var totalRecognizeMs = 0L
+            val capturedBitmaps = mutableListOf<Bitmap>()
+            val captureScores = mutableListOf<Double>()
+            val captureSources = mutableListOf<String>()
+            var failureMessageRes: Int? = null
+            fun addOcrCandidate(
+                source: String,
+                bitmap: Bitmap
+            ) {
+                val score = OcrBitmapQuality.edgeScore(bitmap)
+                if (OcrBitmapQuality.isProbablyBlank(score)) {
+                    Log.d(
+                        tag,
+                        "OCR prefill skipped blank candidate source=$source " +
+                            "bitmap=${bitmap.width}x${bitmap.height} " +
+                            "sharpness=${String.format("%.2f", score)}"
+                    )
+                    bitmap.recycle()
+                    return
+                }
+                if (OcrDebugConfig.VERBOSE_LOGS) {
+                    Log.d(
+                        tag,
+                        "OCR prefill candidate source=$source bitmap=${bitmap.width}x${bitmap.height} " +
+                            "sharpness=${String.format("%.2f", score)}"
+                    )
+                }
+                capturedBitmaps += bitmap
+                captureScores += score
+                captureSources += source
+            }
+
+            fun recycleCapturedBitmaps() {
+                capturedBitmaps.forEach { bitmap ->
+                    if (!bitmap.isRecycled) {
+                        bitmap.recycle()
+                    }
+                }
+                capturedBitmaps.clear()
+                captureScores.clear()
+                captureSources.clear()
+            }
+
             val ocrText = try {
-                Thread.sleep(150)
-                afterHideDelay = SystemClock.uptimeMillis()
+                Thread.sleep(OcrPrefillCapturePolicy.INITIAL_CAPTURE_DELAY_MS)
+                initialDelayMs = SystemClock.uptimeMillis() - startedAt
                 ScreenCaptureManager.refreshDisplayMetrics(this)
-                ocrBitmap = if (!ScreenCaptureManager.isReady) {
-                    null
-                } else {
-                    beforeCapture = SystemClock.uptimeMillis()
-                    OcrHelper.captureAreaBitmap(
+                Log.i(
+                    tag,
+                    "OCR prefill after refresh: captureReady=${ScreenCaptureManager.isReady} " +
+                        "capture=${ScreenCaptureManager.getCaptureWidth()}x" +
+                        ScreenCaptureManager.getCaptureHeight()
+                )
+                var text = ""
+                captureLoop@ for (attemptIndex in 0 until OcrPrefillCapturePolicy.CAPTURE_ATTEMPT_COUNT) {
+                    if (attemptIndex > 0) {
+                        Thread.sleep(OcrPrefillCapturePolicy.BETWEEN_ATTEMPTS_DELAY_MS)
+                    }
+
+                    if (!ScreenCaptureManager.isReady) {
+                        failureMessageRes = R.string.screen_capture_not_ready
+                        break
+                    }
+
+                    val beforeCapture = SystemClock.uptimeMillis()
+                    val bitmap = OcrHelper.captureAreaBitmap(
                         area = area,
                         screenWidth = ScreenCaptureManager.getCaptureWidth(),
                         screenHeight = ScreenCaptureManager.getCaptureHeight(),
                         timeoutMs = OcrTimingPolicy.PREFILL_CAPTURE_TIMEOUT_MS
                     )
-                }
-                afterCapture = SystemClock.uptimeMillis()
-                handler.post { ScreenshotHider.revealAll() }
-
-                val bitmap = ocrBitmap
-                if (bitmap == null) {
-                    Log.d(
-                        tag,
-                        "OCR prefill empty bitmap: hideDelay=${afterHideDelay - startedAt}ms " +
-                            "capture=${afterCapture - beforeCapture}ms area=${area.width()}x${area.height()}"
-                    )
-                    ""
-                } else {
-                    try {
-                        val beforeRecognize = SystemClock.uptimeMillis()
-                        val text = OcrHelper.recognizeTextFromBitmap(bitmap, filterMode)
-                        val afterRecognize = SystemClock.uptimeMillis()
+                    val captureMs = SystemClock.uptimeMillis() - beforeCapture
+                    totalCaptureMs += captureMs
+                    if (bitmap == null) {
                         Log.d(
                             tag,
-                            "OCR prefill timing: hideDelay=${afterHideDelay - startedAt}ms " +
-                                "capture=${afterCapture - beforeCapture}ms " +
-                                "recognize=${afterRecognize - beforeRecognize}ms " +
-                                "bitmap=${bitmap.width}x${bitmap.height} " +
-                                "filter=$filterMode " +
+                            "OCR prefill capture attempt=${attemptIndex + 1}/" +
+                                "${OcrPrefillCapturePolicy.CAPTURE_ATTEMPT_COUNT} returned null " +
+                                "capture=${captureMs}ms area=${area.width()}x${area.height()}"
+                        )
+                    } else {
+                        if (OcrDebugConfig.VERBOSE_LOGS) {
+                            Log.d(
+                                tag,
+                                "OCR prefill capture attempt=${attemptIndex + 1}/" +
+                                    "${OcrPrefillCapturePolicy.CAPTURE_ATTEMPT_COUNT} " +
+                                    "bitmap=${bitmap.width}x${bitmap.height} capture=${captureMs}ms"
+                            )
+                        }
+                        val candidateCountBefore = capturedBitmaps.size
+                        addOcrCandidate("media-${attemptIndex + 1}", bitmap)
+                        if (capturedBitmaps.size > candidateCountBefore) {
+                            val candidateBitmap = capturedBitmaps.last()
+                            val beforeRecognize = SystemClock.uptimeMillis()
+                            val candidateText = OcrHelper.recognizeTextFromBitmap(candidateBitmap)
+                            totalRecognizeMs += SystemClock.uptimeMillis() - beforeRecognize
+                            if (candidateText.isNotEmpty()) {
+                                text = candidateText
+                                break@captureLoop
+                            }
+                        }
+                    }
+                }
+                if (capturedBitmaps.isEmpty()) {
+                    Log.d(
+                        tag,
+                        "OCR prefill empty bitmap: initialDelay=${initialDelayMs}ms " +
+                            "capture=${totalCaptureMs}ms area=${area.width()}x${area.height()}"
+                    )
+                    if (failureMessageRes == null) {
+                        failureMessageRes = R.string.condition_ocr_capture_failed
+                    }
+                    ""
+                } else {
+                    val bestFailureIndex = captureScores.indices.maxByOrNull { index ->
+                        captureScores[index]
+                    } ?: 0
+                    if (OcrDebugConfig.VERBOSE_LOGS) {
+                        Log.d(
+                            tag,
+                            "OCR prefill timing: initialDelay=${initialDelayMs}ms " +
+                                "capture=${totalCaptureMs}ms " +
+                                "recognize=${totalRecognizeMs}ms " +
+                                "captures=${capturedBitmaps.size} " +
+                                "bestCaptureSource=${captureSources[bestFailureIndex]} " +
                                 "textLength=${text.length}"
                         )
-                        text
-                    } finally {
-                        bitmap.recycle()
                     }
+                    if (
+                        OcrDebugImagePolicy.shouldSavePrefillFailureCrop(
+                            recognizedText = text,
+                            captureFailure = false
+                        )
+                    ) {
+                        val debugCrop = OcrDebugImageSaver.savePrefillFailureCrop(
+                            context = this,
+                            bitmap = capturedBitmaps[bestFailureIndex]
+                        )
+                        Log.i(
+                            tag,
+                            "OCR prefill saved failure crop: ${debugCrop?.absolutePath ?: "failed"}"
+                        )
+                    }
+                    text
                 }
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
                 handler.post { ScreenshotHider.revealAll() }
+                failureMessageRes = R.string.condition_ocr_capture_failed
                 ""
             } catch (e: Exception) {
                 Log.w(tag, "Failed to prefill text condition from OCR area", e)
                 handler.post { ScreenshotHider.revealAll() }
+                failureMessageRes = R.string.condition_ocr_recognize_failed
                 ""
+            } finally {
+                recycleCapturedBitmaps()
             }
 
             handler.post {
@@ -2991,8 +3097,9 @@ class FloatingControlService : Service() {
                         textInput.setSelection(textInput.text?.length ?: 0)
                     }
                 }
-                if (textInput != null && recognizedText.isEmpty()) {
-                    Toast.makeText(this, getString(R.string.condition_ocr_prefill_empty), Toast.LENGTH_SHORT).show()
+                if (recognizedText.isEmpty()) {
+                    val messageRes = failureMessageRes ?: R.string.condition_ocr_prefill_empty
+                    Toast.makeText(this, getString(messageRes), Toast.LENGTH_SHORT).show()
                 }
             }
         }.start()

@@ -1,7 +1,6 @@
 package com.fffcccdfgh.androidclicker
 
 import org.json.JSONObject
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
 
@@ -28,23 +27,7 @@ class ActionStepTest {
     }
 
     @Test
-    fun textConditionOcrFilterIsSavedAndLoaded() {
-        val action = ActionStep(
-            type = ActionStep.TYPE_TAP,
-            x = 10,
-            y = 20,
-            conditionType = ActionStep.CONDITION_TEXT_CONTAINS,
-            conditionText = "ready",
-            conditionOcrFilter = OcrFilterMode.THRESHOLD_INVERT
-        )
-
-        val reloaded = ActionStep.fromJson(action.toJson())
-
-        assertEquals(OcrFilterMode.THRESHOLD_INVERT, reloaded.conditionOcrFilter)
-    }
-
-    @Test
-    fun legacyTextConditionDefaultsToBlackWhiteOcrFilter() {
+    fun legacyTextConditionOcrFilterIsIgnoredWhenSavedAgain() {
         val action = ActionStep.fromJson(
             JSONObject(
                 """
@@ -53,12 +36,13 @@ class ActionStepTest {
                   "x": 10,
                   "y": 20,
                   "conditionType": "text_contains",
-                  "conditionText": "ready"
+                  "conditionText": "ready",
+                  "conditionOcrFilter": "threshold_invert"
                 }
                 """.trimIndent()
             )
         )
 
-        assertEquals(OcrFilterMode.THRESHOLD, action.conditionOcrFilter)
+        assertFalse(action.toJson().has("conditionOcrFilter"))
     }
 }

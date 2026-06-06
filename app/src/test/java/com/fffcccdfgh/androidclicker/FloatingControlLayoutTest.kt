@@ -18,18 +18,11 @@ class FloatingControlLayoutTest {
     }
 
     @Test
-    fun conditionOcrFilterIsBetweenTextInputAndAreaPicker() {
+    fun conditionPickerDoesNotExposeOcrFilters() {
         val layout = File("src/main/res/layout/condition_picker.xml").readText()
 
-        val textInputIndex = layout.indexOf("@+id/conditionTextInput")
-        val filterRowIndex = layout.indexOf("@+id/conditionOcrFilterRow")
-        val filterDropdownIndex = layout.indexOf("@+id/condOcrFilterDropdown")
-        val areaRowIndex = layout.indexOf("@+id/conditionTextAreaRow")
-
-        assertTrue(textInputIndex >= 0)
-        assertTrue(filterRowIndex > textInputIndex)
-        assertTrue(filterDropdownIndex > filterRowIndex)
-        assertTrue(areaRowIndex > filterDropdownIndex)
+        assertFalse(layout.contains("@+id/conditionOcrFilterRow"))
+        assertFalse(layout.contains("@+id/condOcrFilterDropdown"))
     }
 
     @Test

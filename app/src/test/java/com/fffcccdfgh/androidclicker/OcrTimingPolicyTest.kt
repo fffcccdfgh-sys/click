@@ -15,4 +15,10 @@ class OcrTimingPolicyTest {
         assertEquals(3000L, OcrTimingPolicy.DEFAULT_CAPTURE_TIMEOUT_MS)
         assertTrue(OcrTimingPolicy.DEFAULT_CAPTURE_TIMEOUT_MS > OcrTimingPolicy.PREFILL_CAPTURE_TIMEOUT_MS)
     }
+
+    @Test
+    fun accessibilityScreenshotGetsEnoughTimeForSystemCallback() {
+        assertTrue(OcrTimingPolicy.ACCESSIBILITY_CAPTURE_TIMEOUT_MS > OcrTimingPolicy.PREFILL_CAPTURE_TIMEOUT_MS)
+        assertTrue(OcrTimingPolicy.ACCESSIBILITY_CAPTURE_TIMEOUT_MS <= OcrTimingPolicy.DEFAULT_CAPTURE_TIMEOUT_MS)
+    }
 }

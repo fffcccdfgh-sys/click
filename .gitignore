@@ -21,3 +21,8 @@ key/
 *.apk
 app/release/
 output/imagegen/
+.codegraph/
+.kotlin/
+output/
+window.xml
+game/

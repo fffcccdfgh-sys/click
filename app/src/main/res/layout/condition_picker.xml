@@ -111,40 +111,6 @@
     </LinearLayout>
 
     <LinearLayout
-        android:id="@+id/conditionOcrFilterRow"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/conditionOcrFilterLabel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/condition_ocr_filter_label"
-            android:textColor="#CBD5E1"
-            android:textSize="12sp" />
-
-        <TextView
-            android:id="@+id/condOcrFilterDropdown"
-            android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:layout_marginTop="4dp"
-            android:background="@drawable/floating_input_bg"
-            android:clickable="true"
-            android:drawableEnd="@drawable/ic_dropdown_arrow"
-            android:drawablePadding="8dp"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:text="@string/condition_ocr_filter_threshold"
-            android:textColor="#334155"
-            android:textSize="13sp" />
-    </LinearLayout>
-
-    <LinearLayout
         android:id="@+id/conditionTextAreaRow"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

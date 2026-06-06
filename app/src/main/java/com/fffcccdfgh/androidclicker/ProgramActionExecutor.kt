@@ -316,6 +316,25 @@ object ProgramActionExecutor {
             }
             globals.rawset(LuaValue.valueOf("other_points"), otherTable)
         }
+
+        val endlessSupplyArea = PvzCalibrationStorage.getEndlessSupplyTextArea(service)
+        if (endlessSupplyArea != null) {
+            globals.rawset(
+                LuaValue.valueOf("endless_supply_text_area"),
+                areaTable(endlessSupplyArea)
+            )
+        }
+
+        val endlessSupplyPoints = PvzCalibrationStorage.getEndlessSupplyPoints(service)
+        if (endlessSupplyPoints.isNotEmpty()) {
+            val endlessSupplyTable = LuaTable()
+            endlessSupplyPoints.forEach { point ->
+                val pointTable = pointTable(point.x, point.y)
+                globals.rawset(LuaValue.valueOf(point.key), pointTable)
+                endlessSupplyTable.rawset(LuaValue.valueOf(point.key), pointTable)
+            }
+            globals.rawset(LuaValue.valueOf("endless_supply_points"), endlessSupplyTable)
+        }
     }
 
     private fun pointTable(x: Int, y: Int): LuaTable {
@@ -327,6 +346,27 @@ object ProgramActionExecutor {
             rawset(
                 LuaValue.valueOf("y"),
                 LuaValue.valueOf(storedPercentToLuaPercent(y))
+            )
+        }
+    }
+
+    private fun areaTable(area: PvzCalibrationStorage.Area): LuaTable {
+        return LuaTable().apply {
+            rawset(
+                LuaValue.valueOf("left"),
+                LuaValue.valueOf(storedPercentToLuaPercent(area.left))
+            )
+            rawset(
+                LuaValue.valueOf("top"),
+                LuaValue.valueOf(storedPercentToLuaPercent(area.top))
+            )
+            rawset(
+                LuaValue.valueOf("right"),
+                LuaValue.valueOf(storedPercentToLuaPercent(area.right))
+            )
+            rawset(
+                LuaValue.valueOf("bottom"),
+                LuaValue.valueOf(storedPercentToLuaPercent(area.bottom))
             )
         }
     }

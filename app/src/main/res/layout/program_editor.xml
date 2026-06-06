@@ -150,7 +150,6 @@
                     android:gravity="top|start"
                     android:hint="@string/program_code_hint"
                     android:inputType="textMultiLine|textNoSuggestions"
-                    android:maxLength="4096"
                     android:overScrollMode="always"
                     android:paddingStart="10dp"
                     android:paddingTop="10dp"
