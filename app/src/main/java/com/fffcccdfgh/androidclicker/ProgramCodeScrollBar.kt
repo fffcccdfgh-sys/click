@@ -144,6 +144,16 @@ class ProgramLineNumberView @JvmOverloads constructor(
     }
 }
 
+class ProgramCodeEditText @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = android.R.attr.editTextStyle
+) : EditText(context, attrs, defStyleAttr) {
+    fun verticalScrollRangePx(): Int = computeVerticalScrollRange()
+    fun verticalScrollExtentPx(): Int = computeVerticalScrollExtent()
+    fun verticalScrollOffsetPx(): Int = computeVerticalScrollOffset()
+}
+
 class ProgramCodeScrollBar @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
@@ -162,8 +172,24 @@ class ProgramCodeScrollBar @JvmOverloads constructor(
     private var dragging = false
     private var dragOffsetY = 0f
 
+    private data class EditScrollMetrics(
+        val range: Int,
+        val extent: Int,
+        val offset: Int
+    )
+
     fun attachTo(input: EditText) {
         editText = input
+        input.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun afterTextChanged(s: android.text.Editable?) {
+                input.post {
+                    clampScrollToContent(input)
+                    invalidate()
+                }
+            }
+        })
         input.setOnScrollChangeListener { _, _, _, _, _ -> invalidate() }
         input.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> invalidate() }
         input.post { invalidate() }
@@ -224,33 +250,70 @@ class ProgramCodeScrollBar @JvmOverloads constructor(
 
     private fun scrollToThumbTop(thumbTop: Int) {
         val input = editText ?: return
-        val contentHeight = contentHeight(input)
-        val viewportHeight = viewportHeight(input)
+        val metrics = scrollMetrics(input)
         val scrollY = ProgramCodeScrollBarMath.scrollYForThumbTop(
             thumbTop = thumbTop,
             trackHeight = height,
-            contentHeight = contentHeight,
-            viewportHeight = viewportHeight
+            contentHeight = metrics.range,
+            viewportHeight = metrics.extent
         )
         input.scrollTo(0, scrollY)
     }
 
     private fun currentThumb(): ScrollThumb {
         val input = editText ?: return ScrollThumb(0, height)
+        val metrics = scrollMetrics(input)
         return ProgramCodeScrollBarMath.thumb(
             trackHeight = height,
-            contentHeight = contentHeight(input),
-            viewportHeight = viewportHeight(input),
-            scrollY = input.scrollY
+            contentHeight = metrics.range,
+            viewportHeight = metrics.extent,
+            scrollY = metrics.offset
         )
     }
 
     private fun canScroll(input: EditText): Boolean {
-        return contentHeight(input) > viewportHeight(input)
+        val metrics = scrollMetrics(input)
+        return metrics.range > metrics.extent ||
+            input.canScrollVertically(1) ||
+            input.canScrollVertically(-1)
+    }
+
+    private fun clampScrollToContent(input: EditText) {
+        val metrics = scrollMetrics(input)
+        val maxScrollY = (metrics.range - metrics.extent).coerceAtLeast(0)
+        if (input.scrollY > maxScrollY) {
+            input.scrollTo(0, maxScrollY)
+        }
+    }
+
+    private fun scrollMetrics(input: EditText): EditScrollMetrics {
+        if (input is ProgramCodeEditText) {
+            val range = input.verticalScrollRangePx().coerceAtLeast(input.height)
+            val extent = input.verticalScrollExtentPx().coerceAtLeast(1)
+            return EditScrollMetrics(
+                range = range,
+                extent = extent,
+                offset = input.verticalScrollOffsetPx().coerceAtLeast(0)
+            )
+        }
+        return EditScrollMetrics(
+            range = contentHeight(input),
+            extent = viewportHeight(input),
+            offset = input.scrollY
+        )
     }
 
     private fun contentHeight(input: EditText): Int {
-        return ((input.layout?.height ?: 0) + input.compoundPaddingTop + input.compoundPaddingBottom)
+        val layout = input.layout
+        val layoutLineHeight = if (layout != null && layout.lineCount > 0) {
+            layout.getLineBottom(layout.lineCount - 1)
+        } else {
+            0
+        }
+        val measuredLineHeight = (layout?.lineCount ?: 0) * input.lineHeight
+        val textLineHeight = ProgramLineNumberMath.lineCount(input.text) * input.lineHeight
+        val textHeight = max(max(layout?.height ?: 0, layoutLineHeight), max(measuredLineHeight, textLineHeight))
+        return (textHeight + input.compoundPaddingTop + input.compoundPaddingBottom)
             .coerceAtLeast(input.height)
     }
 

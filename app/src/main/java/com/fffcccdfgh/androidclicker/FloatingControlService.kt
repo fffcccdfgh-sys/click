@@ -10,6 +10,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
@@ -45,18 +46,23 @@ class FloatingControlService : Service() {
     private var windowManager: WindowManager? = null
     private var floatingView: View? = null
     private var floatingParams: WindowManager.LayoutParams? = null
+    private var floatingControlSize: FloatingWindowSize? = null
     private var addPanelView: View? = null
     private var addPanelParams: WindowManager.LayoutParams? = null
     private var actionListPanelView: View? = null
     private var actionListPanelParams: WindowManager.LayoutParams? = null
     private var loopPanelView: View? = null
     private var loopPanelParams: WindowManager.LayoutParams? = null
+    private var saveConfirmPanelView: View? = null
+    private var saveConfirmPanelParams: WindowManager.LayoutParams? = null
     private var programTemplatePanelView: View? = null
     private var programTemplatePanelParams: WindowManager.LayoutParams? = null
     private var floatingTouchThrough = false
     private var executionStopButton: ExecutionStopButtonOverlay? = null
     private var stopButtonPositioning = false
     private var pickerView: View? = null
+    private var pickerHiddenFloatingWasVisible = false
+    private var programEditorParams: WindowManager.LayoutParams? = null
     private var pickerMode: Int = PICKER_TAP_POINT
     private var initialX = 0
     private var initialY = 0
@@ -92,10 +98,15 @@ class FloatingControlService : Service() {
     private var conditionOcrPrefillGeneration: Int = 0
     private var pendingProgramDraftCode: String? = null
     private var pendingProgramDraftCursor: Int = 0
+    private val floatingPanelController by lazy {
+        FloatingPanelController(
+            windowManagerProvider = { windowManager },
+            touchThroughProvider = { floatingTouchThrough }
+        )
+    }
 
     private enum class MarkerPointType { TAP, SWIPE_START, SWIPE_END, WAIT, PROGRAM }
     private data class MarkerBinding(val actionIndex: Int, val pointType: MarkerPointType)
-
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -127,6 +138,13 @@ class FloatingControlService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        updateFloatingControlSizeForCurrentDisplay()
+        updateProgramEditorSizeForCurrentDisplay()
+        updateProgramTemplatePanelSizeForCurrentDisplay()
+    }
 
     override fun onDestroy() {
         super.onDestroy()
@@ -185,6 +203,178 @@ class FloatingControlService : Service() {
             .build()
     }
 
+    private fun dpToPx(dp: Int): Int = (dp * resources.displayMetrics.density).toInt()
+
+    private fun refreshCurrentScreenSize() {
+        val display = ScreenCaptureDisplayReader.current(this)
+        screenWidthPx = display.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+        screenHeightPx = display.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+    }
+
+    private fun calculateFloatingControlSizeForCurrentDisplay(): FloatingWindowSize {
+        refreshCurrentScreenSize()
+        return FloatingWindowSizePolicy.expandedControlSize(screenWidthPx, screenHeightPx)
+    }
+
+    private fun calculateCollapsedControlSizeForCurrentDisplay(): FloatingWindowSize {
+        refreshCurrentScreenSize()
+        return FloatingWindowSizePolicy.collapsedControlSize(screenWidthPx, screenHeightPx)
+    }
+
+    private fun updateFloatingControlSizeForCurrentDisplay() {
+        val view = floatingView ?: return
+        val controlSize = calculateFloatingControlSizeForCurrentDisplay()
+        floatingControlSize = controlSize
+
+        val expandedControls = view.findViewById<View>(R.id.expandedControls)
+        val collapsedControls = view.findViewById<View>(R.id.collapsedControls)
+        val saveConfirmPanel = view.findViewById<View>(R.id.saveConfirmPanel)
+        if (saveConfirmPanel.visibility == View.VISIBLE) {
+            return
+        }
+
+        if (collapsedControls.visibility == View.VISIBLE) {
+            applyCollapsedFloatingControlLayout(view, FloatingWindowSizePolicy.collapsedControlSize(screenWidthPx, screenHeightPx))
+            return
+        }
+
+        if (expandedControls.visibility != View.VISIBLE) {
+            return
+        }
+
+        applyExpandedFloatingControlLayout(view, controlSize)
+        floatingParams?.let { lp ->
+            lp.width = controlSize.widthPx
+            lp.height = controlSize.heightPx
+            if (view.isAttachedToWindow) {
+                windowManager?.updateViewLayout(view, lp)
+            }
+        }
+    }
+
+    private fun applyCollapsedFloatingControlLayout(view: View, controlSize: FloatingWindowSize) {
+        val root = view.findViewById<View>(R.id.floatingRoot)
+        val collapsedControls = view.findViewById<LinearLayout>(R.id.collapsedControls)
+        val collapsedTitle = view.findViewById<TextView>(R.id.collapsedTitle)
+        val collapsedButtons = listOf<View>(
+            view.findViewById(R.id.collapsedStartButton),
+            view.findViewById(R.id.collapsedCloseButton),
+            view.findViewById(R.id.collapsedExpandButton)
+        )
+
+        collapsedControls.layoutParams = collapsedControls.layoutParams?.apply {
+            width = ViewGroup.LayoutParams.MATCH_PARENT
+            height = ViewGroup.LayoutParams.MATCH_PARENT
+        }
+
+        val horizontalPadding = root.paddingLeft + root.paddingRight
+        val verticalPadding = root.paddingTop + root.paddingBottom
+        val contentWidth = (controlSize.widthPx - horizontalPadding).coerceAtLeast(1)
+        val contentHeight = (controlSize.heightPx - verticalPadding).coerceAtLeast(1)
+        val gapPx = (contentWidth / 72).coerceIn(dpToPx(2), dpToPx(8))
+        val availableWidth = (contentWidth - gapPx * COLLAPSED_CONTROL_GAP_COUNT).coerceAtLeast(1)
+        val itemWidth = (availableWidth / COLLAPSED_CONTROL_ITEM_COUNT).coerceAtLeast(1)
+
+        collapsedTitle.minimumWidth = 0
+        collapsedTitle.setPadding(0, collapsedTitle.paddingTop, 0, collapsedTitle.paddingBottom)
+        collapsedTitle.gravity = Gravity.CENTER
+        collapsedTitle.layoutParams = (collapsedTitle.layoutParams as LinearLayout.LayoutParams).apply {
+            width = itemWidth
+            height = contentHeight
+            weight = 0f
+            marginStart = 0
+            marginEnd = 0
+        }
+
+        collapsedButtons.forEachIndexed { index, button ->
+            button.minimumWidth = 0
+            button.setPadding(0, button.paddingTop, 0, button.paddingBottom)
+            button.layoutParams = (button.layoutParams as LinearLayout.LayoutParams).apply {
+                width = itemWidth
+                height = contentHeight
+                weight = 0f
+                marginStart = gapPx
+                marginEnd = 0
+            }
+        }
+
+        floatingParams?.let { lp ->
+            lp.width = controlSize.widthPx
+            lp.height = controlSize.heightPx
+            if (view.isAttachedToWindow) {
+                windowManager?.updateViewLayout(view, lp)
+            }
+        }
+    }
+
+    private fun applyExpandedFloatingControlLayout(view: View, controlSize: FloatingWindowSize) {
+        val root = view.findViewById<View>(R.id.floatingRoot)
+        val expandedControls = view.findViewById<View>(R.id.expandedControls)
+        val dragHandle = view.findViewById<TextView>(R.id.dragHandle)
+        val foldButton = view.findViewById<TextView>(R.id.foldButton)
+        val closeButton = view.findViewById<TextView>(R.id.closeButton)
+        val mainActionRow = view.findViewById<LinearLayout>(R.id.mainActionRow)
+        val actionButtons = listOf<View>(
+            view.findViewById(R.id.startButton),
+            view.findViewById(R.id.addButton),
+            view.findViewById(R.id.listButton),
+            view.findViewById(R.id.saveButton),
+            view.findViewById(R.id.positionButton),
+            view.findViewById(R.id.stopPositionButton),
+            view.findViewById(R.id.loopButton)
+        )
+
+        expandedControls.layoutParams = expandedControls.layoutParams?.apply {
+            width = ViewGroup.LayoutParams.MATCH_PARENT
+            height = ViewGroup.LayoutParams.MATCH_PARENT
+        }
+
+        val horizontalPadding = root.paddingLeft + root.paddingRight
+        val verticalPadding = root.paddingTop + root.paddingBottom
+        val contentWidth = (controlSize.widthPx - horizontalPadding).coerceAtLeast(1)
+        val contentHeight = (controlSize.heightPx - verticalPadding).coerceAtLeast(1)
+        val gapPx = (contentWidth / 64).coerceIn(dpToPx(2), dpToPx(8))
+        val buttonHeight = ((contentHeight - gapPx) / 2).coerceAtLeast(1)
+        val actionButtonWidth = ((contentWidth - gapPx * (actionButtons.size - 1)) / actionButtons.size)
+            .coerceAtLeast(1)
+
+        mainActionRow.layoutParams = (mainActionRow.layoutParams as LinearLayout.LayoutParams).apply {
+            width = ViewGroup.LayoutParams.MATCH_PARENT
+            height = 0
+            weight = 1f
+            topMargin = gapPx
+        }
+
+        actionButtons.forEachIndexed { index, button ->
+            button.minimumWidth = 0
+            button.setPadding(0, button.paddingTop, 0, button.paddingBottom)
+            button.layoutParams = (button.layoutParams as LinearLayout.LayoutParams).apply {
+                width = actionButtonWidth
+                height = buttonHeight
+                weight = 0f
+                marginStart = if (index == 0) 0 else gapPx
+            }
+        }
+
+        listOf(foldButton, closeButton).forEach { button ->
+            button.minimumWidth = 0
+            button.setPadding(0, button.paddingTop, 0, button.paddingBottom)
+            button.layoutParams = (button.layoutParams as LinearLayout.LayoutParams).apply {
+                width = actionButtonWidth
+                height = buttonHeight
+                weight = 0f
+                marginStart = gapPx
+            }
+        }
+
+        dragHandle.layoutParams = (dragHandle.layoutParams as LinearLayout.LayoutParams).apply {
+            width = 0
+            height = buttonHeight
+            weight = 1f
+            marginStart = 0
+        }
+    }
+
     @SuppressLint("InflateParams")
     private fun showFloatingControl() {
         val inflater = LayoutInflater.from(this)
@@ -192,9 +382,8 @@ class FloatingControlService : Service() {
         floatingView = view
 
         val wm = windowManager ?: return
-        val display = ScreenCaptureDisplayReader.current(this)
-        screenWidthPx = display.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
-        screenHeightPx = display.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+        val controlSize = calculateFloatingControlSizeForCurrentDisplay()
+        floatingControlSize = controlSize
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -204,8 +393,8 @@ class FloatingControlService : Service() {
         }
 
         floatingParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            controlSize.widthPx,
+            controlSize.heightPx,
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
@@ -268,50 +457,9 @@ class FloatingControlService : Service() {
                 Toast.makeText(this, getString(R.string.no_action_to_save), Toast.LENGTH_SHORT).show()
             } else {
                 hideFloatingPanels()
-                val confirmPanel = view.findViewById<View>(R.id.saveConfirmPanel)
-                val nameInput = view.findViewById<EditText>(R.id.saveNameInput)
                 val editingName = getEditingScriptName()
-                nameInput.setText(editingName ?: ScriptStorage.nextAutoName(this))
-                confirmPanel.visibility = View.VISIBLE
-                enableOverlayFocus()
+                showSaveConfirmPanel(editingName ?: ScriptStorage.nextAutoName(this))
             }
-        }
-
-        view.findViewById<View>(R.id.saveConfirmYes).setOnClickListener {
-            val nameInput = view.findViewById<EditText>(R.id.saveNameInput)
-            val name = nameInput.text.toString().trim()
-            if (name.isEmpty()) {
-                Toast.makeText(this, getString(R.string.script_name_empty), Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            val editingName = getEditingScriptName()
-            if (name != editingName && ScriptStorage.getScript(this, name) != null) {
-                Toast.makeText(this, getString(R.string.script_name_exists), Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            val sequence = loadSequence()
-            ScriptStorage.saveNamedScript(
-                this,
-                name,
-                sequence,
-                getLoopCount(this),
-                getLoopGapMs(this)
-            )
-            setEditingScriptName(name)
-            val msg = when {
-                editingName != null && name == editingName -> getString(R.string.script_updated)
-                editingName != null -> getString(R.string.script_saved_as)
-                else -> getString(R.string.script_saved)
-            }
-            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-            sendBroadcast(Intent(ScriptStorage.ACTION_SCRIPTS_CHANGED))
-            view.findViewById<View>(R.id.saveConfirmPanel).visibility = View.GONE
-            disableOverlayFocus()
-        }
-
-        view.findViewById<View>(R.id.saveConfirmNo).setOnClickListener {
-            view.findViewById<View>(R.id.saveConfirmPanel).visibility = View.GONE
-            disableOverlayFocus()
         }
 
         view.findViewById<View>(R.id.closeButton).setOnTouchListener { _, event ->
@@ -389,6 +537,7 @@ class FloatingControlService : Service() {
         updateStopPositionButton()
 
         updateFloatingTitle()
+        applyExpandedFloatingControlLayout(view, controlSize)
 
         wm.addView(view, floatingParams)
         ControlZoneChecker.register("floating_control") { getControlZoneRect() }
@@ -536,12 +685,127 @@ class FloatingControlService : Service() {
         }
     }
 
+    @SuppressLint("InflateParams")
+    private fun showSaveConfirmPanel(initialName: String) {
+        val wm = windowManager ?: return
+        if (saveConfirmPanelView != null) {
+            hideSaveConfirmPanel()
+        }
+
+        val panel = LayoutInflater.from(this).inflate(R.layout.floating_save_confirm_panel, null)
+        val params = createSaveConfirmPanelParams()
+        saveConfirmPanelView = panel
+        saveConfirmPanelParams = params
+
+        panel.findViewById<TextView>(R.id.savePanelTitle).text = getString(R.string.confirm_save)
+        val nameInput = panel.findViewById<EditText>(R.id.savePanelNameInput)
+        nameInput.setText(initialName)
+        nameInput.selectAll()
+        bindPanelDrag(panel.findViewById(R.id.savePanelHeader), panel, params)
+        panel.findViewById<View>(R.id.savePanelConfirmButton).setOnClickListener {
+            saveCurrentSequenceWithConfirmedName(nameInput.text.toString().trim())
+        }
+        val dismiss = View.OnClickListener { hideSaveConfirmPanel() }
+        panel.findViewById<View>(R.id.savePanelCancelButton).setOnClickListener(dismiss)
+
+        floatingPanelController.show(
+            panel = panel,
+            params = params,
+            zoneKey = "floating_save_confirm_panel",
+            viewProvider = { saveConfirmPanelView },
+            paramsProvider = { saveConfirmPanelParams }
+        )
+        enableSaveConfirmInput(nameInput)
+    }
+
+    private fun createSaveConfirmPanelParams(): WindowManager.LayoutParams {
+        val screen = ScreenCaptureDisplayReader.current(this)
+        val screenWidth = screen.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+        val screenHeight = screen.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+        val panelSize = FloatingWindowSizePolicy.saveConfirmPanelEstimatedSize(resources.displayMetrics.density)
+        return WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            overlayType(),
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            FloatingWindowLayoutPolicy.applyCenteredPosition(this, screenWidth, screenHeight, panelSize)
+        }
+    }
+
+    private fun enableSaveConfirmInput(nameInput: EditText) {
+        nameInput.requestFocus()
+        nameInput.post {
+            val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.showSoftInput(nameInput, InputMethodManager.SHOW_IMPLICIT)
+        }
+    }
+
+    private fun saveCurrentSequenceWithConfirmedName(name: String) {
+        if (name.isEmpty()) {
+            Toast.makeText(this, getString(R.string.script_name_empty), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val editingName = getEditingScriptName()
+        if (name != editingName && ScriptStorage.getScript(this, name) != null) {
+            Toast.makeText(this, getString(R.string.script_name_exists), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val sequence = loadSequence()
+        ScriptStorage.saveNamedScript(
+            this,
+            name,
+            sequence,
+            getLoopCount(this),
+            getLoopGapMs(this)
+        )
+        setEditingScriptName(name)
+        val msg = when {
+            editingName != null && name == editingName -> getString(R.string.script_updated)
+            editingName != null -> getString(R.string.script_saved_as)
+            else -> getString(R.string.script_saved)
+        }
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+        sendBroadcast(Intent(ScriptStorage.ACTION_SCRIPTS_CHANGED))
+        hideSaveConfirmPanel()
+    }
+
+    private fun hideSaveConfirmPanel() {
+        removePanel(saveConfirmPanelView, "floating_save_confirm_panel") {
+            saveConfirmPanelView = null
+        }
+        saveConfirmPanelParams = null
+    }
+
+    private fun hideSaveConfirmPanel(view: View) {
+        val saveConfirmPanel = view.findViewById<View>(R.id.saveConfirmPanel)
+        if (saveConfirmPanel.visibility == View.GONE) return
+
+        saveConfirmPanel.visibility = View.GONE
+        floatingControlSize?.let { controlSize ->
+            applyExpandedFloatingControlLayout(view, controlSize)
+            floatingParams?.let { lp ->
+                lp.width = controlSize.widthPx
+                lp.height = controlSize.heightPx
+                if (view.isAttachedToWindow) {
+                    windowManager?.updateViewLayout(view, lp)
+                }
+            }
+        }
+        disableOverlayFocus()
+    }
+
     private fun collapseFloatingControl() {
         val view = floatingView ?: return
-        view.findViewById<View>(R.id.saveConfirmPanel).visibility = View.GONE
-        disableOverlayFocus()
+        hideSaveConfirmPanel()
+        hideSaveConfirmPanel(view)
         view.findViewById<View>(R.id.expandedControls).visibility = View.GONE
         view.findViewById<View>(R.id.collapsedControls).visibility = View.VISIBLE
+        applyCollapsedFloatingControlLayout(view, calculateCollapsedControlSizeForCurrentDisplay())
         updateFloatingTitle()
     }
 
@@ -549,6 +813,14 @@ class FloatingControlService : Service() {
         val view = floatingView ?: return
         view.findViewById<View>(R.id.collapsedControls).visibility = View.GONE
         view.findViewById<View>(R.id.expandedControls).visibility = View.VISIBLE
+        floatingControlSize?.let { controlSize ->
+            applyExpandedFloatingControlLayout(view, controlSize)
+            floatingParams?.let { lp ->
+                lp.width = controlSize.widthPx
+                lp.height = controlSize.heightPx
+                windowManager?.updateViewLayout(view, lp)
+            }
+        }
     }
 
     private fun hideAllPanels() {
@@ -657,25 +929,7 @@ class FloatingControlService : Service() {
     }
 
     private fun bindPanelDrag(handle: View, panel: View, params: WindowManager.LayoutParams) {
-        handle.setOnTouchListener { _, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    initialX = params.x
-                    initialY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (event.rawX - initialTouchX).toInt()
-                    params.y = initialY + (event.rawY - initialTouchY).toInt()
-                    windowManager?.updateViewLayout(panel, params)
-                    if (panel === actionListPanelView) updateActionListViewport(loadSequence().size)
-                    true
-                }
-                else -> false
-            }
-        }
+        floatingPanelController.bindDrag(handle, panel, params)
     }
 
     private fun removePanel(
@@ -683,29 +937,18 @@ class FloatingControlService : Service() {
         zoneKey: String,
         onRemoved: () -> Unit
     ) {
-        val wm = windowManager
-        if (view != null && wm != null) {
-            try {
-                wm.removeView(view)
-            } catch (_: Exception) {
-            }
-        }
-        ScreenshotHider.unregister(zoneKey)
-        ControlZoneChecker.unregister(zoneKey)
-        onRemoved()
+        floatingPanelController.remove(view, zoneKey, onRemoved)
     }
 
     private fun panelZoneRect(view: View?, params: WindowManager.LayoutParams?): Rect? {
-        if (floatingTouchThrough) return null
-        if (view == null || params == null) return null
-        if (view.width <= 0 || view.height <= 0) return null
-        return Rect(params.x, params.y, params.x + view.width, params.y + view.height)
+        return floatingPanelController.zoneRect(view, params)
     }
 
     private fun hideFloatingPanels() {
         hideAddPanel()
         hideActionList()
         hideLoopSettingsPanel()
+        hideSaveConfirmPanel()
         hideProgramTemplatePanel()
     }
 
@@ -721,7 +964,7 @@ class FloatingControlService : Service() {
     private fun showAddPanel() {
         val wm = windowManager ?: return
         if (addPanelView != null) return
-        floatingView?.findViewById<View>(R.id.saveConfirmPanel)?.visibility = View.GONE
+        floatingView?.let { hideSaveConfirmPanel(it) }
         hideLoopSettingsPanel()
         disableOverlayFocus()
 
@@ -737,7 +980,7 @@ class FloatingControlService : Service() {
         }
         panel.findViewById<View>(R.id.swipeOption).setOnClickListener {
             hideAddPanel()
-            showPickerOverlay(PICKER_SWIPE_START)
+            showSwipePickerOverlay()
         }
         panel.findViewById<View>(R.id.waitOption).setOnClickListener {
             hideAddPanel()
@@ -748,11 +991,12 @@ class FloatingControlService : Service() {
             showProgramEditor()
         }
 
-        wm.addView(panel, params)
-        ControlZoneChecker.register("floating_add_panel") { panelZoneRect(addPanelView, addPanelParams) }
-        ScreenshotHider.register("floating_add_panel",
-            hide = { addPanelView?.visibility = View.INVISIBLE },
-            reveal = { addPanelView?.visibility = View.VISIBLE }
+        floatingPanelController.show(
+            panel = panel,
+            params = params,
+            zoneKey = "floating_add_panel",
+            viewProvider = { addPanelView },
+            paramsProvider = { addPanelParams }
         )
     }
 
@@ -783,16 +1027,15 @@ class FloatingControlService : Service() {
                 hideActionList()
             }
             bindActionListScrollBar(panel)
-            wm.addView(panel, params)
-            ControlZoneChecker.register("floating_action_list_panel") {
-                panelZoneRect(actionListPanelView, actionListPanelParams)
-            }
-            ScreenshotHider.register("floating_action_list_panel",
-                hide = { actionListPanelView?.visibility = View.INVISIBLE },
-                reveal = { actionListPanelView?.visibility = View.VISIBLE }
+            floatingPanelController.show(
+                panel = panel,
+                params = params,
+                zoneKey = "floating_action_list_panel",
+                viewProvider = { actionListPanelView },
+                paramsProvider = { actionListPanelParams }
             )
         }
-        floatingView?.findViewById<View>(R.id.saveConfirmPanel)?.visibility = View.GONE
+        floatingView?.let { hideSaveConfirmPanel(it) }
         hideLoopSettingsPanel()
         disableOverlayFocus()
         actionListVisible = true
@@ -1044,9 +1287,50 @@ class FloatingControlService : Service() {
             PICKER_SWIPE_END -> R.string.pick_swipe_end_instruction
             else -> R.string.pick_position_instruction
         }
-        view.findViewById<TextView>(R.id.pickerInstruction).setText(instructionRes)
+        val instructionView = view.findViewById<TextView>(R.id.pickerInstruction)
+        val pointPickerOverlay = view.findViewById<PointPickerOverlayView>(R.id.pointPickerOverlay)
+        instructionView.setText(instructionRes)
+
+        if (mode == PICKER_TAP_POINT) {
+            pickerHiddenFloatingWasVisible = floatingView?.visibility == View.VISIBLE
+            floatingView?.visibility = View.INVISIBLE
+            instructionView.visibility = View.GONE
+            pointPickerOverlay.visibility = View.VISIBLE
+            pointPickerOverlay.instruction = getString(instructionRes)
+            pointPickerOverlay.coordinateFormatter = { x, y ->
+                "${formatStoredPercent(pixelXToStoredPercent(x))}, ${formatStoredPercent(pixelYToStoredPercent(y))}"
+            }
+            pointPickerOverlay.onCancel = {
+                hidePickerOverlay()
+            }
+            pointPickerOverlay.onSavePoint = { x, y ->
+                if (onPointPicked != null) {
+                    hidePickerOverlay()
+                    onPointPicked(x, y)
+                } else {
+                    val storedX = pixelXToStoredPercent(x)
+                    val storedY = pixelYToStoredPercent(y)
+                    val action = ActionStep(type = ActionStep.TYPE_TAP, x = storedX, y = storedY)
+                    appendToSequence(action)
+                    hidePickerOverlay()
+                    Toast.makeText(
+                        this,
+                        getString(
+                            R.string.action_added_tap,
+                            formatStoredPercent(storedX),
+                            formatStoredPercent(storedY)
+                        ),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        } else {
+            instructionView.visibility = View.VISIBLE
+            pointPickerOverlay.visibility = View.GONE
+        }
 
         view.setOnTouchListener { _, event ->
+            if (pickerMode == PICKER_TAP_POINT) return@setOnTouchListener true
             if (event.action == MotionEvent.ACTION_UP) {
                 val x = event.rawX.toInt()
                 val y = event.rawY.toInt()
@@ -1113,16 +1397,78 @@ class FloatingControlService : Service() {
         wm.addView(view, params)
     }
 
+    private fun showSwipePickerOverlay(onSwipePicked: ((Int, Int, Int, Int) -> Unit)? = null) {
+        val wm = windowManager ?: return
+        if (pickerView != null) return
+
+        pickerMode = PICKER_SWIPE_START
+        pickerHiddenFloatingWasVisible = floatingView?.visibility == View.VISIBLE
+        floatingView?.visibility = View.INVISIBLE
+
+        val view = LayoutInflater.from(this).inflate(R.layout.activity_position_picker, null)
+        pickerView = view
+
+        val pointPickerOverlay = view.findViewById<PointPickerOverlayView>(R.id.pointPickerOverlay)
+        val swipePickerOverlay = view.findViewById<SwipePickerOverlayView>(R.id.swipePickerOverlay)
+        val instructionView = view.findViewById<TextView>(R.id.pickerInstruction)
+
+        instructionView.visibility = View.GONE
+        pointPickerOverlay.visibility = View.GONE
+        swipePickerOverlay.visibility = View.VISIBLE
+        swipePickerOverlay.coordinateFormatter = { startX, startY, endX, endY, startActive ->
+            val startText = "${formatStoredPercent(pixelXToStoredPercent(startX))}, " +
+                formatStoredPercent(pixelYToStoredPercent(startY))
+            val endText = "${formatStoredPercent(pixelXToStoredPercent(endX))}, " +
+                formatStoredPercent(pixelYToStoredPercent(endY))
+            if (startActive) {
+                "($startText) -> $endText"
+            } else {
+                "$startText -> ($endText)"
+            }
+        }
+        swipePickerOverlay.onCancel = {
+            hidePickerOverlay()
+        }
+        swipePickerOverlay.onSaveSwipe = { startX, startY, endX, endY ->
+            if (onSwipePicked != null) {
+                hidePickerOverlay()
+                onSwipePicked(startX, startY, endX, endY)
+            } else {
+                val action = ActionStep(
+                    type = ActionStep.TYPE_SWIPE,
+                    startX = pixelXToStoredPercent(startX),
+                    startY = pixelYToStoredPercent(startY),
+                    endX = pixelXToStoredPercent(endX),
+                    endY = pixelYToStoredPercent(endY)
+                )
+                appendToSequence(action)
+                hidePickerOverlay()
+                Toast.makeText(this, getString(R.string.action_added_swipe), Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        wm.addView(view, createFullScreenPickerParams())
+    }
+
     private fun hidePickerOverlay() {
         hideProgramTemplatePanel()
         val wm = windowManager
         val view = pickerView ?: return
+        view.findViewById<PointPickerOverlayView>(R.id.pointPickerOverlay)?.cleanup()
+        view.findViewById<SwipePickerOverlayView>(R.id.swipePickerOverlay)?.cleanup()
         try {
             wm?.removeView(view)
         } catch (_: Exception) {
         }
         ScreenshotHider.unregister("condition_picker")
+        if (view.id == R.id.programEditorRoot) {
+            programEditorParams = null
+        }
         pickerView = null
+        if (pickerHiddenFloatingWasVisible) {
+            floatingView?.visibility = View.VISIBLE
+        }
+        pickerHiddenFloatingWasVisible = false
     }
 
     private fun togglePositionMarkers() {
@@ -1130,7 +1476,7 @@ class FloatingControlService : Service() {
         if (positionVisible) {
             val view = floatingView
             if (view != null) {
-                view.findViewById<View>(R.id.saveConfirmPanel).visibility = View.GONE
+                hideSaveConfirmPanel(view)
                 hideFloatingPanels()
                 disableOverlayFocus()
             }
@@ -1442,8 +1788,7 @@ class FloatingControlService : Service() {
         hideStopButtonPositionEditor()
         val view = floatingView ?: return
         hideFloatingPanels()
-        view.findViewById<View>(R.id.saveConfirmPanel).visibility = View.GONE
-        disableOverlayFocus()
+        hideSaveConfirmPanel(view)
         hidePickerOverlay()
     }
 
@@ -1509,7 +1854,7 @@ class FloatingControlService : Service() {
                     hidePickerOverlay()
                     when (actionType) {
                         ActionStep.TYPE_TAP -> showPickerOverlay(PICKER_TAP_POINT)
-                        ActionStep.TYPE_SWIPE -> showPickerOverlay(PICKER_SWIPE_START)
+                        ActionStep.TYPE_SWIPE -> showSwipePickerOverlay()
                         ActionStep.TYPE_WAIT -> showWaitDurationPicker()
                         ActionStep.TYPE_PROGRAM -> showProgramEditor()
                     }
@@ -1561,33 +1906,26 @@ class FloatingControlService : Service() {
             gravity = Gravity.CENTER
         }
 
-        val durations = listOf(500L to R.string.wait_duration_05s, 1000L to R.string.wait_duration_1s, 2000L to R.string.wait_duration_2s, 5000L to R.string.wait_duration_5s)
-        val container = picker.findViewById<LinearLayout>(R.id.durationContainer)
-
-        for ((durationMs, labelRes) in durations) {
-            val option = TextView(this).apply {
-                text = getString(labelRes)
-                setTextColor(Color.WHITE)
-                textSize = 14f
-                gravity = Gravity.CENTER
-                setPadding(32, 16, 32, 16)
-                isClickable = true
-                isFocusable = true
-                setOnClickListener {
-                    val action = ActionStep(type = ActionStep.TYPE_WAIT, durationMs = durationMs)
-                    appendToSequence(action)
-                    Toast.makeText(
-                        this@FloatingControlService,
-                        getString(R.string.action_added_wait, durationMs / 1000.0),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    hidePickerOverlay()
-                }
-            }
-            container.addView(option)
-        }
+        bindPanelDrag(picker.findViewById(R.id.durationPickerDragHandle), picker, params)
+        bindWaitDurationOption(picker, R.id.waitDuration05Option, 500L)
+        bindWaitDurationOption(picker, R.id.waitDuration1Option, 1000L)
+        bindWaitDurationOption(picker, R.id.waitDuration2Option, 2000L)
+        bindWaitDurationOption(picker, R.id.waitDuration5Option, 5000L)
 
         wm.addView(picker, params)
+    }
+
+    private fun bindWaitDurationOption(picker: View, optionId: Int, durationMs: Long) {
+        picker.findViewById<View>(optionId).setOnClickListener {
+            val action = ActionStep(type = ActionStep.TYPE_WAIT, durationMs = durationMs)
+            appendToSequence(action)
+            Toast.makeText(
+                this@FloatingControlService,
+                getString(R.string.action_added_wait, durationMs / 1000.0),
+                Toast.LENGTH_SHORT
+            ).show()
+            hidePickerOverlay()
+        }
     }
 
     private fun showProgramEditor() {
@@ -1606,7 +1944,7 @@ class FloatingControlService : Service() {
         }
 
         val currentDisplay = ScreenCaptureDisplayReader.current(this)
-        val editorSize = ProgramEditorWindowPolicy.windowSizeForCurrentDisplay(
+        val editorSize = FloatingWindowSizePolicy.programEditorSizeForDisplay(
             displayWidthPx = currentDisplay.width,
             displayHeightPx = currentDisplay.height,
             resourceWidthPx = resources.displayMetrics.widthPixels,
@@ -1615,8 +1953,8 @@ class FloatingControlService : Service() {
         )
 
         val params = WindowManager.LayoutParams(
-            editorSize.width,
-            editorSize.height,
+            editorSize.widthPx,
+            editorSize.heightPx,
             type,
             ProgramEditorWindowPolicy.FLAGS,
             PixelFormat.TRANSLUCENT
@@ -1624,16 +1962,10 @@ class FloatingControlService : Service() {
             gravity = Gravity.CENTER
             softInputMode = ProgramEditorWindowPolicy.SOFT_INPUT_MODE
         }
+        programEditorParams = params
 
         val codeInput = editor.findViewById<EditText>(R.id.programCodeInput)
-        val codePanel = editor.findViewById<View>(R.id.programCodePanel)
-        codePanel.layoutParams = codePanel.layoutParams.apply {
-            height = ProgramEditorWindowPolicy.codePanelHeight(
-                editorWidthPx = editorSize.width,
-                editorHeightPx = editorSize.height,
-                density = resources.displayMetrics.density
-            )
-        }
+        applyProgramEditorCodePanelHeight(editor, editorSize)
         configureProgramCodeInput(codeInput)
         bindProgramTextToolbar(editor, codeInput)
         val codeScrollBar = editor.findViewById<ProgramCodeScrollBar>(R.id.programCodeScrollBar)
@@ -1804,6 +2136,33 @@ class FloatingControlService : Service() {
         focusProgramCodeInput(codeInput)
     }
 
+    private fun updateProgramEditorSizeForCurrentDisplay() {
+        val editor = pickerView ?: return
+        if (editor.id != R.id.programEditorRoot) return
+        val params = programEditorParams ?: return
+
+        val currentDisplay = ScreenCaptureDisplayReader.current(this)
+        val editorSize = FloatingWindowSizePolicy.programEditorSizeForDisplay(
+            displayWidthPx = currentDisplay.width,
+            displayHeightPx = currentDisplay.height,
+            resourceWidthPx = resources.displayMetrics.widthPixels,
+            resourceHeightPx = resources.displayMetrics.heightPixels,
+            density = resources.displayMetrics.density
+        )
+
+        FloatingWindowLayoutPolicy.applyCenterGravitySize(params, editorSize)
+        applyProgramEditorCodePanelHeight(editor, editorSize)
+        FloatingWindowLayoutPolicy.updateIfAttached(windowManager, editor, params)
+    }
+
+    private fun applyProgramEditorCodePanelHeight(editor: View, editorSize: FloatingWindowSize) {
+        val codePanel = editor.findViewById<View>(R.id.programCodePanel)
+        codePanel.layoutParams = (codePanel.layoutParams as LinearLayout.LayoutParams).apply {
+            height = Math.round(editorSize.heightPx * ProgramEditorWindowPolicy.CODE_PANEL_HEIGHT_RATIO)
+            weight = 0f
+        }
+    }
+
     private fun configureProgramCodeInput(codeInput: EditText) {
         codeInput.isFocusable = true
         codeInput.isFocusableInTouchMode = true
@@ -1906,6 +2265,8 @@ class FloatingControlService : Service() {
 
         val panel = LayoutInflater.from(this).inflate(R.layout.floating_program_template_panel, null)
         val params = programTemplatePanelParams ?: createProgramTemplatePanelParams()
+        val templateSize = calculateProgramTemplatePanelSizeForCurrentDisplay()
+        applyProgramTemplatePanelParams(params, templateSize)
         programTemplatePanelView = panel
         programTemplatePanelParams = params
 
@@ -1917,7 +2278,7 @@ class FloatingControlService : Service() {
         val templates = ProgramLuaAssist.quickTemplates()
         val container = panel.findViewById<LinearLayout>(R.id.programTemplateContainer)
         container.removeAllViews()
-        val rowWidth = dp(PROGRAM_TEMPLATE_PANEL_WIDTH_DP)
+        val rowWidth = programTemplateRowWidth(templateSize)
         for ((index, template) in templates.withIndex()) {
             val item = TextView(this).apply {
                 text = template.title
@@ -1943,40 +2304,97 @@ class FloatingControlService : Service() {
 
         val scrollView = panel.findViewById<ScrollView>(R.id.programTemplateScroll)
         val scrollBar = panel.findViewById<ProgramTemplateMenuScrollBar>(R.id.programTemplateScrollBar)
-        val menuHeight = ProgramTemplateMenuLayout.popupHeight(
-            itemCount = templates.size,
-            itemHeightPx = dp(PROGRAM_TEMPLATE_ROW_HEIGHT_DP + 8f),
-            verticalPaddingPx = 0,
-            maxVisibleRows = PROGRAM_TEMPLATE_MAX_VISIBLE_ROWS
-        )
         scrollView.layoutParams = scrollView.layoutParams.apply {
-            height = menuHeight
+            height = programTemplateScrollHeight(templateSize)
         }
+        applyProgramTemplatePanelContentSize(panel, templateSize)
         scrollBar.attachTo(scrollView)
 
-        wm.addView(panel, params)
-        ControlZoneChecker.register("floating_program_template_panel") {
-            panelZoneRect(programTemplatePanelView, programTemplatePanelParams)
-        }
-        ScreenshotHider.register("floating_program_template_panel",
-            hide = { programTemplatePanelView?.visibility = View.INVISIBLE },
-            reveal = { programTemplatePanelView?.visibility = View.VISIBLE }
+        floatingPanelController.show(
+            panel = panel,
+            params = params,
+            zoneKey = "floating_program_template_panel",
+            viewProvider = { programTemplatePanelView },
+            paramsProvider = { programTemplatePanelParams }
         )
     }
 
     private fun createProgramTemplatePanelParams(): WindowManager.LayoutParams {
-        val panelWidth = dp(PROGRAM_TEMPLATE_PANEL_WIDTH_DP + 42f)
+        val templateSize = calculateProgramTemplatePanelSizeForCurrentDisplay()
         return WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            templateSize.widthPx,
+            templateSize.heightPx,
             overlayType(),
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = ((resources.displayMetrics.widthPixels - panelWidth) / 2).coerceAtLeast(0)
-            y = (resources.displayMetrics.heightPixels * 0.18f).toInt().coerceAtLeast(0)
+            x = ((resources.displayMetrics.widthPixels - templateSize.widthPx) / 2).coerceAtLeast(0)
+            y = ((resources.displayMetrics.heightPixels - templateSize.heightPx) / 2).coerceAtLeast(0)
         }
+    }
+
+    private fun updateProgramTemplatePanelSizeForCurrentDisplay() {
+        val panel = programTemplatePanelView ?: return
+        val params = programTemplatePanelParams ?: return
+        val templateSize = calculateProgramTemplatePanelSizeForCurrentDisplay()
+
+        applyProgramTemplatePanelParams(params, templateSize)
+
+        applyProgramTemplatePanelContentSize(panel, templateSize)
+        FloatingWindowLayoutPolicy.updateIfAttached(windowManager, panel, params)
+    }
+
+    private fun calculateProgramTemplatePanelSizeForCurrentDisplay(): FloatingWindowSize {
+        val currentDisplay = ScreenCaptureDisplayReader.current(this)
+        return FloatingWindowSizePolicy.programTemplateSize(
+            screenWidthPx = currentDisplay.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels,
+            screenHeightPx = currentDisplay.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels,
+            density = resources.displayMetrics.density
+        )
+    }
+
+    private fun applyProgramTemplatePanelParams(
+        params: WindowManager.LayoutParams,
+        templateSize: FloatingWindowSize
+    ) {
+        FloatingWindowLayoutPolicy.applyCenteredSize(
+            params = params,
+            screenWidthPx = resources.displayMetrics.widthPixels,
+            screenHeightPx = resources.displayMetrics.heightPixels,
+            size = templateSize
+        )
+    }
+
+    private fun applyProgramTemplatePanelContentSize(panel: View, templateSize: FloatingWindowSize) {
+        panel.layoutParams = ViewGroup.LayoutParams(templateSize.widthPx, templateSize.heightPx)
+        panel.findViewById<View>(R.id.programTemplateHeader).layoutParams =
+            panel.findViewById<View>(R.id.programTemplateHeader).layoutParams.apply {
+                width = ViewGroup.LayoutParams.MATCH_PARENT
+            }
+        val rowWidth = programTemplateRowWidth(templateSize)
+        val container = panel.findViewById<LinearLayout>(R.id.programTemplateContainer)
+        for (index in 0 until container.childCount) {
+            container.getChildAt(index).layoutParams = LinearLayout.LayoutParams(
+                rowWidth,
+                dp(PROGRAM_TEMPLATE_ROW_HEIGHT_DP)
+            ).apply {
+                if (index > 0) topMargin = dp(8f)
+            }
+        }
+        val scrollView = panel.findViewById<ScrollView>(R.id.programTemplateScroll)
+        scrollView.layoutParams = scrollView.layoutParams.apply {
+            width = rowWidth
+            height = programTemplateScrollHeight(templateSize)
+        }
+    }
+
+    private fun programTemplateRowWidth(templateSize: FloatingWindowSize): Int {
+        return (templateSize.widthPx - dp(34f)).coerceAtLeast(dp(120f))
+    }
+
+    private fun programTemplateScrollHeight(templateSize: FloatingWindowSize): Int {
+        return (templateSize.heightPx - dp(66f)).coerceAtLeast(dp(PROGRAM_TEMPLATE_ROW_HEIGHT_DP))
     }
 
     private fun hideProgramTemplatePanel() {
@@ -2050,14 +2468,11 @@ class FloatingControlService : Service() {
     private fun startProgramSwipeAssist(codeInput: EditText) {
         saveProgramDraftForAssist(codeInput)
         hidePickerOverlay()
-        showPickerOverlay(PICKER_SWIPE_START) { startX, startY ->
-            Toast.makeText(this, getString(R.string.swipe_start_set, startX, startY), Toast.LENGTH_SHORT).show()
-            showPickerOverlay(PICKER_SWIPE_END) { endX, endY ->
-                val screen = programScreenSize()
-                restoreProgramEditorWithSnippet(
-                    ProgramLuaAssist.swipeSnippet(startX, startY, endX, endY, screen.width, screen.height)
-                )
-            }
+        showSwipePickerOverlay { startX, startY, endX, endY ->
+            val screen = programScreenSize()
+            restoreProgramEditorWithSnippet(
+                ProgramLuaAssist.swipeSnippet(startX, startY, endX, endY, screen.width, screen.height)
+            )
         }
     }
 
@@ -3282,7 +3697,7 @@ class FloatingControlService : Service() {
         val wm = windowManager ?: return
         if (loopPanelView != null) return
         hideAddPanel()
-        floatingView?.findViewById<View>(R.id.saveConfirmPanel)?.visibility = View.GONE
+        floatingView?.let { hideSaveConfirmPanel(it) }
 
         val panel = LayoutInflater.from(this).inflate(R.layout.floating_loop_panel, null)
         val params = loopPanelParams ?: createPanelParams(220, 88)
@@ -3292,11 +3707,12 @@ class FloatingControlService : Service() {
         panel.findViewById<View>(R.id.loopSettingsSave).setOnClickListener {
             saveLoopSettings()
         }
-        wm.addView(panel, params)
-        ControlZoneChecker.register("floating_loop_panel") { panelZoneRect(loopPanelView, loopPanelParams) }
-        ScreenshotHider.register("floating_loop_panel",
-            hide = { loopPanelView?.visibility = View.INVISIBLE },
-            reveal = { loopPanelView?.visibility = View.VISIBLE }
+        floatingPanelController.show(
+            panel = panel,
+            params = params,
+            zoneKey = "floating_loop_panel",
+            viewProvider = { loopPanelView },
+            paramsProvider = { loopPanelParams }
         )
         loadLoopSettings()
         enableOverlayFocus()
@@ -3437,6 +3853,8 @@ class FloatingControlService : Service() {
         private const val PICKER_SWIPE_START = 1
         private const val PICKER_SWIPE_END = 2
         private const val DRAG_THRESHOLD_DP = 12f
+        private const val COLLAPSED_CONTROL_ITEM_COUNT = 4
+        private const val COLLAPSED_CONTROL_GAP_COUNT = 3
         private const val COLOR_PICK_CAPTURE_TIMEOUT_MS = 3000L
         private const val ACTION_LIST_ROW_HEIGHT_DP = 44f
         private const val ACTION_LIST_PANEL_WIDTH_DP = 292f
@@ -3450,3 +3868,4 @@ class FloatingControlService : Service() {
         private const val PROGRAM_TEMPLATE_MAX_VISIBLE_ROWS = 9
     }
 }
+

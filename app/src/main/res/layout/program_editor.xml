@@ -47,7 +47,7 @@
         <LinearLayout
             android:id="@+id/programEditorContent"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:orientation="vertical">
 
             <LinearLayout
@@ -131,6 +131,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="240dp"
                 android:layout_marginTop="10dp"
+                android:layout_weight="1"
                 android:background="@drawable/floating_control_bg"
                 android:orientation="horizontal"
                 android:padding="8dp">
@@ -141,14 +142,13 @@
                     android:layout_height="match_parent"
                     android:layout_marginEnd="6dp" />
 
-                <EditText
+                <com.fffcccdfgh.androidclicker.ProgramCodeEditText
                     android:id="@+id/programCodeInput"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:background="#0B1020"
                     android:gravity="top|start"
-                    android:hint="@string/program_code_hint"
                     android:inputType="textMultiLine|textNoSuggestions"
                     android:overScrollMode="always"
                     android:paddingStart="10dp"
@@ -157,7 +157,6 @@
                     android:paddingBottom="10dp"
                     android:scrollbars="none"
                     android:textColor="#DBEAFE"
-                    android:textColorHint="#64748B"
                     android:textSize="12sp" />
 
                 <com.fffcccdfgh.androidclicker.ProgramCodeScrollBar

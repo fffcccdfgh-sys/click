@@ -100,6 +100,16 @@
     <string name="pvz_default_script_name">PVZ2脚本</string>
     <string name="pvz_program_editor_title">PVZ2编程脚本</string>
     <string name="pvz_program_empty">请先编辑PVZ2脚本</string>
+    <string name="pvz_usb_sync_title">USB脚本同步</string>
+    <string name="pvz_usb_sync_message">检测到电脑同步的 PVZ2 脚本更新，是否覆盖当前编程代码？</string>
+    <string name="pvz_usb_sync_message_named">检测到电脑同步的 PVZ2 脚本「%1$s」更新，是否覆盖当前编程代码？</string>
+    <string name="pvz_usb_sync_batch_message">检测到电脑同步的 %1$d 个 PVZ2 脚本，是否更新？</string>
+    <string name="pvz_usb_sync_batch_replace_message">检测到电脑同步的 %1$d 个 PVZ2 脚本，将删除平板已有 PVZ2 脚本后重新导入，是否继续？</string>
+    <string name="pvz_usb_sync_applied">已覆盖当前PVZ2编程代码</string>
+    <string name="pvz_usb_sync_batch_imported">已同步%1$d个PVZ2脚本</string>
+    <string name="overwrite">覆盖</string>
+    <string name="update_all">更新全部</string>
+    <string name="replace_all">清空并导入</string>
     <string name="pvz_program_insert_tap">点击</string>
     <string name="pvz_program_insert_swipe">滑动</string>
     <string name="pvz_program_insert_text">文字识别</string>

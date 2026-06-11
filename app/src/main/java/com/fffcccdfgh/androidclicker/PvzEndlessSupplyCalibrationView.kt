@@ -55,9 +55,10 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
     private val handleRadius = 11f * density
     private val minAreaWidth = 70f * density
     private val minAreaHeight = 42f * density
-    private val buttonHeight = 46f * density
-    private val buttonMargin = 16f * density
-    private val buttonGap = 12f * density
+    private val controlHeight = 40f * density
+    private val controlMargin = 12f * density
+    private val smallButtonWidth = 62f * density
+    private val smallButtonHeight = 30f * density
 
     private val areaFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
@@ -115,9 +116,13 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
     }
     private val buttonTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
-        textSize = 15f * density
+        textSize = 13f * density
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
+    }
+    private val barPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = 0xCC111827.toInt()
     }
 
     private val saveRect = RectF()
@@ -281,13 +286,29 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
     }
 
     private fun drawButtons(canvas: Canvas) {
-        val top = height.toFloat() - buttonMargin - buttonHeight
-        val widthEach = (width.toFloat() - buttonMargin * 2f - buttonGap) / 2f
-        cancelRect.set(buttonMargin, top, buttonMargin + widthEach, top + buttonHeight)
-        saveRect.set(cancelRect.right + buttonGap, top, cancelRect.right + buttonGap + widthEach, top + buttonHeight)
-        canvas.drawRoundRect(cancelRect, 18f * density, 18f * density, cancelButtonPaint)
-        canvas.drawRoundRect(saveRect, 18f * density, 18f * density, saveButtonPaint)
-        val baseline = top + buttonHeight / 2f - (buttonTextPaint.ascent() + buttonTextPaint.descent()) / 2f
+        val barLeft = controlMargin
+        val barRight = width.toFloat() - controlMargin
+        val barBottom = height.toFloat() - controlMargin
+        val barTop = barBottom - controlHeight
+        val barRect = RectF(barLeft, barTop, barRight, barBottom)
+        canvas.drawRoundRect(barRect, 12f * density, 12f * density, barPaint)
+
+        val buttonTop = barTop + (controlHeight - smallButtonHeight) / 2f
+        cancelRect.set(
+            barLeft + 5f * density,
+            buttonTop,
+            barLeft + 5f * density + smallButtonWidth,
+            buttonTop + smallButtonHeight
+        )
+        saveRect.set(
+            barRight - 5f * density - smallButtonWidth,
+            buttonTop,
+            barRight - 5f * density,
+            buttonTop + smallButtonHeight
+        )
+        canvas.drawRoundRect(cancelRect, 8f * density, 8f * density, cancelButtonPaint)
+        canvas.drawRoundRect(saveRect, 8f * density, 8f * density, saveButtonPaint)
+        val baseline = cancelRect.centerY() - (buttonTextPaint.ascent() + buttonTextPaint.descent()) / 2f
         canvas.drawText(context.getString(R.string.cancel), cancelRect.centerX(), baseline, buttonTextPaint)
         canvas.drawText(context.getString(R.string.save), saveRect.centerX(), baseline, buttonTextPaint)
     }
@@ -362,8 +383,8 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
 
     private fun movePoint(index: Int, dx: Float, dy: Float) {
         if (index !in points.indices) return
-        points[index].x = (points[index].x + dx).coerceIn(circleRadius, width.toFloat() - circleRadius)
-        points[index].y = (points[index].y + dy).coerceIn(circleRadius, height.toFloat() - circleRadius)
+        points[index].x = (points[index].x + dx).coerceIn(0f, (width - 1).coerceAtLeast(0).toFloat())
+        points[index].y = (points[index].y + dy).coerceIn(0f, (height - 1).coerceAtLeast(0).toFloat())
     }
 
     private sealed class ActiveTarget {

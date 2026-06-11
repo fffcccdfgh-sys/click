@@ -1,4 +1,4 @@
-package com.fffcccdfgh.androidclicker
+﻿package com.fffcccdfgh.androidclicker
 
 import android.annotation.SuppressLint
 import android.app.Notification
@@ -10,6 +10,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
@@ -33,6 +34,14 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class PvzFloatingControlService : Service() {
     private val stopDebugTag = "ClickerStopDebug"
@@ -44,6 +53,12 @@ class PvzFloatingControlService : Service() {
     private var editorParams: WindowManager.LayoutParams? = null
     private var programTemplatePanelView: View? = null
     private var programTemplatePanelParams: WindowManager.LayoutParams? = null
+    private var saveConfirmPanelView: View? = null
+    private var saveConfirmPanelParams: WindowManager.LayoutParams? = null
+    private var usbSyncConfirmPanelView: View? = null
+    private var usbSyncConfirmPanelParams: WindowManager.LayoutParams? = null
+    private var pendingUsbSyncUpdate: PvzUsbSyncUpdate? = null
+    private var lastSeenUsbSyncSignature: String? = null
     private var calibrationPanelView: View? = null
     private var calibrationPanelParams: WindowManager.LayoutParams? = null
     private var calibrationPickerView: View? = null
@@ -58,6 +73,15 @@ class PvzFloatingControlService : Service() {
     private var initialY = 0
     private var initialTouchX = 0f
     private var initialTouchY = 0f
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var usbSyncJob: Job? = null
+    private val usbSyncWatcher by lazy { PvzUsbSyncWatcher(this) }
+    private val floatingPanelController by lazy {
+        FloatingPanelController(
+            windowManagerProvider = { windowManager },
+            touchThroughProvider = { floatingTouchThrough }
+        )
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -87,12 +111,21 @@ class PvzFloatingControlService : Service() {
         if (openEditorAfterStart) {
             showProgramEditor()
         }
+        startUsbSyncPolling()
         isRunning = true
 
         return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        updateFloatingControlSizeForCurrentDisplay()
+        updateProgramEditorSizeForCurrentDisplay()
+        updateProgramTemplatePanelSizeForCurrentDisplay()
+        updateCalibrationPanelSizeForCurrentDisplay()
+    }
 
     override fun onDestroy() {
         super.onDestroy()
@@ -103,8 +136,10 @@ class PvzFloatingControlService : Service() {
         hideEditor()
         hideCalibrationPanel()
         hideCalibrationPickerOverlay(revealOverlays = true)
+        hideUsbSyncConfirmPanel()
         hideExecutionStopButton()
         hideFloatingControl()
+        usbSyncJob?.cancel()
         isRunning = false
     }
 
@@ -152,6 +187,7 @@ class PvzFloatingControlService : Service() {
         val wm = windowManager ?: return
         val view = LayoutInflater.from(this).inflate(R.layout.pvz_floating_control, null)
         floatingView = view
+        val controlSize = calculateFloatingControlSizeForCurrentDisplay()
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -161,8 +197,8 @@ class PvzFloatingControlService : Service() {
         }
 
         floatingParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            controlSize.widthPx,
+            controlSize.heightPx,
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
@@ -192,13 +228,6 @@ class PvzFloatingControlService : Service() {
         view.findViewById<View>(R.id.pvzSaveButton).setOnClickListener {
             showSaveConfirmPanel()
         }
-        view.findViewById<View>(R.id.pvzSaveConfirmYes).setOnClickListener {
-            saveCurrentProgramWithConfirmedName()
-        }
-        view.findViewById<View>(R.id.pvzSaveConfirmNo).setOnClickListener {
-            view.findViewById<View>(R.id.pvzSaveConfirmPanel).visibility = View.GONE
-            disableOverlayFocus()
-        }
         view.findViewById<View>(R.id.pvzStopPositionButton).setOnClickListener {
             toggleStopButtonPositioning()
         }
@@ -213,6 +242,7 @@ class PvzFloatingControlService : Service() {
 
         updateFloatingTitle()
         updateStopPositionButton()
+        applyExpandedFloatingControlLayout(view, controlSize)
         wm.addView(view, floatingParams)
 
         ControlZoneChecker.register(ZONE_KEY) { getControlZoneRect() }
@@ -221,6 +251,166 @@ class PvzFloatingControlService : Service() {
             hide = { floatingView?.visibility = View.INVISIBLE },
             reveal = { floatingView?.visibility = View.VISIBLE }
         )
+    }
+
+    private fun dpToPx(dp: Int): Int = (dp * resources.displayMetrics.density).toInt()
+
+    private fun calculateFloatingControlSizeForCurrentDisplay(): FloatingWindowSize {
+        val screen = currentProgramScreenSize()
+        return FloatingWindowSizePolicy.expandedControlSize(screen.width, screen.height)
+    }
+
+    private fun calculateCollapsedControlSizeForCurrentDisplay(): FloatingWindowSize {
+        val screen = currentProgramScreenSize()
+        return FloatingWindowSizePolicy.collapsedControlSize(screen.width, screen.height)
+    }
+
+    private fun updateFloatingControlSizeForCurrentDisplay() {
+        val view = floatingView ?: return
+        val expandedControls = view.findViewById<View>(R.id.pvzExpandedControls)
+        val collapsedControls = view.findViewById<View>(R.id.pvzCollapsedControls)
+        val saveConfirmPanel = view.findViewById<View>(R.id.pvzSaveConfirmPanel)
+        if (saveConfirmPanel.visibility == View.VISIBLE) {
+            return
+        }
+
+        if (collapsedControls.visibility == View.VISIBLE) {
+            applyCollapsedFloatingControlLayout(view, calculateCollapsedControlSizeForCurrentDisplay())
+            return
+        }
+
+        if (expandedControls.visibility == View.VISIBLE) {
+            applyExpandedFloatingControlLayout(view, calculateFloatingControlSizeForCurrentDisplay())
+        }
+    }
+
+    private fun applyCollapsedFloatingControlLayout(view: View, controlSize: FloatingWindowSize) {
+        val root = view.findViewById<View>(R.id.pvzFloatingRoot)
+        val collapsedControls = view.findViewById<LinearLayout>(R.id.pvzCollapsedControls)
+        val collapsedTitle = view.findViewById<TextView>(R.id.pvzCollapsedTitle)
+        val collapsedButtons = listOf<View>(
+            view.findViewById(R.id.pvzCollapsedStartButton),
+            view.findViewById(R.id.pvzCollapsedCloseButton),
+            view.findViewById(R.id.pvzCollapsedExpandButton)
+        )
+
+        collapsedControls.layoutParams = collapsedControls.layoutParams?.apply {
+            width = ViewGroup.LayoutParams.MATCH_PARENT
+            height = ViewGroup.LayoutParams.MATCH_PARENT
+        }
+
+        val horizontalPadding = root.paddingLeft + root.paddingRight
+        val verticalPadding = root.paddingTop + root.paddingBottom
+        val contentWidth = (controlSize.widthPx - horizontalPadding).coerceAtLeast(1)
+        val contentHeight = (controlSize.heightPx - verticalPadding).coerceAtLeast(1)
+        val gapPx = (contentWidth / 72).coerceIn(dpToPx(2), dpToPx(8))
+        val availableWidth = (contentWidth - gapPx * COLLAPSED_CONTROL_GAP_COUNT).coerceAtLeast(1)
+        val itemWidth = (availableWidth / COLLAPSED_CONTROL_ITEM_COUNT).coerceAtLeast(1)
+
+        collapsedTitle.minimumWidth = 0
+        collapsedTitle.setPadding(0, collapsedTitle.paddingTop, 0, collapsedTitle.paddingBottom)
+        collapsedTitle.gravity = Gravity.CENTER
+        collapsedTitle.layoutParams = (collapsedTitle.layoutParams as LinearLayout.LayoutParams).apply {
+            width = itemWidth
+            height = contentHeight
+            weight = 0f
+            marginStart = 0
+            marginEnd = 0
+        }
+
+        collapsedButtons.forEach { button ->
+            button.minimumWidth = 0
+            button.setPadding(0, button.paddingTop, 0, button.paddingBottom)
+            button.layoutParams = (button.layoutParams as LinearLayout.LayoutParams).apply {
+                width = itemWidth
+                height = contentHeight
+                weight = 0f
+                marginStart = gapPx
+                marginEnd = 0
+            }
+        }
+
+        floatingParams?.let { lp ->
+            lp.width = controlSize.widthPx
+            lp.height = controlSize.heightPx
+            if (view.isAttachedToWindow) {
+                windowManager?.updateViewLayout(view, lp)
+            }
+        }
+    }
+
+    private fun applyExpandedFloatingControlLayout(view: View, controlSize: FloatingWindowSize) {
+        val root = view.findViewById<View>(R.id.pvzFloatingRoot)
+        val expandedControls = view.findViewById<View>(R.id.pvzExpandedControls)
+        val dragHandle = view.findViewById<TextView>(R.id.pvzDragHandle)
+        val foldButton = view.findViewById<TextView>(R.id.pvzFoldButton)
+        val closeButton = view.findViewById<TextView>(R.id.pvzCloseButton)
+        val mainActionRow = view.findViewById<LinearLayout>(R.id.pvzMainActionRow)
+        val actionButtons = listOf<View>(
+            view.findViewById(R.id.pvzStartButton),
+            view.findViewById(R.id.pvzEditButton),
+            view.findViewById(R.id.pvzCalibrationButton),
+            view.findViewById(R.id.pvzSaveButton),
+            view.findViewById(R.id.pvzStopPositionButton)
+        )
+
+        expandedControls.layoutParams = expandedControls.layoutParams?.apply {
+            width = ViewGroup.LayoutParams.MATCH_PARENT
+            height = ViewGroup.LayoutParams.MATCH_PARENT
+        }
+
+        val horizontalPadding = root.paddingLeft + root.paddingRight
+        val verticalPadding = root.paddingTop + root.paddingBottom
+        val contentWidth = (controlSize.widthPx - horizontalPadding).coerceAtLeast(1)
+        val contentHeight = (controlSize.heightPx - verticalPadding).coerceAtLeast(1)
+        val gapPx = (contentWidth / 64).coerceIn(dpToPx(2), dpToPx(8))
+        val buttonHeight = ((contentHeight - gapPx) / 2).coerceAtLeast(1)
+        val actionButtonWidth = ((contentWidth - gapPx * (actionButtons.size - 1)) / actionButtons.size)
+            .coerceAtLeast(1)
+
+        mainActionRow.layoutParams = (mainActionRow.layoutParams as LinearLayout.LayoutParams).apply {
+            width = ViewGroup.LayoutParams.MATCH_PARENT
+            height = 0
+            weight = 1f
+            topMargin = gapPx
+        }
+
+        actionButtons.forEachIndexed { index, button ->
+            button.minimumWidth = 0
+            button.setPadding(0, button.paddingTop, 0, button.paddingBottom)
+            button.layoutParams = (button.layoutParams as LinearLayout.LayoutParams).apply {
+                width = actionButtonWidth
+                height = buttonHeight
+                weight = 0f
+                marginStart = if (index == 0) 0 else gapPx
+            }
+        }
+
+        listOf(foldButton, closeButton).forEach { button ->
+            button.minimumWidth = 0
+            button.setPadding(0, button.paddingTop, 0, button.paddingBottom)
+            button.layoutParams = (button.layoutParams as LinearLayout.LayoutParams).apply {
+                width = actionButtonWidth
+                height = buttonHeight
+                weight = 0f
+                marginStart = gapPx
+            }
+        }
+
+        dragHandle.layoutParams = (dragHandle.layoutParams as LinearLayout.LayoutParams).apply {
+            width = 0
+            height = buttonHeight
+            weight = 1f
+            marginStart = 0
+        }
+
+        floatingParams?.let { lp ->
+            lp.width = controlSize.widthPx
+            lp.height = controlSize.heightPx
+            if (view.isAttachedToWindow) {
+                windowManager?.updateViewLayout(view, lp)
+            }
+        }
     }
 
     private fun bindDrag(handle: View, view: View) {
@@ -297,19 +487,23 @@ class PvzFloatingControlService : Service() {
 
     private fun collapseFloatingControl() {
         val view = floatingView ?: return
+        hideSaveConfirmPanel()
         view.findViewById<View>(R.id.pvzSaveConfirmPanel).visibility = View.GONE
         disableOverlayFocus()
         view.findViewById<View>(R.id.pvzExpandedControls).visibility = View.GONE
         view.findViewById<View>(R.id.pvzCollapsedControls).visibility = View.VISIBLE
+        applyCollapsedFloatingControlLayout(view, calculateCollapsedControlSizeForCurrentDisplay())
     }
 
     private fun expandFloatingControl() {
         val view = floatingView ?: return
         view.findViewById<View>(R.id.pvzExpandedControls).visibility = View.VISIBLE
         view.findViewById<View>(R.id.pvzCollapsedControls).visibility = View.GONE
+        applyExpandedFloatingControlLayout(view, calculateFloatingControlSizeForCurrentDisplay())
     }
 
     private fun hideFloatingControl() {
+        hideSaveConfirmPanel()
         ScreenshotHider.unregister(ZONE_KEY)
         ControlZoneChecker.unregister(ZONE_KEY)
         val view = floatingView
@@ -435,7 +629,7 @@ class PvzFloatingControlService : Service() {
         hideEditor()
         hideCalibrationPanel()
         hideCalibrationPickerOverlay(revealOverlays = true)
-        floatingView?.findViewById<View>(R.id.pvzSaveConfirmPanel)?.visibility = View.GONE
+        hideSaveConfirmPanel()
         disableOverlayFocus()
         val code = loadCurrentProgramCode()
         if (code.isBlank()) {
@@ -526,7 +720,7 @@ class PvzFloatingControlService : Service() {
         }
 
         val currentDisplay = ScreenCaptureDisplayReader.current(this)
-        val editorSize = ProgramEditorWindowPolicy.windowSizeForCurrentDisplay(
+        val editorSize = FloatingWindowSizePolicy.programEditorSizeForDisplay(
             displayWidthPx = currentDisplay.width,
             displayHeightPx = currentDisplay.height,
             resourceWidthPx = resources.displayMetrics.widthPixels,
@@ -535,8 +729,8 @@ class PvzFloatingControlService : Service() {
         )
 
         val params = WindowManager.LayoutParams(
-            editorSize.width,
-            editorSize.height,
+            editorSize.widthPx,
+            editorSize.heightPx,
             type,
             ProgramEditorWindowPolicy.FLAGS,
             PixelFormat.TRANSLUCENT
@@ -547,14 +741,7 @@ class PvzFloatingControlService : Service() {
         editorParams = params
 
         val codeInput = editor.findViewById<EditText>(R.id.programCodeInput)
-        val codePanel = editor.findViewById<View>(R.id.programCodePanel)
-        codePanel.layoutParams = codePanel.layoutParams.apply {
-            height = ProgramEditorWindowPolicy.codePanelHeight(
-                editorWidthPx = editorSize.width,
-                editorHeightPx = editorSize.height,
-                density = resources.displayMetrics.density
-            )
-        }
+        applyProgramEditorCodePanelHeight(editor, editorSize)
         configureProgramCodeInput(codeInput)
         codeInput.setText(loadCurrentProgramCode())
         val restoreCursor = pendingProgramRestoreCursor
@@ -594,6 +781,31 @@ class PvzFloatingControlService : Service() {
             hide = { editorView?.visibility = View.INVISIBLE },
             reveal = { editorView?.visibility = View.VISIBLE }
         )
+    }
+
+    private fun updateProgramEditorSizeForCurrentDisplay() {
+        val editor = editorView ?: return
+        val params = editorParams ?: return
+        val currentDisplay = ScreenCaptureDisplayReader.current(this)
+        val editorSize = FloatingWindowSizePolicy.programEditorSizeForDisplay(
+            displayWidthPx = currentDisplay.width,
+            displayHeightPx = currentDisplay.height,
+            resourceWidthPx = resources.displayMetrics.widthPixels,
+            resourceHeightPx = resources.displayMetrics.heightPixels,
+            density = resources.displayMetrics.density
+        )
+
+        FloatingWindowLayoutPolicy.applyCenterGravitySize(params, editorSize)
+        applyProgramEditorCodePanelHeight(editor, editorSize)
+        FloatingWindowLayoutPolicy.updateIfAttached(windowManager, editor, params)
+    }
+
+    private fun applyProgramEditorCodePanelHeight(editor: View, editorSize: FloatingWindowSize) {
+        val codePanel = editor.findViewById<View>(R.id.programCodePanel)
+        codePanel.layoutParams = (codePanel.layoutParams as LinearLayout.LayoutParams).apply {
+            height = Math.round(editorSize.heightPx * ProgramEditorWindowPolicy.CODE_PANEL_HEIGHT_RATIO)
+            weight = 0f
+        }
     }
 
     private fun bindPvzProgramInsertTools(editor: View, codeInput: EditText) {
@@ -972,6 +1184,8 @@ class PvzFloatingControlService : Service() {
 
         val panel = LayoutInflater.from(this).inflate(R.layout.floating_program_template_panel, null)
         val params = programTemplatePanelParams ?: createProgramTemplatePanelParams()
+        val templateSize = calculateProgramTemplatePanelSizeForCurrentDisplay()
+        applyProgramTemplatePanelParams(params, templateSize)
         programTemplatePanelView = panel
         programTemplatePanelParams = params
 
@@ -983,7 +1197,7 @@ class PvzFloatingControlService : Service() {
         val templates = pvzQuickTemplates()
         val container = panel.findViewById<LinearLayout>(R.id.programTemplateContainer)
         container.removeAllViews()
-        val rowWidth = dp(PROGRAM_TEMPLATE_PANEL_WIDTH_DP)
+        val rowWidth = programTemplateRowWidth(templateSize)
         for ((index, template) in templates.withIndex()) {
             val item = TextView(this).apply {
                 text = template.title
@@ -1012,25 +1226,18 @@ class PvzFloatingControlService : Service() {
 
         val scrollView = panel.findViewById<ScrollView>(R.id.programTemplateScroll)
         val scrollBar = panel.findViewById<ProgramTemplateMenuScrollBar>(R.id.programTemplateScrollBar)
-        val menuHeight = ProgramTemplateMenuLayout.popupHeight(
-            itemCount = templates.size,
-            itemHeightPx = dp(PROGRAM_TEMPLATE_ROW_HEIGHT_DP + 8f),
-            verticalPaddingPx = 0,
-            maxVisibleRows = PROGRAM_TEMPLATE_MAX_VISIBLE_ROWS
-        )
         scrollView.layoutParams = scrollView.layoutParams.apply {
-            height = menuHeight
+            height = programTemplateScrollHeight(templateSize)
         }
+        applyProgramTemplatePanelContentSize(panel, templateSize)
         scrollBar.attachTo(scrollView)
 
-        wm.addView(panel, params)
-        ControlZoneChecker.register(TEMPLATE_ZONE_KEY) {
-            panelZoneRect(programTemplatePanelView, programTemplatePanelParams)
-        }
-        ScreenshotHider.register(
-            TEMPLATE_ZONE_KEY,
-            hide = { programTemplatePanelView?.visibility = View.INVISIBLE },
-            reveal = { programTemplatePanelView?.visibility = View.VISIBLE }
+        floatingPanelController.show(
+            panel = panel,
+            params = params,
+            zoneKey = TEMPLATE_ZONE_KEY,
+            viewProvider = { programTemplatePanelView },
+            paramsProvider = { programTemplatePanelParams }
         )
     }
 
@@ -1090,18 +1297,83 @@ class PvzFloatingControlService : Service() {
     }
 
     private fun createProgramTemplatePanelParams(): WindowManager.LayoutParams {
-        val panelWidth = dp(PROGRAM_TEMPLATE_PANEL_WIDTH_DP + 42f)
+        val templateSize = calculateProgramTemplatePanelSizeForCurrentDisplay()
         return WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            templateSize.widthPx,
+            templateSize.heightPx,
             overlayType(),
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = ((resources.displayMetrics.widthPixels - panelWidth) / 2).coerceAtLeast(0)
-            y = (resources.displayMetrics.heightPixels * 0.18f).toInt().coerceAtLeast(0)
+            FloatingWindowLayoutPolicy.applyCenteredPosition(
+                params = this,
+                screenWidthPx = resources.displayMetrics.widthPixels,
+                screenHeightPx = resources.displayMetrics.heightPixels,
+                size = templateSize
+            )
         }
+    }
+
+    private fun updateProgramTemplatePanelSizeForCurrentDisplay() {
+        val panel = programTemplatePanelView ?: return
+        val params = programTemplatePanelParams ?: return
+        val templateSize = calculateProgramTemplatePanelSizeForCurrentDisplay()
+
+        applyProgramTemplatePanelParams(params, templateSize)
+        applyProgramTemplatePanelContentSize(panel, templateSize)
+        FloatingWindowLayoutPolicy.updateIfAttached(windowManager, panel, params)
+    }
+
+    private fun calculateProgramTemplatePanelSizeForCurrentDisplay(): FloatingWindowSize {
+        val currentDisplay = ScreenCaptureDisplayReader.current(this)
+        return FloatingWindowSizePolicy.programTemplateSize(
+            screenWidthPx = currentDisplay.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels,
+            screenHeightPx = currentDisplay.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels,
+            density = resources.displayMetrics.density
+        )
+    }
+
+    private fun applyProgramTemplatePanelParams(
+        params: WindowManager.LayoutParams,
+        templateSize: FloatingWindowSize
+    ) {
+        FloatingWindowLayoutPolicy.applyCenteredSize(
+            params = params,
+            screenWidthPx = resources.displayMetrics.widthPixels,
+            screenHeightPx = resources.displayMetrics.heightPixels,
+            size = templateSize
+        )
+    }
+
+    private fun applyProgramTemplatePanelContentSize(panel: View, templateSize: FloatingWindowSize) {
+        panel.layoutParams = ViewGroup.LayoutParams(templateSize.widthPx, templateSize.heightPx)
+        panel.findViewById<View>(R.id.programTemplateHeader).layoutParams =
+            panel.findViewById<View>(R.id.programTemplateHeader).layoutParams.apply {
+                width = ViewGroup.LayoutParams.MATCH_PARENT
+            }
+        val rowWidth = programTemplateRowWidth(templateSize)
+        val container = panel.findViewById<LinearLayout>(R.id.programTemplateContainer)
+        for (index in 0 until container.childCount) {
+            container.getChildAt(index).layoutParams = LinearLayout.LayoutParams(
+                rowWidth,
+                dp(PROGRAM_TEMPLATE_ROW_HEIGHT_DP)
+            ).apply {
+                if (index > 0) topMargin = dp(8f)
+            }
+        }
+        val scrollView = panel.findViewById<ScrollView>(R.id.programTemplateScroll)
+        scrollView.layoutParams = scrollView.layoutParams.apply {
+            width = rowWidth
+            height = programTemplateScrollHeight(templateSize)
+        }
+    }
+
+    private fun programTemplateRowWidth(templateSize: FloatingWindowSize): Int {
+        return (templateSize.widthPx - dp(34f)).coerceAtLeast(dp(120f))
+    }
+
+    private fun programTemplateScrollHeight(templateSize: FloatingWindowSize): Int {
+        return (templateSize.heightPx - dp(66f)).coerceAtLeast(dp(PROGRAM_TEMPLATE_ROW_HEIGHT_DP))
     }
 
     private fun hideProgramTemplatePanel() {
@@ -1126,33 +1398,32 @@ class PvzFloatingControlService : Service() {
 
         val panel = LayoutInflater.from(this).inflate(R.layout.pvz_calibration_panel, null)
         val params = calibrationPanelParams ?: createCalibrationPanelParams()
+        val panelSize = calculateCalibrationPanelSizeForCurrentDisplay()
+        applyCalibrationPanelParams(params, panelSize)
         calibrationPanelView = panel
         calibrationPanelParams = params
 
-        constrainCalibrationPanelScroll(panel, params)
+        applyCalibrationPanelContentSize(panel, panelSize)
         bindPanelDrag(panel.findViewById(R.id.pvzCalibrationHeader), panel, params)
         panel.findViewById<View>(R.id.pvzCalibrationCloseButton).setOnClickListener {
             hideCalibrationPanel()
         }
         bindCalibrationStatusButtons(panel)
 
-        wm.addView(panel, params)
-        ControlZoneChecker.register(CALIBRATION_ZONE_KEY) {
-            panelZoneRect(calibrationPanelView, calibrationPanelParams)
-        }
-        ScreenshotHider.register(
-            CALIBRATION_ZONE_KEY,
-            hide = { calibrationPanelView?.visibility = View.INVISIBLE },
-            reveal = { calibrationPanelView?.visibility = View.VISIBLE }
+        floatingPanelController.show(
+            panel = panel,
+            params = params,
+            zoneKey = CALIBRATION_ZONE_KEY,
+            viewProvider = { calibrationPanelView },
+            paramsProvider = { calibrationPanelParams }
         )
     }
 
     private fun createCalibrationPanelParams(): WindowManager.LayoutParams {
-        val panelWidth = dp(PROGRAM_TEMPLATE_PANEL_WIDTH_DP + 20f)
-        val screen = currentProgramScreenSize()
+        val panelSize = calculateCalibrationPanelSizeForCurrentDisplay()
         return WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            panelSize.widthPx,
+            panelSize.heightPx,
             overlayType(),
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
@@ -1163,24 +1434,54 @@ class PvzFloatingControlService : Service() {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
-            x = ((screen.width - panelWidth) / 2).coerceAtLeast(0)
-            y = (screen.height * 0.16f).toInt().coerceAtLeast(0)
+            applyCalibrationPanelParams(this, panelSize)
         }
     }
 
-    private fun constrainCalibrationPanelScroll(panel: View, params: WindowManager.LayoutParams) {
-        val scroll = panel.findViewById<View>(R.id.pvzCalibrationEntryScroll)
+    private fun updateCalibrationPanelSizeForCurrentDisplay() {
+        val panel = calibrationPanelView ?: return
+        val params = calibrationPanelParams ?: return
+        val panelSize = calculateCalibrationPanelSizeForCurrentDisplay()
+
+        applyCalibrationPanelParams(params, panelSize)
+        applyCalibrationPanelContentSize(panel, panelSize)
+        FloatingWindowLayoutPolicy.updateIfAttached(windowManager, panel, params)
+    }
+
+    private fun calculateCalibrationPanelSizeForCurrentDisplay(): FloatingWindowSize {
         val screen = currentProgramScreenSize()
-        val maxHeight = (screen.height - params.y - dp(92f)).coerceAtLeast(dp(160f))
-        val contentWidth = dp(PROGRAM_TEMPLATE_PANEL_WIDTH_DP + 20f)
-        val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-        val widthSpec = View.MeasureSpec.makeMeasureSpec(contentWidth, View.MeasureSpec.AT_MOST)
-        scroll.measure(widthSpec, unspecified)
-        val targetHeight = scroll.measuredHeight.takeIf { it > 0 }
-            ?.coerceAtMost(maxHeight)
-            ?: maxHeight
+        return FloatingWindowSizePolicy.calibrationPanelSize(screen.width, screen.height)
+    }
+
+    private fun applyCalibrationPanelParams(
+        params: WindowManager.LayoutParams,
+        panelSize: FloatingWindowSize
+    ) {
+        val screen = currentProgramScreenSize()
+        FloatingWindowLayoutPolicy.applyCenteredSize(
+            params = params,
+            screenWidthPx = screen.width,
+            screenHeightPx = screen.height,
+            size = panelSize
+        )
+    }
+
+    private fun applyCalibrationPanelContentSize(panel: View, panelSize: FloatingWindowSize) {
+        val root = panel.findViewById<View>(R.id.pvzCalibrationPanel)
+        val header = panel.findViewById<View>(R.id.pvzCalibrationHeader)
+        val scroll = panel.findViewById<View>(R.id.pvzCalibrationEntryScroll)
+        val horizontalPadding = root.paddingLeft + root.paddingRight
+        val verticalPadding = root.paddingTop + root.paddingBottom
+        val contentWidth = (panelSize.widthPx - horizontalPadding).coerceAtLeast(dp(120f))
+        val scrollHeight = (panelSize.heightPx - verticalPadding - dp(46f)).coerceAtLeast(dp(160f))
+
+        root.layoutParams = ViewGroup.LayoutParams(panelSize.widthPx, panelSize.heightPx)
+        header.layoutParams = header.layoutParams.apply {
+            width = ViewGroup.LayoutParams.MATCH_PARENT
+        }
         scroll.layoutParams = scroll.layoutParams.apply {
-            height = targetHeight
+            width = contentWidth
+            height = scrollHeight
         } as ViewGroup.LayoutParams
     }
 
@@ -2391,44 +2692,15 @@ class PvzFloatingControlService : Service() {
     }
 
     private fun bindPanelDrag(handle: View, panel: View, params: WindowManager.LayoutParams) {
-        handle.setOnTouchListener { _, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    initialX = params.x
-                    initialY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (event.rawX - initialTouchX).toInt()
-                    params.y = initialY + (event.rawY - initialTouchY).toInt()
-                    windowManager?.updateViewLayout(panel, params)
-                    true
-                }
-                else -> false
-            }
-        }
+        floatingPanelController.bindDrag(handle, panel, params)
     }
 
     private fun removePanel(view: View?, zoneKey: String, onRemoved: () -> Unit) {
-        val wm = windowManager
-        if (view != null && wm != null) {
-            try {
-                wm.removeView(view)
-            } catch (_: Exception) {
-            }
-        }
-        ScreenshotHider.unregister(zoneKey)
-        ControlZoneChecker.unregister(zoneKey)
-        onRemoved()
+        floatingPanelController.remove(view, zoneKey, onRemoved)
     }
 
     private fun panelZoneRect(view: View?, params: WindowManager.LayoutParams?): Rect? {
-        if (floatingTouchThrough) return null
-        if (view == null || params == null) return null
-        if (view.width <= 0 || view.height <= 0) return null
-        return Rect(params.x, params.y, params.x + view.width, params.y + view.height)
+        return floatingPanelController.zoneRect(view, params)
     }
 
     private fun testProgramParse(code: String) {
@@ -2456,30 +2728,75 @@ class PvzFloatingControlService : Service() {
         return true
     }
 
+    @SuppressLint("InflateParams")
     private fun showSaveConfirmPanel() {
         val code = loadCurrentProgramCode()
         if (code.isBlank()) {
             Toast.makeText(this, R.string.pvz_program_empty, Toast.LENGTH_SHORT).show()
             return
         }
-        val view = floatingView ?: return
-        val panel = view.findViewById<View>(R.id.pvzSaveConfirmPanel)
-        val input = view.findViewById<EditText>(R.id.pvzSaveNameInput)
+        val wm = windowManager ?: return
+        if (saveConfirmPanelView != null) {
+            hideSaveConfirmPanel()
+        }
+
+        val panel = LayoutInflater.from(this).inflate(R.layout.floating_save_confirm_panel, null)
+        val params = createSaveConfirmPanelParams()
+        saveConfirmPanelView = panel
+        saveConfirmPanelParams = params
+
+        panel.findViewById<TextView>(R.id.savePanelTitle).text = getString(R.string.confirm_save_pvz_script)
+        val input = panel.findViewById<EditText>(R.id.savePanelNameInput)
         input.setText(getCurrentScriptName() ?: PvzScriptStorage.nextAutoName(this))
         input.selectAll()
-        panel.visibility = View.VISIBLE
-        enableOverlayFocus()
+        bindPanelDrag(panel.findViewById(R.id.savePanelHeader), panel, params)
+        panel.findViewById<View>(R.id.savePanelConfirmButton).setOnClickListener {
+            saveCurrentProgramWithConfirmedName(input.text.toString().trim())
+        }
+        val dismiss = View.OnClickListener { hideSaveConfirmPanel() }
+        panel.findViewById<View>(R.id.savePanelCancelButton).setOnClickListener(dismiss)
+
+        floatingPanelController.show(
+            panel = panel,
+            params = params,
+            zoneKey = SAVE_CONFIRM_ZONE_KEY,
+            viewProvider = { saveConfirmPanelView },
+            paramsProvider = { saveConfirmPanelParams }
+        )
+        enableSaveConfirmInput(input)
     }
 
-    private fun saveCurrentProgramWithConfirmedName() {
-        val view = floatingView ?: return
+    private fun createSaveConfirmPanelParams(): WindowManager.LayoutParams {
+        val screen = currentProgramScreenSize()
+        val panelSize = FloatingWindowSizePolicy.saveConfirmPanelEstimatedSize(resources.displayMetrics.density)
+        return WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            overlayType(),
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            FloatingWindowLayoutPolicy.applyCenteredPosition(this, screen.width, screen.height, panelSize)
+        }
+    }
+
+    private fun enableSaveConfirmInput(input: EditText) {
+        input.requestFocus()
+        input.post {
+            val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
+        }
+    }
+
+    private fun saveCurrentProgramWithConfirmedName(name: String) {
         val code = loadCurrentProgramCode()
         if (code.isBlank()) {
             Toast.makeText(this, R.string.pvz_program_empty, Toast.LENGTH_SHORT).show()
             return
         }
-        val input = view.findViewById<EditText>(R.id.pvzSaveNameInput)
-        val name = input.text.toString().trim()
         if (name.isEmpty()) {
             Toast.makeText(this, R.string.script_name_empty, Toast.LENGTH_SHORT).show()
             return
@@ -2490,9 +2807,117 @@ class PvzFloatingControlService : Service() {
             return
         }
         saveCurrentProgramCode(name, code)
-        view.findViewById<View>(R.id.pvzSaveConfirmPanel).visibility = View.GONE
-        disableOverlayFocus()
+        hideSaveConfirmPanel()
         Toast.makeText(this, R.string.script_saved, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun hideSaveConfirmPanel() {
+        removePanel(saveConfirmPanelView, SAVE_CONFIRM_ZONE_KEY) {
+            saveConfirmPanelView = null
+        }
+        saveConfirmPanelParams = null
+    }
+
+    private fun startUsbSyncPolling() {
+        if (usbSyncJob?.isActive == true) return
+        lastSeenUsbSyncSignature = loadLastSeenUsbSyncSignature()
+        usbSyncJob = serviceScope.launch {
+            while (isActive) {
+                val update = withContext(Dispatchers.IO) {
+                    usbSyncWatcher.readLatestUpdate()
+                }
+                if (update != null && update.signature != lastSeenUsbSyncSignature) {
+                    lastSeenUsbSyncSignature = update.signature
+                    saveLastSeenUsbSyncSignature(update.signature)
+                    showOrUpdateUsbSyncConfirmPanel(update)
+                }
+                delay(USB_SYNC_POLL_INTERVAL_MS)
+            }
+        }
+    }
+
+    @SuppressLint("InflateParams")
+    private fun showOrUpdateUsbSyncConfirmPanel(update: PvzUsbSyncUpdate) {
+        pendingUsbSyncUpdate = update
+        val existing = usbSyncConfirmPanelView
+        if (existing != null) {
+            updateUsbSyncConfirmPanelMessage(existing, update)
+            return
+        }
+
+        val panel = LayoutInflater.from(this).inflate(R.layout.pvz_usb_sync_confirm_panel, null)
+        val params = createUsbSyncConfirmPanelParams()
+        usbSyncConfirmPanelView = panel
+        usbSyncConfirmPanelParams = params
+        updateUsbSyncConfirmPanelMessage(panel, update)
+        bindPanelDrag(panel.findViewById(R.id.pvzUsbSyncPanelHeader), panel, params)
+
+        panel.findViewById<View>(R.id.pvzUsbSyncOverwriteButton).setOnClickListener {
+            applyPendingUsbSyncUpdate()
+        }
+        panel.findViewById<View>(R.id.pvzUsbSyncCancelButton).setOnClickListener {
+            pendingUsbSyncUpdate = null
+            hideUsbSyncConfirmPanel()
+        }
+
+        floatingPanelController.show(
+            panel = panel,
+            params = params,
+            zoneKey = USB_SYNC_CONFIRM_ZONE_KEY,
+            viewProvider = { usbSyncConfirmPanelView },
+            paramsProvider = { usbSyncConfirmPanelParams }
+        )
+    }
+
+    private fun updateUsbSyncConfirmPanelMessage(panel: View, update: PvzUsbSyncUpdate) {
+        panel.findViewById<TextView>(R.id.pvzUsbSyncPanelMessage).text =
+            getString(R.string.pvz_usb_sync_message_named, update.scriptName)
+    }
+
+    private fun createUsbSyncConfirmPanelParams(): WindowManager.LayoutParams {
+        val screen = currentProgramScreenSize()
+        val panelSize = FloatingWindowSize(dp(300f), dp(136f))
+        return WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            overlayType(),
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            FloatingWindowLayoutPolicy.applyCenteredPosition(this, screen.width, screen.height, panelSize)
+        }
+    }
+
+    private fun applyPendingUsbSyncUpdate() {
+        val update = pendingUsbSyncUpdate ?: return
+        saveCurrentProgramCode(update.scriptName, update.code)
+        editorView?.findViewById<EditText>(R.id.programCodeInput)?.let { input ->
+            input.setText(update.code)
+            input.setSelection(update.code.length.coerceIn(0, input.text?.length ?: 0))
+        }
+        pendingUsbSyncUpdate = null
+        hideUsbSyncConfirmPanel()
+        Toast.makeText(this, R.string.pvz_usb_sync_applied, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun hideUsbSyncConfirmPanel() {
+        removePanel(usbSyncConfirmPanelView, USB_SYNC_CONFIRM_ZONE_KEY) {
+            usbSyncConfirmPanelView = null
+        }
+        usbSyncConfirmPanelParams = null
+    }
+
+    private fun loadLastSeenUsbSyncSignature(): String? {
+        return getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_USB_SYNC_SIGNATURE, null)
+    }
+
+    private fun saveLastSeenUsbSyncSignature(signature: String) {
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_USB_SYNC_SIGNATURE, signature)
+            .apply()
     }
 
     private fun loadCurrentProgramCode(): String {
@@ -2551,7 +2976,7 @@ class PvzFloatingControlService : Service() {
             ?.takeIf { it.isNotBlank() }
             ?: getString(R.string.pvz_default_script_name)
         view.findViewById<TextView>(R.id.pvzDragHandle).text = name
-        view.findViewById<TextView>(R.id.pvzCollapsedTitle).text = name
+        view.findViewById<TextView>(R.id.pvzCollapsedTitle).text = name.take(3)
     }
 
     companion object {
@@ -2562,11 +2987,17 @@ class PvzFloatingControlService : Service() {
         const val PREFS_NAME = "pvz2_script_config"
         const val KEY_PROGRAM_CODE = "program_code"
         const val KEY_SCRIPT_NAME = "script_name"
+        private const val KEY_USB_SYNC_SIGNATURE = "usb_sync_signature"
         private const val ZONE_KEY = "pvz_floating_control"
         private const val EDITOR_ZONE_KEY = "pvz_program_editor"
         private const val TEMPLATE_ZONE_KEY = "pvz_program_template_panel"
+        private const val SAVE_CONFIRM_ZONE_KEY = "pvz_save_confirm_panel"
+        private const val USB_SYNC_CONFIRM_ZONE_KEY = "pvz_usb_sync_confirm_panel"
         private const val CALIBRATION_ZONE_KEY = "pvz_calibration_panel"
         private const val STOP_BUTTON_ZONE_KEY = "pvz_execution_stop_button"
+        private const val USB_SYNC_POLL_INTERVAL_MS = 1000L
+        private const val COLLAPSED_CONTROL_ITEM_COUNT = 4
+        private const val COLLAPSED_CONTROL_GAP_COUNT = 3
         private const val PROGRAM_TEMPLATE_PANEL_WIDTH_DP = 292f
         private const val PROGRAM_TEMPLATE_ROW_HEIGHT_DP = 44f
         private const val PROGRAM_TEMPLATE_MAX_VISIBLE_ROWS = 9
@@ -2576,3 +3007,5 @@ class PvzFloatingControlService : Service() {
             private set
     }
 }
+
+

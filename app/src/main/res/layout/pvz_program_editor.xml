@@ -115,14 +115,13 @@
             android:layout_height="match_parent"
             android:layout_marginEnd="6dp" />
 
-        <EditText
+        <com.fffcccdfgh.androidclicker.ProgramCodeEditText
             android:id="@+id/pvzProgramCodeInput"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="#0B1020"
             android:gravity="top|start"
-            android:hint="@string/program_code_hint"
             android:inputType="textMultiLine|textNoSuggestions"
             android:overScrollMode="always"
             android:paddingStart="10dp"
@@ -131,7 +130,6 @@
             android:paddingBottom="10dp"
             android:scrollbars="none"
             android:textColor="#DBEAFE"
-            android:textColorHint="#64748B"
             android:textSize="12sp" />
 
         <com.fffcccdfgh.androidclicker.ProgramCodeScrollBar

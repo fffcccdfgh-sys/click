@@ -21,11 +21,26 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class PvzScriptListActivity : AppCompatActivity() {
 
     private lateinit var scriptListContainer: LinearLayout
+    private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val usbSyncWatcher by lazy { PvzUsbSyncWatcher(this) }
+    private var usbSyncJob: Job? = null
+    private var pendingUsbSyncUpdate: PvzUsbSyncUpdate? = null
+    private var pendingUsbSyncBatch: PvzUsbSyncBatch? = null
+    private var usbSyncDialog: android.app.AlertDialog? = null
+    private var usbSyncDialogMessage: TextView? = null
 
     private val scriptsChangedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -64,15 +79,26 @@ class PvzScriptListActivity : AppCompatActivity() {
         } else {
             registerReceiver(scriptsChangedReceiver, filter)
         }
+        startUsbSyncPolling()
         renderScriptList()
     }
 
     override fun onPause() {
         super.onPause()
+        usbSyncJob?.cancel()
+        usbSyncJob = null
+        usbSyncDialog?.dismiss()
+        usbSyncDialog = null
+        usbSyncDialogMessage = null
         try {
             unregisterReceiver(scriptsChangedReceiver)
         } catch (_: Exception) {
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        activityScope.coroutineContext[Job]?.cancel()
     }
 
     private fun renderScriptList() {
@@ -365,7 +391,7 @@ class PvzScriptListActivity : AppCompatActivity() {
                 return
             }
             val text = contentResolver.openInputStream(uri)?.use { stream ->
-                stream.bufferedReader().readText()
+                stream.bufferedReader().readText().removePrefix("\uFEFF")
             } ?: run {
                 Toast.makeText(this, getString(R.string.script_import_failed), Toast.LENGTH_SHORT).show()
                 return
@@ -382,6 +408,235 @@ class PvzScriptListActivity : AppCompatActivity() {
         return displayName
             ?.substringAfterLast('/')
             ?.startsWith("pvz2_") == true
+    }
+
+    private fun startUsbSyncPolling() {
+        if (usbSyncJob?.isActive == true) return
+        usbSyncJob = activityScope.launch {
+            while (isActive) {
+                val batch = withContext(Dispatchers.IO) {
+                    usbSyncWatcher.readBatch()
+                }
+                val lastSeenBatchId = getLastSeenUsbSyncBatchId()
+                if (batch != null && batch.batchId != lastSeenBatchId) {
+                    saveLastSeenUsbSyncBatchId(batch.batchId)
+                    showOrUpdateUsbSyncBatchDialog(batch)
+                    delay(USB_SYNC_POLL_INTERVAL_MS)
+                    continue
+                }
+
+                val update = withContext(Dispatchers.IO) {
+                    usbSyncWatcher.readLatestUpdate()
+                }
+                val lastSeen = getLastSeenUsbSyncSignature()
+                if (update != null && update.signature != lastSeen) {
+                    saveLastSeenUsbSyncSignature(update.signature)
+                    showOrUpdateUsbSyncDialog(update)
+                }
+                delay(USB_SYNC_POLL_INTERVAL_MS)
+            }
+        }
+    }
+
+    private fun showOrUpdateUsbSyncDialog(update: PvzUsbSyncUpdate) {
+        pendingUsbSyncBatch = null
+        pendingUsbSyncUpdate = update
+        usbSyncDialog?.dismiss()
+        usbSyncDialogMessage?.text = getString(R.string.pvz_usb_sync_message_named, update.scriptName)
+        showUsbSyncDialog(
+            message = getString(R.string.pvz_usb_sync_message_named, update.scriptName),
+            confirmText = getString(R.string.overwrite),
+            onConfirm = { applyPendingUsbSyncUpdate() },
+            onCancel = { pendingUsbSyncUpdate = null }
+        )
+    }
+
+    private fun showOrUpdateUsbSyncBatchDialog(batch: PvzUsbSyncBatch) {
+        pendingUsbSyncUpdate = null
+        pendingUsbSyncBatch = batch
+        usbSyncDialog?.dismiss()
+        val messageRes = if (batch.replaceAll) {
+            R.string.pvz_usb_sync_batch_replace_message
+        } else {
+            R.string.pvz_usb_sync_batch_message
+        }
+        val confirmTextRes = if (batch.replaceAll) {
+            R.string.replace_all
+        } else {
+            R.string.update_all
+        }
+        showUsbSyncDialog(
+            message = getString(messageRes, batch.scripts.size),
+            confirmText = getString(confirmTextRes),
+            onConfirm = { applyPendingUsbSyncBatch() },
+            onCancel = { pendingUsbSyncBatch = null }
+        )
+    }
+
+    private fun showUsbSyncDialog(
+        message: String,
+        confirmText: String,
+        onConfirm: () -> Unit,
+        onCancel: () -> Unit
+    ) {
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22f), dp(20f), dp(22f), dp(18f))
+            background = roundedRect(0xFFFFFFFF.toInt(), 0xFFDDE3EA.toInt(), 20f)
+        }
+
+        content.addView(TextView(this).apply {
+            text = getString(R.string.pvz_usb_sync_title)
+            textSize = 20f
+            setTextColor(0xFF111827.toInt())
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        })
+
+        usbSyncDialogMessage = TextView(this).apply {
+            text = message
+            textSize = 14f
+            setTextColor(0xFF475569.toInt())
+            setPadding(0, dp(8f), 0, 0)
+        }
+        content.addView(usbSyncDialogMessage)
+
+        val buttonRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+            setPadding(0, dp(16f), 0, 0)
+        }
+
+        fun addDialogButton(text: String, textColor: Int, fillColor: Int, strokeColor: Int, onClick: () -> Unit) {
+            val button = TextView(this).apply {
+                this.text = text
+                setTextColor(textColor)
+                textSize = 14f
+                gravity = Gravity.CENTER
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                background = roundedRect(fillColor, strokeColor, 19f)
+                setPadding(dp(18f), 0, dp(18f), 0)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    dp(40f)
+                ).apply {
+                    marginStart = dp(8f)
+                }
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { onClick() }
+            }
+            buttonRow.addView(button)
+        }
+
+        addDialogButton(getString(R.string.cancel), 0xFF475569.toInt(), 0xFFF8FAFC.toInt(), 0xFFCBD5E1.toInt()) {
+            onCancel()
+            usbSyncDialog?.dismiss()
+        }
+        addDialogButton(confirmText, 0xFFFFFFFF.toInt(), 0xFF111827.toInt(), 0xFF111827.toInt()) {
+            onConfirm()
+        }
+
+        content.addView(buttonRow)
+
+        usbSyncDialog = android.app.AlertDialog.Builder(this).create().apply {
+            setView(content)
+            setOnDismissListener {
+                usbSyncDialog = null
+                usbSyncDialogMessage = null
+            }
+            setOnShowListener {
+                window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+                window?.setLayout(
+                    (resources.displayMetrics.widthPixels * 0.86f).toInt(),
+                    android.view.WindowManager.LayoutParams.WRAP_CONTENT
+                )
+            }
+            show()
+        }
+    }
+
+    private fun applyPendingUsbSyncUpdate() {
+        val update = pendingUsbSyncUpdate ?: return
+        saveUsbSyncUpdateAsScript(update)
+        getSharedPreferences(PvzFloatingControlService.PREFS_NAME, MODE_PRIVATE)
+            .edit()
+            .putString(PvzFloatingControlService.KEY_PROGRAM_CODE, update.code)
+            .putString(PvzFloatingControlService.KEY_SCRIPT_NAME, update.scriptName)
+            .apply()
+        sendBroadcast(Intent(PvzScriptStorage.ACTION_SCRIPTS_CHANGED).apply {
+            setPackage(packageName)
+        })
+        pendingUsbSyncUpdate = null
+        usbSyncDialog?.dismiss()
+        renderScriptList()
+        Toast.makeText(this, R.string.pvz_usb_sync_applied, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun applyPendingUsbSyncBatch() {
+        val batch = pendingUsbSyncBatch ?: return
+        if (batch.replaceAll) {
+            for (script in PvzScriptStorage.listScripts(this)) {
+                PvzScriptStorage.deleteScript(this, script.name)
+            }
+        }
+        for (update in batch.scripts) {
+            saveUsbSyncUpdateAsScript(update)
+        }
+        val first = batch.scripts.firstOrNull()
+        if (first != null) {
+            getSharedPreferences(PvzFloatingControlService.PREFS_NAME, MODE_PRIVATE)
+                .edit()
+                .putString(PvzFloatingControlService.KEY_PROGRAM_CODE, first.code)
+                .putString(PvzFloatingControlService.KEY_SCRIPT_NAME, first.scriptName)
+                .apply()
+        }
+        sendBroadcast(Intent(PvzScriptStorage.ACTION_SCRIPTS_CHANGED).apply {
+            setPackage(packageName)
+        })
+        pendingUsbSyncBatch = null
+        usbSyncDialog?.dismiss()
+        renderScriptList()
+        Toast.makeText(this, getString(R.string.pvz_usb_sync_batch_imported, batch.scripts.size), Toast.LENGTH_SHORT).show()
+    }
+
+    private fun saveUsbSyncUpdateAsScript(update: PvzUsbSyncUpdate) {
+        val action = ActionStep(
+            type = ActionStep.TYPE_PROGRAM,
+            code = update.code,
+            delayBeforeMs = 1L,
+            repeatCount = 1
+        )
+        PvzScriptStorage.saveNamedScript(
+            this,
+            update.scriptName,
+            listOf(action),
+            loopCount = 1,
+            loopGapMs = 0L
+        )
+    }
+
+    private fun getLastSeenUsbSyncSignature(): String? {
+        return getSharedPreferences(PvzFloatingControlService.PREFS_NAME, MODE_PRIVATE)
+            .getString(KEY_USB_SYNC_SIGNATURE, null)
+    }
+
+    private fun saveLastSeenUsbSyncSignature(signature: String) {
+        getSharedPreferences(PvzFloatingControlService.PREFS_NAME, MODE_PRIVATE)
+            .edit()
+            .putString(KEY_USB_SYNC_SIGNATURE, signature)
+            .apply()
+    }
+
+    private fun getLastSeenUsbSyncBatchId(): String? {
+        return getSharedPreferences(PvzFloatingControlService.PREFS_NAME, MODE_PRIVATE)
+            .getString(KEY_USB_SYNC_BATCH_ID, null)
+    }
+
+    private fun saveLastSeenUsbSyncBatchId(batchId: String) {
+        getSharedPreferences(PvzFloatingControlService.PREFS_NAME, MODE_PRIVATE)
+            .edit()
+            .putString(KEY_USB_SYNC_BATCH_ID, batchId)
+            .apply()
     }
 
     private fun getDisplayName(uri: Uri): String? {
@@ -406,5 +661,11 @@ class PvzScriptListActivity : AppCompatActivity() {
 
     private fun dp(value: Float): Int {
         return (value * resources.displayMetrics.density + 0.5f).toInt()
+    }
+
+    companion object {
+        private const val USB_SYNC_POLL_INTERVAL_MS = 1000L
+        private const val KEY_USB_SYNC_SIGNATURE = "usb_sync_signature"
+        private const val KEY_USB_SYNC_BATCH_ID = "usb_sync_batch_id"
     }
 }

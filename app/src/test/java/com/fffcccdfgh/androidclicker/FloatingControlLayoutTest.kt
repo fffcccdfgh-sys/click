@@ -36,4 +36,23 @@ class FloatingControlLayoutTest {
         assertTrue(buttonsIndex >= 0)
         assertFalse(buttonsBlock.contains("android:visibility=\"gone\""))
     }
+
+    @Test
+    fun saveConfirmPanelUsesIndependentOverlayWindow() {
+        val layout = File("src/main/res/layout/floating_save_confirm_panel.xml").readText()
+        val service = File("src/main/java/com/fffcccdfgh/androidclicker/FloatingControlService.kt").readText()
+        val pvzService = File("src/main/java/com/fffcccdfgh/androidclicker/PvzFloatingControlService.kt").readText()
+
+        assertTrue(layout.contains("@+id/savePanelRoot"))
+        assertTrue(layout.contains("@+id/savePanelNameInput"))
+        assertTrue(layout.contains("@+id/savePanelConfirmButton"))
+        assertTrue(layout.contains("@+id/savePanelCancelButton"))
+
+        assertTrue(service.contains("saveConfirmPanelView"))
+        assertTrue(service.contains("floatingPanelController.show"))
+        assertTrue(service.contains("removePanel(saveConfirmPanelView, \"floating_save_confirm_panel\")"))
+        assertTrue(pvzService.contains("saveConfirmPanelView"))
+        assertTrue(pvzService.contains("floatingPanelController.show"))
+        assertTrue(pvzService.contains("removePanel(saveConfirmPanelView, SAVE_CONFIRM_ZONE_KEY)"))
+    }
 }

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/floatingRoot"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
     android:background="@drawable/floating_control_bg"
     android:elevation="4dp"
     android:orientation="vertical"
@@ -10,8 +10,8 @@
 
     <LinearLayout
         android:id="@+id/expandedControls"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:orientation="vertical">
 
         <LinearLayout
@@ -44,15 +44,15 @@
             <TextView
                 android:id="@+id/closeButton"
                 style="@style/FloatingControlDangerPill"
-                android:layout_marginStart="8dp"
                 android:text="@string/close_button" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/mainActionRow"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
             android:layout_marginTop="8dp"
+            android:layout_weight="1"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -64,37 +64,31 @@
             <TextView
                 android:id="@+id/addButton"
                 style="@style/FloatingControlSecondaryPill"
-                android:layout_marginStart="6dp"
                 android:text="@string/add_action" />
 
             <TextView
                 android:id="@+id/listButton"
                 style="@style/FloatingControlSecondaryPill"
-                android:layout_marginStart="6dp"
                 android:text="@string/list_action" />
 
             <TextView
                 android:id="@+id/saveButton"
                 style="@style/FloatingControlSuccessPill"
-                android:layout_marginStart="6dp"
                 android:text="@string/save_action" />
 
             <TextView
                 android:id="@+id/positionButton"
                 style="@style/FloatingControlSecondaryPill"
-                android:layout_marginStart="6dp"
                 android:text="@string/position_show" />
 
             <TextView
                 android:id="@+id/stopPositionButton"
                 style="@style/FloatingControlSecondaryPill"
-                android:layout_marginStart="6dp"
                 android:text="@string/stop_position_action" />
 
             <TextView
                 android:id="@+id/loopButton"
                 style="@style/FloatingControlSecondaryPill"
-                android:layout_marginStart="6dp"
                 android:text="@string/loop_button" />
         </LinearLayout>
 

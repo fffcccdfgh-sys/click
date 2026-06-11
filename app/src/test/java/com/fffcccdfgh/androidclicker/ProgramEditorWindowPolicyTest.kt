@@ -33,19 +33,19 @@ class ProgramEditorWindowPolicyTest {
 
     @Test
     fun editorWindowUsesMoreHeightInLandscape() {
-        val size = ProgramEditorWindowPolicy.windowSize(
+        val size = FloatingWindowSizePolicy.programEditorSize(
             screenWidthPx = 2560,
             screenHeightPx = 1600,
             density = 2f
         )
 
-        assertEquals(2202, size.width)
-        assertEquals(1472, size.height)
+        assertEquals(1536, size.widthPx)
+        assertEquals(1280, size.heightPx)
     }
 
     @Test
     fun editorWindowPrefersCurrentDisplaySizeOverResourceSize() {
-        val size = ProgramEditorWindowPolicy.windowSizeForCurrentDisplay(
+        val size = FloatingWindowSizePolicy.programEditorSizeForDisplay(
             displayWidthPx = 2560,
             displayHeightPx = 1600,
             resourceWidthPx = 1600,
@@ -53,62 +53,78 @@ class ProgramEditorWindowPolicyTest {
             density = 2f
         )
 
-        assertEquals(2202, size.width)
-        assertEquals(1472, size.height)
+        assertEquals(1536, size.widthPx)
+        assertEquals(1280, size.heightPx)
     }
 
     @Test
     fun editorWindowStaysInsideScreenMargins() {
-        val size = ProgramEditorWindowPolicy.windowSize(
+        val size = FloatingWindowSizePolicy.programEditorSize(
             screenWidthPx = 480,
             screenHeightPx = 360,
             density = 2f
         )
 
-        assertTrue(size.width <= 416)
-        assertTrue(size.height <= 296)
+        assertTrue(size.widthPx <= 416)
+        assertTrue(size.heightPx <= 296)
     }
 
     @Test
     fun landscapeCodePanelDoesNotPushControlsBelowFold() {
-        val height = ProgramEditorWindowPolicy.codePanelHeight(
-            editorWidthPx = 2202,
-            editorHeightPx = 1472,
-            density = 2f
+        val height = FloatingWindowSizePolicy.programEditorCodePanelHeight(
+            FloatingWindowSize(widthPx = 1536, heightPx = 1280)
         )
 
-        assertEquals(662, height)
+        assertEquals(512, height)
     }
 
     @Test
     fun portraitCodePanelAlsoLeavesRoomForEditorControls() {
-        val size = ProgramEditorWindowPolicy.windowSize(
+        val size = FloatingWindowSizePolicy.programEditorSize(
             screenWidthPx = 1600,
             screenHeightPx = 2560,
             density = 2f
         )
 
-        assertEquals(2150, size.height)
+        assertEquals(1536, size.heightPx)
         assertEquals(
-            1518,
-            ProgramEditorWindowPolicy.codePanelHeight(
-                editorWidthPx = size.width,
-                editorHeightPx = size.height,
-                density = 2f
-            )
+            614,
+            FloatingWindowSizePolicy.programEditorCodePanelHeight(size)
         )
     }
 
     @Test
     fun tightScreensPreferVisibleControlsOverMinimumCodeHeight() {
         assertEquals(
-            208,
-            ProgramEditorWindowPolicy.codePanelHeight(
-                editorWidthPx = 2202,
-                editorHeightPx = 1472,
-                density = 4f
+            589,
+            FloatingWindowSizePolicy.programEditorCodePanelHeight(
+                FloatingWindowSize(widthPx = 2202, heightPx = 1472)
             )
         )
+    }
+
+    @Test
+    fun landscapeTemplateWindowUsesHalfEditorWidthAndFullEditorHeight() {
+        val size = FloatingWindowSizePolicy.programTemplateSize(
+            screenWidthPx = 2560,
+            screenHeightPx = 1600,
+            density = 2f
+        )
+
+        assertEquals(768, size.widthPx)
+        assertEquals(1280, size.heightPx)
+    }
+
+    @Test
+    fun portraitTemplateWindowUsesHalfEditorWidthAndTwoThirdsEditorHeight() {
+        val size = FloatingWindowSizePolicy.programTemplateSize(
+            screenWidthPx = 1600,
+            screenHeightPx = 2560,
+            density = 2f
+        )
+
+        assertEquals(640, size.widthPx)
+        assertEquals(1024, size.heightPx)
     }
 
     private infix fun Int.hasFlag(flag: Int): Boolean = (this and flag) == flag

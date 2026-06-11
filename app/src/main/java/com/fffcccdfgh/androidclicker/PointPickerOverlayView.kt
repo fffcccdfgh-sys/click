@@ -15,20 +15,23 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-data class PvzCalibrationPoint(
-    val key: String,
-    val label: String,
-    var x: Float,
-    var y: Float
-)
-
-class PvzPointCalibrationView @JvmOverloads constructor(
+class PointPickerOverlayView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    var onSave: ((List<PvzCalibrationPoint>) -> Unit)? = null
+    var instruction: String = ""
+        set(value) {
+            field = value
+            invalidate()
+        }
+    var coordinateFormatter: ((Int, Int) -> String)? = null
+        set(value) {
+            field = value
+            invalidate()
+        }
+    var onSavePoint: ((Int, Int) -> Unit)? = null
     var onCancel: (() -> Unit)? = null
 
     private val density = resources.displayMetrics.density
@@ -39,12 +42,13 @@ class PvzPointCalibrationView @JvmOverloads constructor(
         invalidate()
     }
 
-    private val points = mutableListOf<PvzCalibrationPoint>()
-    private var activeIndex = -1
-    private var selectedIndex = -1
+    private var pointX = 0f
+    private var pointY = 0f
+    private var hasPoint = false
     private var lastTouchX = 0f
     private var lastTouchY = 0f
     private var dragDistance = 0f
+    private var dragging = false
     private var buttonsVisible = true
 
     private val circleRadius = 18f * density
@@ -56,6 +60,10 @@ class PvzPointCalibrationView @JvmOverloads constructor(
     private val controlMargin = 12f * density
     private val smallButtonWidth = 62f * density
     private val smallButtonHeight = 30f * density
+
+    private val saveRect = RectF()
+    private val cancelRect = RectF()
+    private val locationOnScreen = IntArray(2)
 
     private val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -85,15 +93,13 @@ class PvzPointCalibrationView @JvmOverloads constructor(
         textAlign = Paint.Align.LEFT
         isFakeBoldText = true
     }
-    private val saveButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-        color = 0xE616A34A.toInt()
+    private val instructionTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = 14f * density
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
     }
-    private val cancelButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-        color = 0xE6DC2626.toInt()
-    }
-    private val buttonTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val coordinateTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textSize = 13f * density
         textAlign = Paint.Align.CENTER
@@ -103,72 +109,74 @@ class PvzPointCalibrationView @JvmOverloads constructor(
         style = Paint.Style.FILL
         color = 0xCC111827.toInt()
     }
+    private val saveButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = 0xE616A34A.toInt()
+    }
+    private val cancelButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = 0xE6DC2626.toInt()
+    }
 
-    private val saveRect = RectF()
-    private val cancelRect = RectF()
-
-    fun setPoints(newPoints: List<PvzCalibrationPoint>) {
-        points.clear()
-        points.addAll(newPoints.map { it.copy() })
-        selectedIndex = selectedIndex.takeIf { it in points.indices } ?: -1
-        invalidate()
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (!hasPoint && w > 0 && h > 0) {
+            pointX = w / 2f
+            pointY = h / 2f
+            hasPoint = true
+        } else if (w > 0 && h > 0) {
+            clampPoint()
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        for ((index, point) in points.withIndex()) {
-            drawPoint(canvas, point, index == selectedIndex)
-        }
-        if (buttonsVisible) {
-            drawButtons(canvas)
+        if (!hasPoint) return
+        drawInstruction(canvas)
+        drawPoint(canvas)
+        if (buttonsVisible && !dragging) {
+            drawControls(canvas)
         }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        when (event.action) {
+        when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 idleHandler.removeCallbacks(showButtonsRunnable)
                 if (buttonsVisible && saveRect.contains(event.x, event.y)) {
-                    onSave?.invoke(points.map { it.copy() })
+                    onSavePoint?.invoke(screenX(), screenY())
                     return true
                 }
                 if (buttonsVisible && cancelRect.contains(event.x, event.y)) {
                     onCancel?.invoke()
                     return true
                 }
-                val hitIndex = hitPoint(event.x, event.y)
-                if (hitIndex >= 0) {
-                    selectedIndex = hitIndex
-                    activeIndex = hitIndex
-                    invalidate()
-                } else {
-                    activeIndex = selectedIndex.takeIf { it in points.indices } ?: -1
-                    if (activeIndex < 0) return false
-                }
                 lastTouchX = event.x
                 lastTouchY = event.y
                 dragDistance = 0f
+                dragging = true
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                val index = activeIndex
-                if (index < 0) return false
+                if (!dragging) return true
                 val dx = event.x - lastTouchX
                 val dy = event.y - lastTouchY
                 dragDistance += abs(dx) + abs(dy)
                 if (dragDistance > touchSlop && buttonsVisible) {
                     buttonsVisible = false
                 }
-                points[index].x = (points[index].x + dx).coerceIn(0f, (width - 1).coerceAtLeast(0).toFloat())
-                points[index].y = (points[index].y + dy).coerceIn(0f, (height - 1).coerceAtLeast(0).toFloat())
+                pointX += dx
+                pointY += dy
+                clampPoint()
                 lastTouchX = event.x
                 lastTouchY = event.y
                 invalidate()
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                activeIndex = -1
+                dragging = false
                 idleHandler.postDelayed(showButtonsRunnable, IDLE_SHOW_BUTTONS_MS)
+                invalidate()
                 return true
             }
         }
@@ -177,41 +185,54 @@ class PvzPointCalibrationView @JvmOverloads constructor(
 
     fun cleanup() {
         idleHandler.removeCallbacks(showButtonsRunnable)
-        onSave = null
+        onSavePoint = null
         onCancel = null
+        coordinateFormatter = null
     }
 
-    private fun drawPoint(canvas: Canvas, point: PvzCalibrationPoint, selected: Boolean) {
-        canvas.drawCircle(point.x, point.y, circleRadius, circleFillPaint)
-        canvas.drawCircle(point.x, point.y, circleRadius, circlePaint)
-        if (selected) {
-            canvas.drawCircle(point.x, point.y, circleRadius + 4f * density, selectedCirclePaint)
-        }
-        canvas.drawCircle(point.x, point.y, dotRadius, dotPaint)
-        drawLabel(canvas, point)
+    private fun drawInstruction(canvas: Canvas) {
+        if (instruction.isBlank()) return
+        val textPaddingX = 12f * density
+        val textPaddingY = 7f * density
+        val textWidth = instructionTextPaint.measureText(instruction)
+        val textHeight = instructionTextPaint.textSize
+        val width = min(width.toFloat() - 24f * density, textWidth + textPaddingX * 2f)
+        val left = (this.width.toFloat() - width) / 2f
+        val top = 18f * density
+        val rect = RectF(left, top, left + width, top + textHeight + textPaddingY * 2f)
+        canvas.drawRoundRect(rect, 14f * density, 14f * density, labelBgPaint)
+        val baseline = rect.top + textPaddingY + textHeight * 0.78f
+        canvas.drawText(instruction, rect.centerX(), baseline, instructionTextPaint)
     }
 
-    private fun drawLabel(canvas: Canvas, point: PvzCalibrationPoint) {
-        val textWidth = labelTextPaint.measureText(point.label)
+    private fun drawPoint(canvas: Canvas) {
+        canvas.drawCircle(pointX, pointY, circleRadius, circleFillPaint)
+        canvas.drawCircle(pointX, pointY, circleRadius, circlePaint)
+        canvas.drawCircle(pointX, pointY, circleRadius + 4f * density, selectedCirclePaint)
+        canvas.drawCircle(pointX, pointY, dotRadius, dotPaint)
+        drawPointLabel(canvas, coordinateText())
+    }
+
+    private fun drawPointLabel(canvas: Canvas, text: String) {
+        val textWidth = labelTextPaint.measureText(text)
         val textHeight = labelTextPaint.textSize
         val labelWidth = textWidth + labelPaddingX * 2f
         val labelHeight = textHeight + labelPaddingY * 2f
-
-        val aboveTop = point.y - circleRadius - labelOffset - labelHeight
-        val belowTop = point.y + circleRadius + labelOffset
+        val aboveTop = pointY - circleRadius - labelOffset - labelHeight
+        val belowTop = pointY + circleRadius + labelOffset
         val top = if (aboveTop >= 0f) {
             aboveTop
         } else {
             min(belowTop, height.toFloat() - labelHeight)
         }
-        val left = (point.x - labelWidth / 2f).coerceIn(0f, max(0f, width.toFloat() - labelWidth))
+        val left = (pointX - labelWidth / 2f).coerceIn(0f, max(0f, width.toFloat() - labelWidth))
         val rect = RectF(left, top, left + labelWidth, top + labelHeight)
         canvas.drawRoundRect(rect, 10f * density, 10f * density, labelBgPaint)
         val baseline = rect.top + labelPaddingY + textHeight * 0.78f
-        canvas.drawText(point.label, rect.left + labelPaddingX, baseline, labelTextPaint)
+        canvas.drawText(text, rect.left + labelPaddingX, baseline, labelTextPaint)
     }
 
-    private fun drawButtons(canvas: Canvas) {
+    private fun drawControls(canvas: Canvas) {
         val barLeft = controlMargin
         val barRight = width.toFloat() - controlMargin
         val barBottom = height.toFloat() - controlMargin
@@ -232,22 +253,37 @@ class PvzPointCalibrationView @JvmOverloads constructor(
             barRight - 5f * density,
             buttonTop + smallButtonHeight
         )
+
         canvas.drawRoundRect(cancelRect, 8f * density, 8f * density, cancelButtonPaint)
         canvas.drawRoundRect(saveRect, 8f * density, 8f * density, saveButtonPaint)
-        val baseline = cancelRect.centerY() - (buttonTextPaint.ascent() + buttonTextPaint.descent()) / 2f
-        canvas.drawText(context.getString(R.string.cancel), cancelRect.centerX(), baseline, buttonTextPaint)
-        canvas.drawText(context.getString(R.string.save), saveRect.centerX(), baseline, buttonTextPaint)
+
+        val buttonBaseline = cancelRect.centerY() -
+            (coordinateTextPaint.ascent() + coordinateTextPaint.descent()) / 2f
+        canvas.drawText(context.getString(R.string.cancel), cancelRect.centerX(), buttonBaseline, coordinateTextPaint)
+        canvas.drawText(context.getString(R.string.save), saveRect.centerX(), buttonBaseline, coordinateTextPaint)
+        canvas.drawText(coordinateText(), barRect.centerX(), buttonBaseline, coordinateTextPaint)
     }
 
-    private fun hitPoint(x: Float, y: Float): Int {
-        val hitRadius = circleRadius * 1.6f
-        for (index in points.indices.reversed()) {
-            val point = points[index]
-            if (abs(x - point.x) <= hitRadius && abs(y - point.y) <= hitRadius) {
-                return index
-            }
-        }
-        return -1
+    private fun clampPoint() {
+        if (width <= 0 || height <= 0) return
+        pointX = pointX.coerceIn(0f, (width - 1).coerceAtLeast(0).toFloat())
+        pointY = pointY.coerceIn(0f, (height - 1).coerceAtLeast(0).toFloat())
+    }
+
+    private fun coordinateText(): String {
+        val x = screenX()
+        val y = screenY()
+        return coordinateFormatter?.invoke(x, y) ?: "$x, $y"
+    }
+
+    private fun screenX(): Int {
+        getLocationOnScreen(locationOnScreen)
+        return (locationOnScreen[0] + pointX).toInt()
+    }
+
+    private fun screenY(): Int {
+        getLocationOnScreen(locationOnScreen)
+        return (locationOnScreen[1] + pointY).toInt()
     }
 
     companion object {
