@@ -4,15 +4,23 @@ plugins {
 
 import java.util.Properties
 
-val localProperties = Properties().apply {
-    val localPropertiesFile = rootProject.file("local.properties")
-    if (localPropertiesFile.exists()) {
-        localPropertiesFile.inputStream().use { load(it) }
+val isReleaseTask = gradle.startParameter.taskNames.any {
+    it.contains("release", ignoreCase = true)
+}
+
+val releaseProperties by lazy {
+    Properties().apply {
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localPropertiesFile.inputStream().use { load(it) }
+        }
     }
 }
 
 fun localProperty(name: String): String? {
-    return localProperties.getProperty(name)?.takeIf { it.isNotBlank() }
+    if (!isReleaseTask) return null
+
+    return releaseProperties.getProperty(name)?.takeIf { it.isNotBlank() }
 }
 
 val hasReleaseSigning = listOf(
@@ -91,6 +99,7 @@ android {
             useLegacyPackaging = true
         }
     }
+
 }
 
 dependencies {
@@ -100,6 +109,7 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.kotlinx.coroutines.android)
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
     implementation("org.luaj:luaj-jse:3.0.1")
     testImplementation(libs.junit)
     testImplementation("org.json:json:20240303")

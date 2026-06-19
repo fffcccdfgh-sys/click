@@ -1,5 +1,8 @@
 package com.fffcccdfgh.androidclicker
 
+import com.fffcccdfgh.androidclicker.core.program.ProgramCodeScrollBarMath
+import com.fffcccdfgh.androidclicker.core.program.ProgramLineNumberMath
+import com.fffcccdfgh.androidclicker.core.program.ProgramTemplateMenuLayout
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

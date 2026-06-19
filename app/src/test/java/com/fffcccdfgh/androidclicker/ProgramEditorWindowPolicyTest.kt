@@ -1,6 +1,8 @@
 package com.fffcccdfgh.androidclicker
 
 import android.view.WindowManager
+import com.fffcccdfgh.androidclicker.core.overlay.FloatingWindowSizePolicy
+import com.fffcccdfgh.androidclicker.core.program.ProgramEditorWindowPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -67,40 +69,6 @@ class ProgramEditorWindowPolicyTest {
 
         assertTrue(size.widthPx <= 416)
         assertTrue(size.heightPx <= 296)
-    }
-
-    @Test
-    fun landscapeCodePanelDoesNotPushControlsBelowFold() {
-        val height = FloatingWindowSizePolicy.programEditorCodePanelHeight(
-            FloatingWindowSize(widthPx = 1536, heightPx = 1280)
-        )
-
-        assertEquals(512, height)
-    }
-
-    @Test
-    fun portraitCodePanelAlsoLeavesRoomForEditorControls() {
-        val size = FloatingWindowSizePolicy.programEditorSize(
-            screenWidthPx = 1600,
-            screenHeightPx = 2560,
-            density = 2f
-        )
-
-        assertEquals(1536, size.heightPx)
-        assertEquals(
-            614,
-            FloatingWindowSizePolicy.programEditorCodePanelHeight(size)
-        )
-    }
-
-    @Test
-    fun tightScreensPreferVisibleControlsOverMinimumCodeHeight() {
-        assertEquals(
-            589,
-            FloatingWindowSizePolicy.programEditorCodePanelHeight(
-                FloatingWindowSize(widthPx = 2202, heightPx = 1472)
-            )
-        )
     }
 
     @Test

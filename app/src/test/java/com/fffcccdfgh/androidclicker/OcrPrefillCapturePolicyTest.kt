@@ -1,5 +1,6 @@
 package com.fffcccdfgh.androidclicker
 
+import com.fffcccdfgh.androidclicker.core.ocr.OcrPrefillCapturePolicy
 import org.junit.Assert.assertTrue
 import org.junit.Test
 

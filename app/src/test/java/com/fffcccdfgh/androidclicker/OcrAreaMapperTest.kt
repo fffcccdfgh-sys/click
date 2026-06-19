@@ -1,5 +1,6 @@
 package com.fffcccdfgh.androidclicker
 
+import com.fffcccdfgh.androidclicker.core.ocr.OcrAreaMapper
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -83,6 +84,22 @@ class OcrAreaMapperTest {
         )
 
         assertEquals(OcrAreaMapper.Area(2800, 200, 3180, 520), mapped)
+    }
+
+    @Test
+    fun keepsLandscapeCaptureCoordinatesWhenRotatedAreaAlsoFitsPortraitWidth() {
+        val mapped = OcrAreaMapper.mapScreenAreaToCaptureAreaAllowingRotation(
+            left = 1000,
+            top = 200,
+            right = 1300,
+            bottom = 520,
+            screenWidth = 1440,
+            screenHeight = 3200,
+            captureWidth = 3200,
+            captureHeight = 1440
+        )
+
+        assertEquals(OcrAreaMapper.Area(1000, 200, 1300, 520), mapped)
     }
 
     @Test

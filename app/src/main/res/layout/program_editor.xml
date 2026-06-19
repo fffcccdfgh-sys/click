@@ -136,13 +136,13 @@
                 android:orientation="horizontal"
                 android:padding="8dp">
 
-                <com.fffcccdfgh.androidclicker.ProgramLineNumberView
+                <com.fffcccdfgh.androidclicker.core.program.ProgramLineNumberView
                     android:id="@+id/programLineNumbers"
                     android:layout_width="36dp"
                     android:layout_height="match_parent"
                     android:layout_marginEnd="6dp" />
 
-                <com.fffcccdfgh.androidclicker.ProgramCodeEditText
+                <com.fffcccdfgh.androidclicker.core.program.ProgramCodeEditText
                     android:id="@+id/programCodeInput"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -159,7 +159,7 @@
                     android:textColor="#DBEAFE"
                     android:textSize="12sp" />
 
-                <com.fffcccdfgh.androidclicker.ProgramCodeScrollBar
+                <com.fffcccdfgh.androidclicker.core.program.ProgramCodeScrollBar
                     android:id="@+id/programCodeScrollBar"
                     android:layout_width="12dp"
                     android:layout_height="match_parent"

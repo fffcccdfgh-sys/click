@@ -1,5 +1,6 @@
 package com.fffcccdfgh.androidclicker
 
+import com.fffcccdfgh.androidclicker.core.execution.ActionStep
 import org.json.JSONObject
 import org.junit.Assert.assertFalse
 import org.junit.Test

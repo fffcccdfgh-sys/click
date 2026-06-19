@@ -5,13 +5,13 @@
     android:layout_height="match_parent"
     android:background="#30000000">
 
-    <com.fffcccdfgh.androidclicker.PointPickerOverlayView
+    <com.fffcccdfgh.androidclicker.core.picker.PointPickerOverlayView
         android:id="@+id/pointPickerOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone" />
 
-    <com.fffcccdfgh.androidclicker.SwipePickerOverlayView
+    <com.fffcccdfgh.androidclicker.core.picker.SwipePickerOverlayView
         android:id="@+id/swipePickerOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

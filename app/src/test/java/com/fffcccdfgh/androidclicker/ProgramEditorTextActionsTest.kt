@@ -1,5 +1,7 @@
 package com.fffcccdfgh.androidclicker
 
+import com.fffcccdfgh.androidclicker.core.program.ProgramEditorTextActions
+import com.fffcccdfgh.androidclicker.core.program.ProgramEditorTextResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

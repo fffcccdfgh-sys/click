@@ -1,5 +1,7 @@
 package com.fffcccdfgh.androidclicker
 
+import com.fffcccdfgh.androidclicker.core.screencapture.ScreenCapturePoint
+import com.fffcccdfgh.androidclicker.core.screencapture.ScreenCapturePointMapper
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

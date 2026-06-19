@@ -1,1110 +1,574 @@
-# PVZ2 编程使用指南
+# PVZ2 脚本与校准变量说明
 
-这份文档只说明“植物大战僵尸2脚本”的编程部分。目标是：
+这份文档给写脚本的 AI 使用。目标是让 AI 能正确生成 PVZ2 Lua 脚本，并能生成电脑端一键推送脚本，把脚本下载到手机 App。
 
-- 用户看了能知道怎么写 PVZ2 脚本。
-- AI 看了能知道怎么根据用户需求生成或修改 PVZ2 脚本。
-- 脚本尽量使用动作校准变量，不直接写死屏幕坐标。
+## 基本规则
 
-## 1. 基本写法
+PVZ2 脚本使用 Lua 风格代码。脚本文件建议使用 UTF-8 无 BOM 保存，文件名建议为：
 
-PVZ2 脚本使用 Lua 风格代码。
-
-最常用的结构是：
-
-```lua
-tap(坐标x, 坐标y)
-wait(毫秒)
-
-if 条件 then
-    执行动作
-end
-
-while true do
-    循环执行
-    wait(500)
-end
+```text
+pvz2_脚本名.lua
 ```
 
-点位变量都有 `.x` 和 `.y`：
+App 导入脚本时会把文件名前缀 `pvz2_` 去掉，作为手机里的脚本名。例如：
 
-```lua
-tap(plant_slots[1].x, plant_slots[1].y)
-tap(board[1][1].x, board[1][1].y)
-tap(other_start_battle.x, other_start_battle.y)
+```text
+pvz2_沙滩无尽.lua -> 手机脚本名：沙滩无尽
 ```
 
-推荐写法是使用校准变量：
+脚本里优先使用校准变量，不要写死屏幕坐标。点位变量结构：
 
 ```lua
-tap(plant_slots[1].x, plant_slots[1].y)
-tap(board[3][5].x, board[3][5].y)
-tap(sun_buy_key.x, sun_buy_key.y)
+变量.x
+变量.y
 ```
 
-不推荐写死坐标：
+区域变量结构：
 
 ```lua
-tap(32.50, 76.20)
+区域.left
+区域.top
+区域.right
+区域.bottom
 ```
 
-因为不同设备分辨率和游戏画面布局可能不同。
+## 常用函数
 
-### 运行前权限准备
-
-首次安装或重新安装后，需要在主界面完成以下授权：
-
-- 无障碍服务：用于执行点击、滑动和种植等手势。
-- 悬浮窗权限：用于显示 PVZ2 控制面板和编程编辑器。
-- 屏幕捕获：用于颜色检测和 OCR 文字检测。
-
-授权屏幕捕获时，如果系统支持“仅共享一个应用”，推荐只选择植物大战僵尸2。这样
-文字和颜色检测只会读取游戏画面，不会把本应用悬浮窗包含进截图。屏幕捕获被关闭或
-系统回收后，需要回到主界面重新授权。
-
-## 2. 坐标规则
-
-脚本中的数字坐标使用百分比坐标，范围是 `0 ~ 100`，可以使用小数。
-
-```lua
-tap(50, 50)
-tap(15.35, 46.94)
-```
-
-`50, 50` 表示屏幕正中央。
-
-校准变量也可以直接用于脚本函数：
-
-```lua
-tap(plant_slots[1].x, plant_slots[1].y)
-check_color("#A020F0", 10, cards_edge.x, cards_edge.y)
-```
-
-注意：
-
-- 不要把自己设备上的像素坐标直接写进脚本。
-- 文字检测区域的 `左, 上, 右, 下` 也是百分比坐标。
-- 颜色检测点位的 `x, y` 也是百分比坐标，或使用校准变量的 `.x, .y`。
-
-## 3. 插入工具
-
-PVZ2 编程编辑器里的“插入工具”有 4 项。
-
-### 点击
-
-点击“点击”会插入：
-
-```lua
-tap()
-```
-
-然后把模板中的坐标填进去，例如：
-
-```lua
-tap(plant_slots[1].x, plant_slots[1].y)
-```
-
-### 滑动
-
-点击“滑动”会插入：
-
-```lua
-swipe(, , , )
-```
-
-需要填入起点和终点，建议再补上持续时间：
-
-```lua
-swipe(起点x, 起点y, 终点x, 终点y, 持续毫秒)
-```
+| 函数 | 含义 |
+|---|---|
+| `tap(x, y)` | 点击坐标 |
+| `tap(x, y, durationMs)` | 按住点击，第三个参数是按住毫秒数 |
+| `swipe(x1, y1, x2, y2)` | 滑动 |
+| `swipe(x1, y1, x2, y2, durationMs)` | 指定时长滑动 |
+| `wait(ms)` | 等待毫秒 |
+| `check_color("#RRGGBB", tolerance, x, y)` | 检测某点颜色是否匹配 |
+| `check_color_not("#RRGGBB", tolerance, x, y)` | 检测某点颜色是否不匹配 |
+| `check_text("文字", left, top, right, bottom)` | 检测区域内是否出现文字 |
+| `check_text_not("文字", left, top, right, bottom)` | 检测区域内是否没有文字 |
+| `ocr_text("文字", left, top, right, bottom)` | OCR 检测区域内是否出现文字 |
+| `ocr_text_not("文字", left, top, right, bottom)` | OCR 检测区域内是否没有文字 |
+| `parallel(function() ... end, function() ... end)` | 并行执行多个函数 |
 
 示例：
 
 ```lua
-swipe(plant_slots[1].x, plant_slots[1].y, board[1][1].x, board[1][1].y, 50)
-```
-
-### 文字识别
-
-点击“文字识别”会进入框选界面。
-
-保存范围后会自动插入类似代码：
-
-```lua
-check_text("文字", 左, 上, 右, 下)
-```
-
-这个工具只负责插入识别范围，不会自动把当前画面的文字替换进代码。需要手动把
-`"文字"` 改成要识别的内容：
-
-```lua
-if check_text("继续", 10.00, 20.00, 40.00, 30.00) then
-    tap(other_continue.x, other_continue.y)
-end
-```
-
-文字检测只使用 `check_text(...)` 这一种方法，不要再给 PVZ2 脚本生成其他文字检测写法。
-
-当前版本使用离线 PaddleOCR，并且始终识别原始游戏截图，没有灰度、黑白或反色滤镜。
-每次调用 `check_text(...)` 都会截取当时的游戏画面，因此可以检测动态变化的文字。
-第一次文字检测可能需要初始化 OCR；后续检测通常更快。
-
-### 颜色识别
-
-点击“颜色识别”会进入取色界面。
-
-确认颜色后会插入：
-
-```lua
-check_color("#颜色", 10, )
-```
-
-最后一个逗号后面需要补坐标，例如用模板填入点位：
-
-```lua
-check_color("#A020F0", 10, cards_edge.x, cards_edge.y)
-```
-
-可配合 `if` 使用：
-
-```lua
-if check_color("#A020F0", 10, cards_edge.x, cards_edge.y) then
-    tap(cards_edge.x, cards_edge.y)
-end
-```
-
-## 4. 模板用法
-
-PVZ2 模板只插入坐标内容，不会自动加 `tap()`，也不会自动换行。
-
-例如光标在这里：
-
-```lua
-tap()
-```
-
-把光标放到括号中：
-
-```lua
-tap(|)
-```
-
-点击“植物卡槽”模板后会变成：
-
-```lua
-tap(plant_slots[].x, plant_slots[].y)
-```
-
-然后把 `[]` 改成具体编号：
-
-```lua
-tap(plant_slots[1].x, plant_slots[1].y)
-```
-
-当前模板内容：
-
-```lua
-植物卡槽      plant_slots[].x, plant_slots[].y
-种植棋盘      board[][].x, board[][].y
-阳光相关      sun_.x, sun_.y
-能量豆相关    plant_food_.x, plant_food_.y
-神器相关      artifact_.x, artifact_.y
-黄瓜相关      cucumber_.x, cucumber_.y
-充值相关      recharge_.x, recharge_.y
-扑克牌        cards_edge.x, cards_edge.y
-其他位置      other_.x, other_.y
-无尽补给相关  endless_supply_.x, endless_supply_.y
-```
-
-模板里的空位需要手动补全。
-
-示例：
-
-```lua
-sun_.x, sun_.y
-```
-
-改成：
-
-```lua
-sun_buy_key.x, sun_buy_key.y
-```
-
-无尽补给相关模板会插入：
-
-```lua
-endless_supply_.x, endless_supply_.y
-```
-
-改成：
-
-```lua
-endless_supply_ability.x, endless_supply_ability.y
-```
-
-如果要使用无尽补给的识别框，不走这个点位模板，直接写：
-
-```lua
-endless_supply_text_area.left,
-endless_supply_text_area.top,
-endless_supply_text_area.right,
-endless_supply_text_area.bottom
-```
-
-## 5. 常用函数
-
-### tap
-
-点击一个位置。
-
-```lua
-tap(x, y)
-tap(x, y, 按压毫秒)
-```
-
-第三个参数是按压持续时间，单位是毫秒，不是点击次数。
-
-示例：
-
-```lua
-tap(other_start_battle.x, other_start_battle.y)
-tap(artifact_main.x, artifact_main.y, 50)
-```
-
-### swipe
-
-从一个位置滑到另一个位置。
-
-```lua
-swipe(起点x, 起点y, 终点x, 终点y)
-swipe(起点x, 起点y, 终点x, 终点y, 持续毫秒)
-```
-
-第五个参数是滑动持续时间，单位是毫秒。项目里不写时默认约 `300` 毫秒，但游戏脚本建议明确写出来，常用 `30 ~ 100`。
-
-示例：
-
-```lua
-swipe(plant_slots[1].x, plant_slots[1].y, board[1][1].x, board[1][1].y, 50)
-```
-
-### wait
-
-等待指定毫秒。
-
-```lua
+tap(start_battle.x, start_battle.y)
 wait(500)
-wait(1000)
-```
+swipe(plant_slots[1].x, plant_slots[1].y, board[3][5].x, board[3][5].y, 200)
 
-强制要求：任何 `while true` 或其他长期循环里，必须包含至少一条 `wait(...)`。推荐最小值是：
+if check_color("#FF0000", 10, final_wave_red.x, final_wave_red.y) then
+    tap(other_next_wave.x, other_next_wave.y)
+end
 
-```lua
-wait(10)
-```
-
-没有等待的循环会占用过高 CPU，脚本可能被系统停止。
-
-### check_text
-
-检查某个区域内是否出现文字。
-
-```lua
-check_text("文字", 左, 上, 右, 下)
-```
-
-`左, 上, 右, 下` 是百分比坐标，范围 `0 ~ 100`。
-
-OCR 比颜色检测耗时。循环检测文字时，建议在每轮末尾使用 `wait(200)` 到
-`wait(500)`，并尽量缩小识别范围。
-
-示例：
-
-```lua
-if check_text("继续", 10.00, 20.00, 40.00, 30.00) then
-    tap(other_continue.x, other_continue.y)
+if ocr_text("最后一波", final_wave_text_area.left, final_wave_text_area.top, final_wave_text_area.right, final_wave_text_area.bottom) then
+    tap(other_next_wave.x, other_next_wave.y)
 end
 ```
 
-### check_text_not
-
-检查某个区域内是否没有出现文字。
-
-```lua
-if check_text_not("暂停", 10.00, 20.00, 40.00, 30.00) then
-    tap(other_pause.x, other_pause.y)
-end
-```
-
-### check_color
-
-检查某个位置颜色是否匹配。
-
-```lua
-check_color("#颜色", 容差, x, y)
-```
-
-容差一般使用 `10`。`x, y` 是百分比坐标，也可以使用校准变量。
-
-示例：
-
-```lua
-if check_color("#A020F0", 10, cards_edge.x, cards_edge.y) then
-    tap(cards_edge.x, cards_edge.y)
-end
-```
-
-### check_color_not
-
-检查某个位置颜色是否不匹配。
-
-```lua
-if check_color_not("#A020F0", 10, cards_edge.x, cards_edge.y) then
-    wait(500)
-end
-```
-
-### parallel
-
-并行执行多个函数。
-
-```lua
-parallel(
-    function()
-        tap(plant_slots[1].x, plant_slots[1].y)
-    end,
-    function()
-        tap(board[1][1].x, board[1][1].y)
-    end
-)
-```
-
-常见错误：
-
-```lua
-parallel(function() tap(plant_slots[1].x, plant_slots[1].y) end function() tap(board[1][1].x, board[1][1].y) end)
-```
-
-上面是错误写法，因为两个 `function() ... end` 中间缺少逗号。
-
-正确写法：
-
-```lua
-parallel(
-    function()
-        tap(plant_slots[1].x, plant_slots[1].y)
-    end,
-    function()
-        tap(board[1][1].x, board[1][1].y)
-    end
-)
-```
-
-每一路 `function() ... end` 之间必须用逗号分隔，最后一路后面不用再加逗号。
-
-## 6. 动作持续时间建议
-
-| 动作类型 | 推荐持续时间 | 备注 |
-| --- | --- | --- |
-| 普通点击 | 不写，或 `1 ~ 10` 毫秒 | 大部分界面点击不需要长按 |
-| 长按点击 | `10 ~ 50` 毫秒 | 部分按钮或神器可能需要更稳定触发 |
-| 滑动种植 | `30 ~ 100` 毫秒 | 太快可能无效，太慢会影响节奏 |
-| 滑动给豆 | `30 ~ 100` 毫秒 | 从能量豆滑到植物或棋盘 |
-| 滑动铲除 | `30 ~ 100` 毫秒 | 从铲子滑到植物，或先点铲子再点格子 |
-
-## 7. 同时执行两个动作
-
-如果需要两个动作同时执行，使用 `parallel(...)`。
-
-最常见写法：
-
-```lua
-parallel(
-    function()
-        动作1
-    end,
-    function()
-        动作2
-    end
-)
-```
-
-示例：同时点击第 1 个植物卡槽和第 1 行第 1 列棋盘：
-
-```lua
-parallel(
-    function()
-        tap(plant_slots[1].x, plant_slots[1].y)
-    end,
-    function()
-        tap(board[1][1].x, board[1][1].y)
-    end
-)
-```
-
-示例：同时点击两个不同位置：
-
-```lua
-parallel(
-    function()
-        tap(other_speed_up.x, other_speed_up.y)
-    end,
-    function()
-        tap(other_next_wave.x, other_next_wave.y)
-    end
-)
-```
-
-如果要同时执行更多动作，可以继续添加 `function() ... end`：
-
-```lua
-parallel(
-    function()
-        tap(plant_slots[1].x, plant_slots[1].y)
-    end,
-    function()
-        tap(board[1][1].x, board[1][1].y)
-    end,
-    function()
-        wait(300)
-        tap(other_next_wave.x, other_next_wave.y)
-    end
-)
-```
-
-注意：
-
-- `parallel` 里面每个 `function() ... end` 是一路同时执行的动作。
-- 如果两个动作之间必须有先后顺序，不要放进同一个 `parallel`。
-- 并行动作里也可以写 `wait(...)`，用于控制这一条动作自己的节奏。
-
-## 8. 常见脚本示例
-
-这一节按 `E:\test\value` 里的 7 个 PVZ2 脚本整理，示例结构和你当前脚本保持一致。
-
-### 等扑克牌开始
-
-你的脚本通常先等扑克牌边缘的紫色出现，再开始执行后面的动作。
-
-```lua
-while not check_color("#DF58FC", 10, cards_edge.x, cards_edge.y) do
-    wait(1)
-end
-
-wait(100)
-```
-
-### 开启加速
-
-```lua
-tap(other_speed_up.x, other_speed_up.y, 1)
-wait(100)
-```
-
-### 第一关写法
-
-第一关主要是加速、快速种多个植物，然后并行点下一波并检测最后一波红字。
-
-```lua
-flag = 1
-
-while not check_color("#DF58FC", 10, cards_edge.x, cards_edge.y) do
-    wait(1)
-end
-
-tap(other_speed_up.x, other_speed_up.y, 1)
-
-wait(30)
-swipe(plant_slots[8].x, plant_slots[8].y, board[2][4].x, board[2][4].y, 30)
-wait(30)
-swipe(plant_slots[8].x, plant_slots[8].y, board[4][5].x, board[4][5].y, 30)
-
-wait(100)
-swipe(plant_slots[5].x, plant_slots[5].y, board[3][5].x, board[3][5].y, 10)
-
-wait(100)
-swipe(plant_slots[7].x, plant_slots[7].y, board[3][4].x, board[3][4].y, 10)
-
-wait(100)
-swipe(plant_slots[4].x, plant_slots[4].y, board[3][3].x, board[3][3].y, 10)
-
-wait(100)
-swipe(plant_slots[3].x, plant_slots[3].y, board[3][3].x, board[3][3].y, 10)
-
-wait(100)
-swipe(plant_slots[6].x, plant_slots[6].y, board[3][3].x, board[3][3].y, 10)
-wait(100)
-swipe(plant_slots[6].x, plant_slots[6].y, board[3][5].x, board[3][5].y, 10)
-
-wait(30)
-swipe(plant_slots[1].x, plant_slots[1].y, board[1][1].x, board[1][1].y, 30)
-wait(30)
-swipe(plant_slots[1].x, plant_slots[1].y, board[2][1].x, board[2][1].y, 30)
-```
-
-### 第二关写法
-
-第二关主要是先给豆几个关键位置，再种能量花。
-
-```lua
-flag = 1
-
-while not check_color("#DF58FC", 10, cards_edge.x, cards_edge.y) do
-    wait(1)
-end
-
-tap(other_speed_up.x, other_speed_up.y, 1)
-
-wait(100)
-swipe(plant_food_bean.x, plant_food_bean.y, board[2][4].x, board[2][4].y, 100)
-
-wait(100)
-swipe(plant_food_bean.x, plant_food_bean.y, board[4][5].x, board[4][5].y, 100)
-
-wait(100)
-swipe(plant_food_bean.x, plant_food_bean.y, board[3][4].x, board[3][4].y, 100)
-
-wait(100)
-swipe(plant_slots[1].x, plant_slots[1].y, board[1][1].x, board[1][1].y, 100)
-
-wait(100)
-swipe(plant_slots[1].x, plant_slots[1].y, board[2][1].x, board[2][1].y, 100)
-```
-
-### 第三关写法
-
-第三关包含给豆、融合电大和种能量花。
-
-```lua
-flag = 1
-
-while not check_color("#DF58FC", 10, cards_edge.x, cards_edge.y) do
-    wait(1)
-end
-
-wait(10)
-tap(other_speed_up.x, other_speed_up.y, 1)
-
-wait(100)
-swipe(plant_food_bean.x, plant_food_bean.y, board[3][3].x, board[3][3].y, 100)
-
-wait(100)
-swipe(plant_slots[2].x, plant_slots[2].y, board[2][4].x, board[2][4].y, 100)
-wait(100)
-swipe(plant_slots[2].x, plant_slots[2].y, board[4][5].x, board[4][5].y, 100)
-
-wait(100)
-swipe(plant_food_bean.x, plant_food_bean.y, board[3][5].x, board[3][5].y, 100)
-
-wait(100)
-swipe(plant_slots[1].x, plant_slots[1].y, board[1][1].x, board[1][1].y, 100)
-wait(100)
-swipe(plant_slots[1].x, plant_slots[1].y, board[2][1].x, board[2][1].y, 100)
-```
-
-### 前期脚本写法
-
-前期脚本常见流程是给豆、种能量花、再使用神器大招。
-
-```lua
-flag = 1
-
-while not check_color("#DF58FC", 10, cards_edge.x, cards_edge.y) do
-    wait(1)
-end
-
-tap(other_speed_up.x, other_speed_up.y, 1)
-
-wait(100)
-swipe(plant_food_bean.x, plant_food_bean.y, board[3][3].x, board[3][3].y, 100)
-
-wait(100)
-swipe(plant_slots[1].x, plant_slots[1].y, board[1][1].x, board[1][1].y, 100)
-
-wait(100)
-swipe(plant_food_bean.x, plant_food_bean.y, board[3][5].x, board[3][5].y, 100)
-
-wait(100)
-swipe(plant_slots[1].x, plant_slots[1].y, board[2][1].x, board[2][1].y, 100)
-
-wait(60)
-tap(artifact_main.x, artifact_main.y, 1)
-tap(artifact_large.x, artifact_large.y, 1)
-```
-
-### 后期葫芦写法
-
-后期葫芦脚本会先布置关键植物，再点击神器并等待后续大招。
-
-```lua
-flag = 1
-
-while not check_color("#DF58FC", 10, cards_edge.x, cards_edge.y) do
-    wait(1)
-end
-
-tap(other_speed_up.x, other_speed_up.y, 1)
-
-wait(50)
-swipe(plant_food_bean.x, plant_food_bean.y, board[2][2].x, board[2][2].y, 10)
-
-wait(50)
-swipe(plant_slots[2].x, plant_slots[2].y, board[3][9].x, board[3][9].y, 10)
-
-wait(50)
-swipe(plant_food_bean.x, plant_food_bean.y, board[3][9].x, board[3][9].y, 10)
-
-wait(50)
-swipe(plant_slots[1].x, plant_slots[1].y, board[5][2].x, board[5][2].y, 10)
-
-wait(50)
-swipe(plant_slots[1].x, plant_slots[1].y, board[5][3].x, board[5][3].y, 10)
-
-wait(100)
-tap(artifact_main.x, artifact_main.y, 10)
-wait(1400)
-tap(artifact_large.x, artifact_large.y, 10)
-```
-
-### 后期保龄球写法
-
-后期保龄球脚本前半段和葫芦类似，但神器只点击一次，然后等待。
-
-```lua
-flag = 1
-
-while not check_color("#DF58FC", 10, cards_edge.x, cards_edge.y) do
-    wait(1)
-end
-
-tap(other_speed_up.x, other_speed_up.y, 1)
-
-wait(50)
-swipe(plant_food_bean.x, plant_food_bean.y, board[2][2].x, board[2][2].y, 10)
-
-wait(50)
-swipe(plant_slots[2].x, plant_slots[2].y, board[3][9].x, board[3][9].y, 10)
-
-wait(50)
-swipe(plant_food_bean.x, plant_food_bean.y, board[3][9].x, board[3][9].y, 10)
-
-wait(50)
-swipe(plant_slots[1].x, plant_slots[1].y, board[5][2].x, board[5][2].y, 10)
-
-wait(50)
-swipe(plant_slots[1].x, plant_slots[1].y, board[5][3].x, board[5][3].y, 10)
-
-wait(300)
-tap(artifact_main.x, artifact_main.y, 10)
-wait(1100)
-```
-
-### boss 脚本写法
-
-boss 脚本先给豆两个关键格子，再加速并补种能量花。
-
-```lua
-while not check_color("#DF58FC", 10, cards_edge.x, cards_edge.y) do
-    wait(1)
-end
-
-wait(100)
-
-swipe(plant_food_bean.x, plant_food_bean.y, board[4][5].x, board[4][5].y, 30)
-wait(100)
-
-swipe(plant_food_bean.x, plant_food_bean.y, board[4][4].x, board[4][4].y, 30)
-wait(100)
-
-tap(other_speed_up.x, other_speed_up.y, 1)
-wait(100)
-
-swipe(plant_slots[1].x, plant_slots[1].y, board[5][2].x, board[5][2].y, 30)
-wait(100)
-swipe(plant_slots[1].x, plant_slots[1].y, board[5][3].x, board[5][3].y, 30)
-```
-
-### 自动点下一波并检测结束
-
-你的多个脚本最后都会用这个结构：一路持续点击“下一波”，另一路检测“最后一波字幕红色”，检测到后把 `flag` 改成 `0` 停止循环。
-
-```lua
-parallel(
-    function()
-        while flag == 1 do
-            wait(1)
-            tap(other_next_wave.x, other_next_wave.y, 1)
-        end
-    end,
-    function()
-        while flag == 1 do
-            if check_color("#FF0000", 10, other_final_wave_red.x, other_final_wave_red.y) then
-                flag = 0
-            end
-
-            wait(1)
-        end
-    end
-)
-```
-
-后期脚本还可以在检测到最后一波红字后补一个给豆动作：
-
-```lua
-parallel(
-    function()
-        while flag == 1 do
-            wait(1)
-            tap(other_next_wave.x, other_next_wave.y, 1)
-        end
-    end,
-    function()
-        while flag == 1 do
-            if check_color("#FF0000", 10, other_final_wave_red.x, other_final_wave_red.y) then
-                flag = 0
-                wait(60)
-                swipe(plant_food_bean.x, plant_food_bean.y, board[3][5].x, board[3][5].y, 10)
-            end
-
-            wait(1)
-        end
-    end
-)
-```
-
-## 9. 校准变量速查
-
-### 植物卡槽
-
-```lua
-plant_slot_1
-plant_slot_2
-plant_slot_3
-plant_slot_4
-plant_slot_5
-plant_slot_6
-plant_slot_7
-plant_slot_8
-plant_slots
-```
-
-推荐：
-
-```lua
-tap(plant_slots[1].x, plant_slots[1].y)
-tap(plant_slots[8].x, plant_slots[8].y)
-```
-
-### 种植棋盘
-
-棋盘是 5 行 9 列。
-
-```lua
-board_r1_c1 到 board_r5_c9
-board
-```
-
-推荐：
-
-```lua
-tap(board[1][1].x, board[1][1].y)
-tap(board[5][9].x, board[5][9].y)
-```
-
-也可以：
-
-```lua
-tap(board_r1_c1.x, board_r1_c1.y)
-tap(board_r5_c9.x, board_r5_c9.y)
-```
-
-### 阳光相关
-
-```lua
-sun_buy_key       购买阳关键
-sun_ad            广告
-sun_10_diamond    10钻石
-sun_close         关闭
-sun_points
-```
-
-示例：
-
-```lua
-tap(sun_buy_key.x, sun_buy_key.y)
-tap(sun_points.sun_buy_key.x, sun_points.sun_buy_key.y)
-```
-
-### 能量豆相关
-
-```lua
-plant_food_bean   豆，给豆操作的起点
-plant_food_plus   +
-plant_food_buy    购买
-plant_food_points
-```
-
-示例：
-
-```lua
-tap(plant_food_bean.x, plant_food_bean.y)
-tap(plant_food_points.plant_food_bean.x, plant_food_points.plant_food_bean.y)
-swipe(plant_food_bean.x, plant_food_bean.y, board[3][5].x, board[3][5].y, 50)
-```
+## 当前变量变化
 
 ### 神器相关
 
-```lua
-artifact_main     神器
-artifact_small    小
-artifact_medium   中
-artifact_large    大
-artifact_points
-```
+原来的 4 个神器点保留，新增 5 个点。
 
-示例：
+| 状态 | Lua 变量 | 中文意思 | 类型 |
+|---|---|---|---|
+| 保留 | `artifact_main` | 神器 | 点 |
+| 保留 | `artifact_small` | 小 | 点 |
+| 保留 | `artifact_medium` | 中 | 点 |
+| 保留 | `artifact_large` | 大 | 点 |
+| 新增 | `artifact_switch` | 切换 | 点 |
+| 新增 | `artifact_gourd` | 葫芦 | 点 |
+| 新增 | `artifact_bowling` | 保龄球 | 点 |
+| 新增 | `artifact_equipment` | 装备 | 点 |
+| 新增 | `artifact_close` | 关闭 | 点 |
 
-```lua
-tap(artifact_main.x, artifact_main.y)
-tap(artifact_points.artifact_main.x, artifact_points.artifact_main.y)
-```
+### 战斗颜色文字
 
-### 黄瓜相关
+“扑克牌相关”改为“战斗颜色文字”，最终包含两个点和一个框。
 
-```lua
-cucumber_main     黄瓜
-cucumber_drop     下瓜
-cucumber_close    关闭
-cucumber_points
-```
+| 变化 | 更改前 | 更改后 | 中文意思 | 类型 |
+|---|---|---|---|---|
+| 改名 | `cards_edge` | `cards_poker` | 扑克牌 | 点 |
+| 移动/改名 | `other_final_wave_red` | `final_wave_red` | 最后一波红色 | 点 |
+| 新增 | 无 | `final_wave_text_area` | 最后一波文字 | 区域 |
 
-示例：
+### 开始战斗相关
 
-```lua
-tap(cucumber_main.x, cucumber_main.y)
-tap(cucumber_points.cucumber_main.x, cucumber_points.cucumber_main.y)
-```
+新增“开始战斗相关”分组，原来在“其他位置”里的两个点移动到这里。
 
-### 充值相关
-
-```lua
-recharge_main     充值
-recharge_close    关闭
-recharge_points
-```
-
-示例：
-
-```lua
-tap(recharge_main.x, recharge_main.y)
-tap(recharge_points.recharge_main.x, recharge_points.recharge_main.y)
-```
-
-### 扑克牌
-
-```lua
-cards_edge        将中心点放到扑克牌边缘的紫色地方
-cards_points
-```
-
-示例：
-
-```lua
-tap(cards_edge.x, cards_edge.y)
-tap(cards_points.cards_edge.x, cards_points.cards_edge.y)
-check_color("#A020F0", 10, cards_edge.x, cards_edge.y)
-```
-
-### 其他位置
-
-其他位置共 11 个点。新增或修改这里的点位后，需要重新进入“其他位置”校准并保存一次。
-
-```lua
-other_speed_up             加速
-other_pause                暂停
-other_continue             继续
-other_restart              重新开始
-other_back_to_map          返回地图
-other_shovel               铲子
-other_card_start_battle    选卡的开始战斗
-other_start_battle         开始战斗
-other_final_wave_red       最后一波字幕（红色）
-other_next_wave            下一波
-other_switch_form          切换形态
-other_points
-```
-
-示例：
-
-```lua
-tap(other_speed_up.x, other_speed_up.y)
-tap(other_points.other_speed_up.x, other_points.other_speed_up.y)
-tap(other_next_wave.x, other_next_wave.y)
-tap(other_shovel.x, other_shovel.y)
-tap(other_switch_form.x, other_switch_form.y)
-```
+| 变化 | 更改前 | 更改后 | 中文意思 | 类型 |
+|---|---|---|---|---|
+| 移动/改名 | `other_start_battle` | `start_battle` | 开始战斗 | 点 |
+| 移动/改名 | `other_card_start_battle` | `card_start_battle` | 选卡开始战斗 | 点 |
+| 新增 | 无 | `start_battle_pair` | 配对 | 点 |
+| 新增 | 无 | `start_battle_deck_1` | 卡组1 | 点 |
+| 新增 | 无 | `start_battle_deck_2` | 卡组2 | 点 |
+| 新增 | 无 | `start_battle_deck_3` | 卡组3 | 点 |
 
 ### 无尽补给相关
 
-无尽补给相关包含 1 个文字识别框和 9 个点击圆圈。校准时需要把“识别框”移动/缩放到要识别文字的位置，并把 9 个圆圈分别放到对应按钮上。
+删除 4 个旧变量。
 
-校准交互：
+| 状态 | 旧 Lua 变量 | 中文意思 | 类型 |
+|---|---|---|---|
+| 删除 | `endless_supply_pair` | 配对 | 点 |
+| 删除 | `endless_supply_1` | 1 | 点 |
+| 删除 | `endless_supply_2` | 2 | 点 |
+| 删除 | `endless_supply_3` | 3 | 点 |
 
-- 点击“识别框”后会选中识别框，识别框出现黄色边框。
-- 识别框选中后，可以在屏幕其他空白位置拖动，识别框会跟着移动。
-- 拖动识别框四个角，可以调整识别框大小。
-- 点击任意圆圈后会选中该圆圈，圆圈出现黄色边框。
-- 圆圈选中后，可以在屏幕其他空白位置拖动，选中的圆圈会跟着移动。
-- 点击其他框或圆圈会切换当前选中对象。
+### 其他位置
 
-```lua
-endless_supply_text_area
-endless_supply_ability
-endless_supply_blue_confirm
-endless_supply_green_confirm
-endless_supply_final_confirm
-endless_supply_pair
-endless_supply_1
-endless_supply_2
-endless_supply_3
-endless_supply_continue_challenge
-endless_supply_points
+这些变量已经从“其他位置”移出：
+
+| 旧变量 | 新变量 |
+|---|---|
+| `other_start_battle` | `start_battle` |
+| `other_card_start_battle` | `card_start_battle` |
+| `other_final_wave_red` | `final_wave_red` |
+
+## 全部 PVZ2 校准变量
+
+### 植物卡槽
+
+| Lua 变量 | 中文意思 | 类型 |
+|---|---|---|
+| `plant_slots` | 植物卡槽列表，包含第 1 到第 8 个卡槽 | 表 |
+| `plant_slots[1]` | 第 1 个植物卡槽 | 点 |
+| `plant_slots[2]` | 第 2 个植物卡槽 | 点 |
+| `plant_slots[3]` | 第 3 个植物卡槽 | 点 |
+| `plant_slots[4]` | 第 4 个植物卡槽 | 点 |
+| `plant_slots[5]` | 第 5 个植物卡槽 | 点 |
+| `plant_slots[6]` | 第 6 个植物卡槽 | 点 |
+| `plant_slots[7]` | 第 7 个植物卡槽 | 点 |
+| `plant_slots[8]` | 第 8 个植物卡槽 | 点 |
+| `plant_slot_1` | 第 1 个植物卡槽 | 点 |
+| `plant_slot_2` | 第 2 个植物卡槽 | 点 |
+| `plant_slot_3` | 第 3 个植物卡槽 | 点 |
+| `plant_slot_4` | 第 4 个植物卡槽 | 点 |
+| `plant_slot_5` | 第 5 个植物卡槽 | 点 |
+| `plant_slot_6` | 第 6 个植物卡槽 | 点 |
+| `plant_slot_7` | 第 7 个植物卡槽 | 点 |
+| `plant_slot_8` | 第 8 个植物卡槽 | 点 |
+
+### 种植棋盘
+
+| Lua 变量 | 中文意思 | 类型 |
+|---|---|---|
+| `board` | 种植棋盘二维表，格式是 `board[行][列]` | 表 |
+| `board[1][1]` ~ `board[1][9]` | 第 1 行第 1 到第 9 列格子 | 点 |
+| `board[2][1]` ~ `board[2][9]` | 第 2 行第 1 到第 9 列格子 | 点 |
+| `board[3][1]` ~ `board[3][9]` | 第 3 行第 1 到第 9 列格子 | 点 |
+| `board[4][1]` ~ `board[4][9]` | 第 4 行第 1 到第 9 列格子 | 点 |
+| `board[5][1]` ~ `board[5][9]` | 第 5 行第 1 到第 9 列格子 | 点 |
+| `board_r1_c1` ~ `board_r1_c9` | 第 1 行第 1 到第 9 列格子 | 点 |
+| `board_r2_c1` ~ `board_r2_c9` | 第 2 行第 1 到第 9 列格子 | 点 |
+| `board_r3_c1` ~ `board_r3_c9` | 第 3 行第 1 到第 9 列格子 | 点 |
+| `board_r4_c1` ~ `board_r4_c9` | 第 4 行第 1 到第 9 列格子 | 点 |
+| `board_r5_c1` ~ `board_r5_c9` | 第 5 行第 1 到第 9 列格子 | 点 |
+
+### 阳光相关
+
+| Lua 变量 | 中文意思 | 类型 |
+|---|---|---|
+| `sun_points` | 阳光相关点位表 | 表 |
+| `sun_buy_key` | 购买阳关键 | 点 |
+| `sun_ad` | 广告 | 点 |
+| `sun_10_diamond` | 10 钻石 | 点 |
+| `sun_close` | 关闭 | 点 |
+
+### 能量豆相关
+
+| Lua 变量 | 中文意思 | 类型 |
+|---|---|---|
+| `plant_food_points` | 能量豆相关点位表 | 表 |
+| `plant_food_bean` | 豆 | 点 |
+| `plant_food_plus` | 加号 | 点 |
+| `plant_food_buy` | 购买 | 点 |
+
+### 神器相关
+
+| Lua 变量 | 中文意思 | 类型 |
+|---|---|---|
+| `artifact_points` | 神器相关点位表 | 表 |
+| `artifact_main` | 神器 | 点 |
+| `artifact_small` | 小 | 点 |
+| `artifact_medium` | 中 | 点 |
+| `artifact_large` | 大 | 点 |
+| `artifact_switch` | 切换 | 点 |
+| `artifact_gourd` | 葫芦 | 点 |
+| `artifact_bowling` | 保龄球 | 点 |
+| `artifact_equipment` | 装备 | 点 |
+| `artifact_close` | 关闭 | 点 |
+
+### 黄瓜相关
+
+| Lua 变量 | 中文意思 | 类型 |
+|---|---|---|
+| `cucumber_points` | 黄瓜相关点位表 | 表 |
+| `cucumber_main` | 黄瓜 | 点 |
+| `cucumber_drop` | 下瓜 | 点 |
+| `cucumber_close` | 关闭 | 点 |
+
+### 充值相关
+
+| Lua 变量 | 中文意思 | 类型 |
+|---|---|---|
+| `recharge_points` | 充值相关点位表 | 表 |
+| `recharge_main` | 充值 | 点 |
+| `recharge_close` | 关闭 | 点 |
+
+### 战斗颜色文字
+
+| Lua 变量 | 中文意思 | 类型 |
+|---|---|---|
+| `cards_points` | 战斗颜色文字点位表 | 表 |
+| `cards_poker` | 扑克牌 | 点 |
+| `final_wave_red` | 最后一波红色 | 点 |
+| `final_wave_text_area` | 最后一波文字 | 区域 |
+
+### 开始战斗相关
+
+| Lua 变量 | 中文意思 | 类型 |
+|---|---|---|
+| `start_battle_points` | 开始战斗相关点位表 | 表 |
+| `start_battle` | 开始战斗 | 点 |
+| `card_start_battle` | 选卡开始战斗 | 点 |
+| `start_battle_pair` | 配对 | 点 |
+| `start_battle_deck_1` | 卡组1 | 点 |
+| `start_battle_deck_2` | 卡组2 | 点 |
+| `start_battle_deck_3` | 卡组3 | 点 |
+
+### 其他位置
+
+| Lua 变量 | 中文意思 | 类型 |
+|---|---|---|
+| `other_points` | 其他位置点位表 | 表 |
+| `other_speed_up` | 加速 | 点 |
+| `other_pause` | 暂停 | 点 |
+| `other_continue` | 继续 | 点 |
+| `other_restart` | 重新开始 | 点 |
+| `other_back_to_map` | 返回地图 | 点 |
+| `other_shovel` | 铲子 | 点 |
+| `other_next_wave` | 下一波 | 点 |
+| `other_switch_form` | 切换形态 | 点 |
+
+### 无尽补给相关
+
+| Lua 变量 | 中文意思 | 类型 |
+|---|---|---|
+| `endless_supply_points` | 无尽补给相关点位表 | 表 |
+| `endless_supply_text_area` | 无尽补给识别框 | 区域 |
+| `endless_supply_ability` | 能力 | 点 |
+| `endless_supply_blue_confirm` | 蓝色确定 | 点 |
+| `endless_supply_green_confirm` | 绿色确定 | 点 |
+| `endless_supply_final_confirm` | 最后确定 | 点 |
+| `endless_supply_continue_challenge` | 继续挑战 | 点 |
+
+## 一键把脚本下载到手机
+
+App 包名：
+
+```text
+com.fffcccdfgh.androidclicker
 ```
 
-识别框字段：
+手机端同步目录：
 
-```lua
-endless_supply_text_area.left
-endless_supply_text_area.top
-endless_supply_text_area.right
-endless_supply_text_area.bottom
+```text
+/sdcard/Android/data/com.fffcccdfgh.androidclicker/files/sync
 ```
 
-点击点位：
+手机 App 会在 PVZ2 脚本列表页轮询同步目录。电脑脚本推送完成后，用户打开或停留在 PVZ2 脚本列表页，App 会弹出确认窗口。
 
-```lua
-endless_supply_ability             能力
-endless_supply_blue_confirm        蓝色确定
-endless_supply_green_confirm       绿色确定
-endless_supply_final_confirm       最后确定
-endless_supply_pair                配对
-endless_supply_1                   1
-endless_supply_2                   2
-endless_supply_3                   3
-endless_supply_continue_challenge  继续挑战
+### 单个脚本同步协议
+
+推送文件：
+
+```text
+/sdcard/Android/data/com.fffcccdfgh.androidclicker/files/sync/pvz2.lua
+/sdcard/Android/data/com.fffcccdfgh.androidclicker/files/sync/pvz2.meta.json
 ```
 
-示例：
+`pvz2.lua` 是脚本内容。
 
-```lua
-if check_text(
-    "补给",
-    endless_supply_text_area.left,
-    endless_supply_text_area.top,
-    endless_supply_text_area.right,
-    endless_supply_text_area.bottom
-) then
-    tap(endless_supply_ability.x, endless_supply_ability.y)
-    wait(100)
-    tap(endless_supply_blue_confirm.x, endless_supply_blue_confirm.y)
-end
+`pvz2.meta.json` 示例：
+
+```json
+{
+  "scriptName": "沙滩无尽",
+  "updatedAt": "2026-06-14T12:00:00.0000000Z",
+  "sourcePath": "E:\\pvz2\\沙滩无尽\\pvz2_沙滩无尽.lua"
+}
 ```
 
-新增点位示例：
+字段含义：
 
-```lua
-tap(endless_supply_pair.x, endless_supply_pair.y)
-tap(endless_supply_1.x, endless_supply_1.y)
-tap(endless_supply_2.x, endless_supply_2.y)
-tap(endless_supply_3.x, endless_supply_3.y)
-tap(endless_supply_continue_challenge.x, endless_supply_continue_challenge.y)
+| 字段 | 含义 |
+|---|---|
+| `scriptName` | 手机上的脚本名 |
+| `updatedAt` | 更新时间，建议使用 UTC ISO 时间 |
+| `sourcePath` | 电脑端源文件路径，用于生成变化签名 |
+
+### 批量同步协议
+
+批量同步目录：
+
+```text
+/sdcard/Android/data/com.fffcccdfgh.androidclicker/files/sync/batch
 ```
 
-也可以通过表访问：
+必须包含 manifest：
 
-```lua
-tap(endless_supply_points.endless_supply_ability.x, endless_supply_points.endless_supply_ability.y)
+```text
+/sdcard/Android/data/com.fffcccdfgh.androidclicker/files/sync/batch/pvz2_batch.json
 ```
 
-## 10. 给 AI 的使用规则
+`pvz2_batch.json` 示例：
 
-AI 帮用户写 PVZ2 脚本时，按这些规则来：
-
-1. 优先使用校准变量，不要直接写死屏幕坐标。
-2. 用户说“第几张植物卡”时，使用 `plant_slots[n]`。
-3. 用户说“第几行第几列”时，使用 `board[行][列]`。
-4. 用户说“开始战斗”，优先使用 `other_start_battle`。
-5. 用户说“选卡的开始战斗”，使用 `other_card_start_battle`。
-6. 用户说“继续、暂停、加速、重新开始、返回地图、铲子、下一波、切换形态”，使用 `other_` 对应变量。
-7. 用户说“无尽补给相关”时，优先使用 `endless_supply_text_area` 做文字识别区域，使用 `endless_supply_ability`、`endless_supply_blue_confirm`、`endless_supply_green_confirm`、`endless_supply_final_confirm`、`endless_supply_pair`、`endless_supply_1`、`endless_supply_2`、`endless_supply_3`、`endless_supply_continue_challenge` 做点击点。
-8. 用户要识别文字时，只生成 `if check_text(...) then ... end`，并提醒文字范围需要用插入工具框选；如果是无尽补给文字，优先使用已校准的 `endless_supply_text_area`。
-9. 用户要识别颜色时，生成 `if check_color("#颜色", 10, x, y) then ... end`，颜色和坐标可以让用户用插入工具与模板补全。
-10. 用户没有说明循环时，不要默认写无限循环；需要重复检测时再写 `while true do ... wait(...) end`。
-11. 任何循环里必须加 `wait(...)`，最低建议 `wait(10)`。
-12. 对点击动作之间加短等待，例如 `wait(100)` 或 `wait(300)`。
-13. `tap` 第三个参数是按压毫秒，不是点击次数。
-14. `swipe` 建议写第五个参数，游戏动作常用 `30 ~ 100` 毫秒。
-15. 生成 `parallel(...)` 时，每个 `function() ... end` 之间必须用逗号分隔。
-16. 生成脚本时保持 Lua 语法完整，不要留下未补全的占位符，除非用户明确要求保留空位。
-17. 文字识别始终使用原始游戏截图，不要建议用户选择 OCR 滤镜。
-18. 使用文字或颜色检测前，提醒用户先授权屏幕捕获；系统支持时推荐只共享 PVZ2。
-
-## 11. AI 生成脚本的常用模板
-
-### 单次动作
-
-```lua
-tap(目标.x, 目标.y)
-wait(300)
+```json
+{
+  "batchId": "20260614120000",
+  "mode": "merge",
+  "scripts": [
+    {
+      "name": "沙滩无尽",
+      "path": "pvz2_沙滩无尽.lua"
+    },
+    {
+      "name": "前50关",
+      "path": "pvz2_前50关.lua"
+    }
+  ]
+}
 ```
 
-### 选植物并种植
+字段含义：
 
-```lua
-tap(plant_slots[卡槽编号].x, plant_slots[卡槽编号].y)
-wait(100)
-tap(board[行][列].x, board[行][列].y)
-wait(300)
+| 字段 | 含义 |
+|---|---|
+| `batchId` | 批次 ID。每次推送必须变化，否则 App 会认为已经处理过 |
+| `mode` | `merge` 或 `replace_all` |
+| `scripts` | 脚本列表 |
+| `scripts[].name` | 手机上的脚本名 |
+| `scripts[].path` | 相对 `batch` 目录的 Lua 文件路径 |
+
+`mode` 的区别：
+
+| mode | 手机端行为 |
+|---|---|
+| `merge` | 添加或覆盖同名脚本，不删除手机里其他脚本 |
+| `replace_all` | 先删除手机里所有 PVZ2 脚本，再导入本批次脚本 |
+
+电脑端推送脚本应该让用户选择同步模式：
+
+```text
+请选择同步模式：
+[1] 更新全部（merge）：保留手机已有脚本，只更新/新增本批脚本。
+[2] 清空并导入（replace_all）：平板确认后先清空已有 PVZ2 脚本，再导入本批脚本。
 ```
 
-### 滑动种植
+选择规则：
 
-```lua
-swipe(plant_slots[卡槽编号].x, plant_slots[卡槽编号].y, board[行][列].x, board[行][列].y, 50)
-wait(300)
+| 用户输入 | 写入 manifest 的 mode | 含义 |
+|---|---|---|
+| `1` | `merge` | 保留手机已有脚本，只新增或覆盖本批脚本 |
+| `2` | `replace_all` | 平板确认后清空已有 PVZ2 脚本，再导入本批脚本 |
+
+如果用户输入不是 `1` 或 `2`，脚本应该继续提示，直到输入有效值。
+
+### 推荐电脑目录结构
+
+```text
+E:\pvz2
+  沙滩无尽
+    pvz2_沙滩无尽.lua
+  前50关
+    pvz2_前50关.lua
+  其他脚本
+    pvz2_其他脚本.lua
 ```
 
-### 给豆
+每个子文件夹代表一个脚本。脚本 AI 生成脚本时，建议把 Lua 文件放在对应脚本文件夹里。
 
-```lua
-swipe(plant_food_bean.x, plant_food_bean.y, board[行][列].x, board[行][列].y, 50)
-wait(300)
+### 推荐 PowerShell 批量推送脚本
+
+把下面内容保存为：
+
+```text
+E:\pvz2\push_all_pvz2.ps1
 ```
 
-### 文字出现后点击
+`.ps1` 文件建议使用 UTF-8 with BOM 保存，避免 Windows PowerShell 5 读取中文路径或中文字符串出错。
 
-```lua
-if check_text("文字", 左, 上, 右, 下) then
-    tap(目标.x, 目标.y)
-end
+```powershell
+param(
+    [ValidateSet("merge", "replace_all")]
+    [string]$Mode = "merge"
+)
+
+$ErrorActionPreference = "Stop"
+
+$Root = "E:\pvz2"
+$PackageName = "com.fffcccdfgh.androidclicker"
+$RemoteSyncDir = "/sdcard/Android/data/$PackageName/files/sync"
+$RemoteBatchDir = "$RemoteSyncDir/batch"
+
+$adbCandidates = @(
+    "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe",
+    "$env:ANDROID_HOME\platform-tools\adb.exe",
+    "$env:ANDROID_SDK_ROOT\platform-tools\adb.exe"
+)
+$adb = $adbCandidates | Where-Object { $_ -and (Test-Path -Path $_) } | Select-Object -First 1
+if (-not $adb) {
+    $adbCommand = Get-Command adb -ErrorAction SilentlyContinue
+    if ($adbCommand) {
+        $adb = $adbCommand.Source
+    }
+}
+if (-not $adb) {
+    throw "adb.exe not found. Install Android platform-tools or add adb to PATH."
+}
+
+$deviceLines = @(& $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match "^\S+\s+device$" })
+if ($deviceLines.Count -eq 0) {
+    throw "No authorized Android device found. Connect device and allow USB debugging."
+}
+
+$devices = @($deviceLines | ForEach-Object { ($_ -split "\s+")[0] })
+if ($devices.Count -eq 1) {
+    $targetDevice = $devices[0]
+} else {
+    Write-Host "Connected devices:"
+    for ($i = 0; $i -lt $devices.Count; $i++) {
+        Write-Host "[$($i + 1)] $($devices[$i])"
+    }
+    do {
+        $choice = Read-Host "Select device number"
+        $choiceNumber = 0
+        $validChoice = [int]::TryParse($choice, [ref]$choiceNumber) -and
+            $choiceNumber -ge 1 -and
+            $choiceNumber -le $devices.Count
+    } while (-not $validChoice)
+    $targetDevice = $devices[$choiceNumber - 1]
+}
+$adbTarget = @("-s", $targetDevice)
+
+if (-not (Test-Path -Path $Root)) {
+    throw "Root folder not found: $Root"
+}
+
+$scripts = @()
+foreach ($dir in Get-ChildItem -Path $Root -Directory) {
+    $lua = Get-ChildItem -Path $dir.FullName -File -Filter "*.lua" |
+        Where-Object { $_.Name -like "pvz2_*.lua" } |
+        Select-Object -First 1
+    if (-not $lua) {
+        $lua = Get-ChildItem -Path $dir.FullName -File -Filter "*.lua" | Select-Object -First 1
+    }
+    if ($lua) {
+        $name = [System.IO.Path]::GetFileNameWithoutExtension($lua.Name)
+        if ($name.StartsWith("pvz2_")) {
+            $name = $name.Substring(5)
+        }
+        $scripts += [pscustomobject]@{
+            Name = $name
+            Source = $lua.FullName
+            FileName = $lua.Name
+        }
+    }
+}
+
+if ($scripts.Count -eq 0) {
+    throw "No Lua scripts found under $Root"
+}
+
+$batchId = (Get-Date).ToUniversalTime().ToString("yyyyMMddHHmmssffff")
+$tempBatch = Join-Path $env:TEMP "pvz2_batch_$batchId"
+New-Item -Path $tempBatch -ItemType Directory -Force | Out-Null
+
+$manifestScripts = @()
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+foreach ($script in $scripts) {
+    $targetFile = Join-Path $tempBatch $script.FileName
+    $content = [System.IO.File]::ReadAllText($script.Source)
+    if ($content.Length -gt 0 -and $content[0] -eq [char]0xFEFF) {
+        $content = $content.Substring(1)
+    }
+    [System.IO.File]::WriteAllText($targetFile, $content, $utf8NoBom)
+
+    $manifestScripts += [pscustomobject]@{
+        name = $script.Name
+        path = $script.FileName
+    }
+}
+
+$manifest = [pscustomobject]@{
+    batchId = $batchId
+    mode = $Mode
+    scripts = $manifestScripts
+}
+$manifestPath = Join-Path $tempBatch "pvz2_batch.json"
+$manifestJson = $manifest | ConvertTo-Json -Depth 5
+[System.IO.File]::WriteAllText($manifestPath, $manifestJson, $utf8NoBom)
+
+Write-Host "Using adb: $adb"
+Write-Host "Using device: $targetDevice"
+Write-Host "Mode: $Mode"
+Write-Host "Scripts: $($scripts.Count)"
+
+& $adb @adbTarget shell "rm -rf '$RemoteBatchDir' && mkdir -p '$RemoteBatchDir'" | Out-Null
+& $adb @adbTarget push "$tempBatch\." $RemoteBatchDir | Out-Null
+
+if ($LASTEXITCODE -ne 0) {
+    throw "adb push failed."
+}
+
+Write-Host "Pushed batch $batchId to phone."
+Write-Host "Open PVZ2 script list in the app and confirm the sync dialog."
 ```
 
-### 颜色匹配后点击
+### 推荐 BAT 启动脚本
 
-```lua
-if check_color("#颜色", 10, 目标.x, 目标.y) then
-    tap(目标.x, 目标.y)
-end
+把下面内容保存为：
+
+```text
+E:\pvz2\推送全部-添加或覆盖.bat
 ```
 
-### 循环检测
-
-```lua
-while true do
-    if check_text("文字", 左, 上, 右, 下) then
-        tap(目标.x, 目标.y)
-    end
-
-    wait(500)
-end
+```bat
+@echo off
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0push_all_pvz2.ps1" -Mode merge
+pause
 ```
+
+把下面内容保存为：
+
+```text
+E:\pvz2\推送全部-替换手机全部.bat
+```
+
+```bat
+@echo off
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0push_all_pvz2.ps1" -Mode replace_all
+pause
+```
+
+## 给脚本 AI 的生成要求
+
+1. 生成 Lua 脚本时，优先使用本文档里的校准变量。
+2. 不要使用已删除变量：
+   - `cards_edge`
+   - `other_final_wave_red`
+   - `other_start_battle`
+   - `other_card_start_battle`
+   - `endless_supply_pair`
+   - `endless_supply_1`
+   - `endless_supply_2`
+   - `endless_supply_3`
+3. Lua 文件使用 UTF-8 无 BOM。
+4. PowerShell 文件如果包含中文路径或中文字符串，使用 UTF-8 with BOM。
+5. 批量推送时，`batchId` 每次必须变化。
+6. 用户只想添加或覆盖脚本时，用 `mode = "merge"`。
+7. 用户想删除手机旧脚本并只保留本批次脚本时，用 `mode = "replace_all"`。

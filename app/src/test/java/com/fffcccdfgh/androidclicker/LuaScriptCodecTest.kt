@@ -1,5 +1,8 @@
 package com.fffcccdfgh.androidclicker
 
+import com.fffcccdfgh.androidclicker.core.execution.ActionStep
+import com.fffcccdfgh.androidclicker.core.storage.LuaScriptCodec
+import com.fffcccdfgh.androidclicker.core.storage.ScriptStorage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
