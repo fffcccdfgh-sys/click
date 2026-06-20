@@ -65,68 +65,6 @@ if ocr_text("最后一波", final_wave_text_area.left, final_wave_text_area.top,
 end
 ```
 
-## 当前变量变化
-
-### 神器相关
-
-原来的 4 个神器点保留，新增 5 个点。
-
-| 状态 | Lua 变量 | 中文意思 | 类型 |
-|---|---|---|---|
-| 保留 | `artifact_main` | 神器 | 点 |
-| 保留 | `artifact_small` | 小 | 点 |
-| 保留 | `artifact_medium` | 中 | 点 |
-| 保留 | `artifact_large` | 大 | 点 |
-| 新增 | `artifact_switch` | 切换 | 点 |
-| 新增 | `artifact_gourd` | 葫芦 | 点 |
-| 新增 | `artifact_bowling` | 保龄球 | 点 |
-| 新增 | `artifact_equipment` | 装备 | 点 |
-| 新增 | `artifact_close` | 关闭 | 点 |
-
-### 战斗颜色文字
-
-“扑克牌相关”改为“战斗颜色文字”，最终包含两个点和一个框。
-
-| 变化 | 更改前 | 更改后 | 中文意思 | 类型 |
-|---|---|---|---|---|
-| 改名 | `cards_edge` | `cards_poker` | 扑克牌 | 点 |
-| 移动/改名 | `other_final_wave_red` | `final_wave_red` | 最后一波红色 | 点 |
-| 新增 | 无 | `final_wave_text_area` | 最后一波文字 | 区域 |
-
-### 开始战斗相关
-
-新增“开始战斗相关”分组，原来在“其他位置”里的两个点移动到这里。
-
-| 变化 | 更改前 | 更改后 | 中文意思 | 类型 |
-|---|---|---|---|---|
-| 移动/改名 | `other_start_battle` | `start_battle` | 开始战斗 | 点 |
-| 移动/改名 | `other_card_start_battle` | `card_start_battle` | 选卡开始战斗 | 点 |
-| 新增 | 无 | `start_battle_pair` | 配对 | 点 |
-| 新增 | 无 | `start_battle_deck_1` | 卡组1 | 点 |
-| 新增 | 无 | `start_battle_deck_2` | 卡组2 | 点 |
-| 新增 | 无 | `start_battle_deck_3` | 卡组3 | 点 |
-
-### 无尽补给相关
-
-删除 4 个旧变量。
-
-| 状态 | 旧 Lua 变量 | 中文意思 | 类型 |
-|---|---|---|---|
-| 删除 | `endless_supply_pair` | 配对 | 点 |
-| 删除 | `endless_supply_1` | 1 | 点 |
-| 删除 | `endless_supply_2` | 2 | 点 |
-| 删除 | `endless_supply_3` | 3 | 点 |
-
-### 其他位置
-
-这些变量已经从“其他位置”移出：
-
-| 旧变量 | 新变量 |
-|---|---|
-| `other_start_battle` | `start_battle` |
-| `other_card_start_battle` | `card_start_battle` |
-| `other_final_wave_red` | `final_wave_red` |
-
 ## 全部 PVZ2 校准变量
 
 ### 植物卡槽
@@ -264,6 +202,16 @@ end
 | `endless_supply_green_confirm` | 绿色确定 | 点 |
 | `endless_supply_final_confirm` | 最后确定 | 点 |
 | `endless_supply_continue_challenge` | 继续挑战 | 点 |
+
+## 手机权限授权记录
+
+已执行授权命令：
+
+```shell
+adb shell pm grant com.fffcccdfgh.androidclicker android.permission.WRITE_SECURE_SETTINGS
+```
+
+前提是 App 的 `AndroidManifest.xml` 已声明 `android.permission.WRITE_SECURE_SETTINGS`。执行一次后，只要不卸载 App，一般会保留这个授权；App 启动时可以自动把自己的无障碍服务重新写回系统设置。
 
 ## 一键把脚本下载到手机
 
@@ -558,17 +506,8 @@ pause
 ## 给脚本 AI 的生成要求
 
 1. 生成 Lua 脚本时，优先使用本文档里的校准变量。
-2. 不要使用已删除变量：
-   - `cards_edge`
-   - `other_final_wave_red`
-   - `other_start_battle`
-   - `other_card_start_battle`
-   - `endless_supply_pair`
-   - `endless_supply_1`
-   - `endless_supply_2`
-   - `endless_supply_3`
-3. Lua 文件使用 UTF-8 无 BOM。
-4. PowerShell 文件如果包含中文路径或中文字符串，使用 UTF-8 with BOM。
-5. 批量推送时，`batchId` 每次必须变化。
-6. 用户只想添加或覆盖脚本时，用 `mode = "merge"`。
-7. 用户想删除手机旧脚本并只保留本批次脚本时，用 `mode = "replace_all"`。
+2. Lua 文件使用 UTF-8 无 BOM。
+3. PowerShell 文件如果包含中文路径或中文字符串，使用 UTF-8 with BOM。
+4. 批量推送时，`batchId` 每次必须变化。
+5. 用户只想添加或覆盖脚本时，用 `mode = "merge"`。
+6. 用户想删除手机旧脚本并只保留本批次脚本时，用 `mode = "replace_all"`。

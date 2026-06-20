@@ -5,7 +5,9 @@ import android.app.Service
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.media.Image
 import android.os.Build
+import android.os.Handler
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -36,6 +38,8 @@ class PvzCalibrationFlowController(
 ) {
     private var calibrationPickerView: View? = null
     private var areaPickerBackgroundBitmap: Bitmap? = null
+    private var calibrationPreviewImage: Image? = null
+    private val mainHandler = Handler(service.mainLooper)
 
     fun showPlantSlotsCalibrationPicker() {
         val wm = windowManagerProvider() ?: return
@@ -672,8 +676,9 @@ class PvzCalibrationFlowController(
         calibrationPickerView = view
 
         val params = createFullScreenPickerParams()
+        val area = cardsCalibrationArea()
+        val points = cardsCalibrationPoints()
 
-        view.setCalibration(cardsCalibrationArea(), cardsCalibrationPoints())
         view.onSave = { area, points ->
             saveCardsCalibration(area, points)
             hideCalibrationPickerOverlay(revealOverlays = true)
@@ -684,10 +689,38 @@ class PvzCalibrationFlowController(
             hideCalibrationPickerOverlay(revealOverlays = true)
         }
 
+        Thread {
+            Thread.sleep(COLOR_PREVIEW_CAPTURE_DELAY_MS)
+            val image = if (ScreenCaptureManager.isReady) {
+                ScreenCaptureManager.captureFrameSync(COLOR_PREVIEW_CAPTURE_TIMEOUT_MS)
+            } else {
+                null
+            }
+            mainHandler.post {
+                if (calibrationPickerView !== view) {
+                    image?.close()
+                    return@post
+                }
+                if (image != null) {
+                    calibrationPreviewImage = image
+                    view.colorSampler = { x, y -> ScreenCaptureManager.readPixel(image, x, y) }
+                }
+                view.setCalibration(area, points)
+                showCardsCalibrationPickerView(wm, view, params)
+            }
+        }.start()
+    }
+
+    private fun showCardsCalibrationPickerView(
+        wm: WindowManager,
+        view: PvzEndlessSupplyCalibrationView,
+        params: WindowManager.LayoutParams
+    ) {
         try {
             wm.addView(view, params)
         } catch (e: Exception) {
             calibrationPickerView = null
+            closeCalibrationPreviewImage()
             ScreenshotHider.revealAll()
             Log.w(STOP_DEBUG_TAG, "Failed to show PVZ2 cards calibration picker", e)
         }
@@ -1131,9 +1164,15 @@ class PvzCalibrationFlowController(
             if (!it.isRecycled) it.recycle()
         }
         areaPickerBackgroundBitmap = null
+        closeCalibrationPreviewImage()
         if (revealOverlays) {
             ScreenshotHider.revealAll()
         }
+    }
+
+    private fun closeCalibrationPreviewImage() {
+        calibrationPreviewImage?.close()
+        calibrationPreviewImage = null
     }
 
     private fun pixelXToStoredPercent(x: Int): Int {
@@ -1193,5 +1232,7 @@ class PvzCalibrationFlowController(
     private companion object {
         const val STOP_DEBUG_TAG = "ClickerStopDebug"
         const val PLANT_SLOT_COUNT = 8
+        const val COLOR_PREVIEW_CAPTURE_DELAY_MS = 300L
+        const val COLOR_PREVIEW_CAPTURE_TIMEOUT_MS = 1200L
     }
 }

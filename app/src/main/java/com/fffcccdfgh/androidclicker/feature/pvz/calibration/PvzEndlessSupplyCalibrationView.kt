@@ -15,6 +15,7 @@ import com.fffcccdfgh.androidclicker.R
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 data class PvzCalibrationArea(
     val label: String,
@@ -29,6 +30,11 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
 
     var onSave: ((PvzCalibrationArea, List<PvzCalibrationPoint>) -> Unit)? = null
     var onCancel: (() -> Unit)? = null
+    var colorSampler: ((Int, Int) -> Int?)? = null
+        set(value) {
+            field = value
+            refreshPointPreviewColors()
+        }
 
     private val density = resources.displayMetrics.density
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
@@ -53,9 +59,9 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
     private val labelOffset = 12f * density
     private val labelPaddingX = 8f * density
     private val labelPaddingY = 5f * density
+    private val colorPreviewSize = 12f * density
+    private val colorPreviewGap = 6f * density
     private val handleRadius = 11f * density
-    private val minAreaWidth = 70f * density
-    private val minAreaHeight = 42f * density
     private val controlHeight = 40f * density
     private val controlMargin = 12f * density
     private val smallButtonWidth = 62f * density
@@ -107,6 +113,14 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
         textAlign = Paint.Align.LEFT
         isFakeBoldText = true
     }
+    private val colorPreviewPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    private val colorPreviewBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * density
+        color = 0x99FFFFFF.toInt()
+    }
     private val saveButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
         color = 0xE616A34A.toInt()
@@ -133,6 +147,7 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
         area = PvzCalibrationArea(newArea.label, RectF(newArea.rect))
         points.clear()
         points.addAll(newPoints.map { it.copy() })
+        refreshPointPreviewColors()
         selectedPointIndex = selectedPointIndex.takeIf { it in points.indices } ?: -1
         invalidate()
     }
@@ -222,6 +237,7 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
         idleHandler.removeCallbacks(showButtonsRunnable)
         onSave = null
         onCancel = null
+        colorSampler = null
     }
 
     private fun drawArea(canvas: Canvas) {
@@ -268,9 +284,15 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
     }
 
     private fun drawPointLabel(canvas: Canvas, point: PvzCalibrationPoint) {
+        val previewColor = point.previewColor
         val textWidth = labelTextPaint.measureText(point.label)
         val textHeight = labelTextPaint.textSize
-        val labelWidth = textWidth + labelPaddingX * 2f
+        val previewWidth = if (previewColor != null) {
+            colorPreviewSize + colorPreviewGap
+        } else {
+            0f
+        }
+        val labelWidth = previewWidth + textWidth + labelPaddingX * 2f
         val labelHeight = textHeight + labelPaddingY * 2f
         val aboveTop = point.y - circleRadius - labelOffset - labelHeight
         val belowTop = point.y + circleRadius + labelOffset
@@ -282,8 +304,30 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
         val left = (point.x - labelWidth / 2f).coerceIn(0f, max(0f, width.toFloat() - labelWidth))
         val rect = RectF(left, top, left + labelWidth, top + labelHeight)
         canvas.drawRoundRect(rect, 10f * density, 10f * density, labelBgPaint)
+        val textX = if (previewColor != null) {
+            val previewLeft = rect.left + labelPaddingX
+            val previewTop = rect.top + (labelHeight - colorPreviewSize) / 2f
+            colorPreviewPaint.color = previewColor
+            canvas.drawRect(
+                previewLeft,
+                previewTop,
+                previewLeft + colorPreviewSize,
+                previewTop + colorPreviewSize,
+                colorPreviewPaint
+            )
+            canvas.drawRect(
+                previewLeft,
+                previewTop,
+                previewLeft + colorPreviewSize,
+                previewTop + colorPreviewSize,
+                colorPreviewBorderPaint
+            )
+            previewLeft + colorPreviewSize + colorPreviewGap
+        } else {
+            rect.left + labelPaddingX
+        }
         val baseline = rect.top + labelPaddingY + textHeight * 0.78f
-        canvas.drawText(point.label, rect.left + labelPaddingX, baseline, labelTextPaint)
+        canvas.drawText(point.label, textX, baseline, labelTextPaint)
     }
 
     private fun drawButtons(canvas: Canvas) {
@@ -362,30 +406,44 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
 
     private fun resizeArea(corner: Corner, dx: Float, dy: Float) {
         val rect = area.rect
-        when (corner) {
-            Corner.TopLeft -> {
-                rect.left = (rect.left + dx).coerceIn(0f, rect.right - minAreaWidth)
-                rect.top = (rect.top + dy).coerceIn(0f, rect.bottom - minAreaHeight)
-            }
-            Corner.TopRight -> {
-                rect.right = (rect.right + dx).coerceIn(rect.left + minAreaWidth, width.toFloat())
-                rect.top = (rect.top + dy).coerceIn(0f, rect.bottom - minAreaHeight)
-            }
-            Corner.BottomLeft -> {
-                rect.left = (rect.left + dx).coerceIn(0f, rect.right - minAreaWidth)
-                rect.bottom = (rect.bottom + dy).coerceIn(rect.top + minAreaHeight, height.toFloat())
-            }
-            Corner.BottomRight -> {
-                rect.right = (rect.right + dx).coerceIn(rect.left + minAreaWidth, width.toFloat())
-                rect.bottom = (rect.bottom + dy).coerceIn(rect.top + minAreaHeight, height.toFloat())
-            }
-        }
+        val resized = PvzCalibrationAreaResizePolicy.resize(
+            left = rect.left,
+            top = rect.top,
+            right = rect.right,
+            bottom = rect.bottom,
+            corner = corner.toPolicyCorner(),
+            dx = dx,
+            dy = dy,
+            width = width.toFloat(),
+            height = height.toFloat()
+        )
+        rect.set(resized.left, resized.top, resized.right, resized.bottom)
     }
 
     private fun movePoint(index: Int, dx: Float, dy: Float) {
         if (index !in points.indices) return
         points[index].x = (points[index].x + dx).coerceIn(0f, (width - 1).coerceAtLeast(0).toFloat())
         points[index].y = (points[index].y + dy).coerceIn(0f, (height - 1).coerceAtLeast(0).toFloat())
+        refreshPointPreviewColor(index)
+    }
+
+    private fun refreshPointPreviewColors() {
+        for (index in points.indices) {
+            refreshPointPreviewColor(index)
+        }
+        invalidate()
+    }
+
+    private fun refreshPointPreviewColor(index: Int) {
+        val sampler = colorSampler
+        val point = points.getOrNull(index) ?: return
+        if (!PvzCalibrationPointColorPreviewPolicy.shouldShowColorPreview(point.key)) {
+            points[index] = point.copy(previewColor = null)
+            return
+        }
+        points[index] = point.copy(
+            previewColor = sampler?.invoke(point.x.roundToInt(), point.y.roundToInt())
+        )
     }
 
     private sealed class ActiveTarget {
@@ -400,6 +458,15 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
         TopRight,
         BottomLeft,
         BottomRight
+    }
+
+    private fun Corner.toPolicyCorner(): PvzCalibrationAreaCorner {
+        return when (this) {
+            Corner.TopLeft -> PvzCalibrationAreaCorner.TopLeft
+            Corner.TopRight -> PvzCalibrationAreaCorner.TopRight
+            Corner.BottomLeft -> PvzCalibrationAreaCorner.BottomLeft
+            Corner.BottomRight -> PvzCalibrationAreaCorner.BottomRight
+        }
     }
 
     companion object {

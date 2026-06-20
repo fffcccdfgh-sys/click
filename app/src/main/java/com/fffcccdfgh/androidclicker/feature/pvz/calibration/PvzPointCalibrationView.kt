@@ -20,7 +20,8 @@ data class PvzCalibrationPoint(
     val key: String,
     val label: String,
     var x: Float,
-    var y: Float
+    var y: Float,
+    val previewColor: Int? = null
 )
 
 class PvzPointCalibrationView @JvmOverloads constructor(
