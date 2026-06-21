@@ -695,7 +695,7 @@ class PvzProgramEditorController(
             ProgramLuaTemplate(
                 id = "pvz_endless_supply",
                 title = service.getString(R.string.pvz_calibration_endless_supply),
-                snippet = "endless_supply_.x, endless_supply_.y"
+                snippet = "endless_supply_ability_1.x, endless_supply_ability_1_area.left"
             )
         )
     }

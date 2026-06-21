@@ -82,8 +82,10 @@
     <string name="pvz_other_next_wave">下一波</string>
     <string name="pvz_other_switch_form">切换形态</string>
     <string name="pvz_other_calibration_saved">其他位置已校准</string>
-    <string name="pvz_endless_supply_text_area">识别框</string>
-    <string name="pvz_endless_supply_ability">能力</string>
+    <string name="pvz_endless_supply_text_area">补给界面</string>
+    <string name="pvz_endless_supply_ability_1_area">能力1</string>
+    <string name="pvz_endless_supply_ability_2_area">能力2</string>
+    <string name="pvz_endless_supply_ability_3_area">能力3</string>
     <string name="pvz_endless_supply_blue_confirm">蓝色确定</string>
     <string name="pvz_endless_supply_green_confirm">绿色确定</string>
     <string name="pvz_endless_supply_final_confirm">最后确定</string>

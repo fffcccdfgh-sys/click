@@ -19,7 +19,8 @@ import kotlin.math.roundToInt
 
 data class PvzCalibrationArea(
     val label: String,
-    val rect: RectF
+    val rect: RectF,
+    val key: String = ""
 )
 
 class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
@@ -29,6 +30,7 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     var onSave: ((PvzCalibrationArea, List<PvzCalibrationPoint>) -> Unit)? = null
+    var onSaveAreas: ((List<PvzCalibrationArea>, List<PvzCalibrationPoint>) -> Unit)? = null
     var onCancel: (() -> Unit)? = null
     var colorSampler: ((Int, Int) -> Int?)? = null
         set(value) {
@@ -44,10 +46,10 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
         invalidate()
     }
 
-    private var area = PvzCalibrationArea("", RectF())
+    private val areas = mutableListOf<PvzCalibrationArea>()
     private val points = mutableListOf<PvzCalibrationPoint>()
     private var activeTarget: ActiveTarget = ActiveTarget.None
-    private var areaSelected = false
+    private var selectedAreaIndex = -1
     private var selectedPointIndex = -1
     private var lastTouchX = 0f
     private var lastTouchY = 0f
@@ -144,17 +146,25 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
     private val cancelRect = RectF()
 
     fun setCalibration(newArea: PvzCalibrationArea, newPoints: List<PvzCalibrationPoint>) {
-        area = PvzCalibrationArea(newArea.label, RectF(newArea.rect))
+        setCalibration(listOf(newArea), newPoints)
+    }
+
+    fun setCalibration(newAreas: List<PvzCalibrationArea>, newPoints: List<PvzCalibrationPoint>) {
+        areas.clear()
+        areas.addAll(newAreas.map { PvzCalibrationArea(it.label, RectF(it.rect), it.key) })
         points.clear()
         points.addAll(newPoints.map { it.copy() })
         refreshPointPreviewColors()
+        selectedAreaIndex = selectedAreaIndex.takeIf { it in areas.indices } ?: -1
         selectedPointIndex = selectedPointIndex.takeIf { it in points.indices } ?: -1
         invalidate()
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        drawArea(canvas)
+        for ((index, area) in areas.withIndex()) {
+            drawArea(canvas, area, index)
+        }
         for ((index, point) in points.withIndex()) {
             drawPoint(canvas, point, index == selectedPointIndex)
         }
@@ -168,10 +178,17 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
             MotionEvent.ACTION_DOWN -> {
                 idleHandler.removeCallbacks(showButtonsRunnable)
                 if (buttonsVisible && saveRect.contains(event.x, event.y)) {
-                    onSave?.invoke(
-                        PvzCalibrationArea(area.label, RectF(area.rect)),
-                        points.map { it.copy() }
-                    )
+                    val savedAreas = areas.map { PvzCalibrationArea(it.label, RectF(it.rect), it.key) }
+                    val savedPoints = points.map { it.copy() }
+                    val saveAreas = onSaveAreas
+                    if (saveAreas != null) {
+                        saveAreas(savedAreas, savedPoints)
+                    } else {
+                        onSave?.invoke(
+                            savedAreas.firstOrNull() ?: PvzCalibrationArea("", RectF()),
+                            savedPoints
+                        )
+                    }
                     return true
                 }
                 if (buttonsVisible && cancelRect.contains(event.x, event.y)) {
@@ -182,24 +199,24 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
                 activeTarget = when (touchedTarget) {
                     is ActiveTarget.Point -> {
                         selectedPointIndex = touchedTarget.index
-                        areaSelected = false
+                        selectedAreaIndex = -1
                         touchedTarget
                     }
-                    ActiveTarget.Area -> {
+                    is ActiveTarget.Area -> {
                         selectedPointIndex = -1
-                        areaSelected = true
+                        selectedAreaIndex = touchedTarget.index
                         touchedTarget
                     }
                     is ActiveTarget.Corner -> {
                         selectedPointIndex = -1
-                        areaSelected = true
+                        selectedAreaIndex = touchedTarget.areaIndex
                         touchedTarget
                     }
                     ActiveTarget.None -> {
                         when {
                             selectedPointIndex in points.indices ->
                                 ActiveTarget.Point(selectedPointIndex)
-                            areaSelected -> ActiveTarget.Area
+                            selectedAreaIndex in areas.indices -> ActiveTarget.Area(selectedAreaIndex)
                             else -> ActiveTarget.None
                         }
                     }
@@ -236,21 +253,24 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
     fun cleanup() {
         idleHandler.removeCallbacks(showButtonsRunnable)
         onSave = null
+        onSaveAreas = null
         onCancel = null
         colorSampler = null
     }
 
-    private fun drawArea(canvas: Canvas) {
+    private fun drawArea(canvas: Canvas, area: PvzCalibrationArea, index: Int) {
         canvas.drawRect(area.rect, areaFillPaint)
         canvas.drawRect(area.rect, areaStrokePaint)
-        if (areaSelected || activeTarget is ActiveTarget.Area || activeTarget is ActiveTarget.Corner) {
+        if (selectedAreaIndex == index || activeTarget == ActiveTarget.Area(index) ||
+            (activeTarget as? ActiveTarget.Corner)?.areaIndex == index
+        ) {
             canvas.drawRect(area.rect, areaSelectedPaint)
         }
-        drawAreaHandles(canvas)
-        drawAreaLabel(canvas)
+        drawAreaHandles(canvas, area)
+        drawAreaLabel(canvas, area)
     }
 
-    private fun drawAreaHandles(canvas: Canvas) {
+    private fun drawAreaHandles(canvas: Canvas, area: PvzCalibrationArea) {
         val rect = area.rect
         canvas.drawCircle(rect.left, rect.top, handleRadius, handlePaint)
         canvas.drawCircle(rect.right, rect.top, handleRadius, handlePaint)
@@ -258,7 +278,7 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
         canvas.drawCircle(rect.right, rect.bottom, handleRadius, handlePaint)
     }
 
-    private fun drawAreaLabel(canvas: Canvas) {
+    private fun drawAreaLabel(canvas: Canvas, area: PvzCalibrationArea) {
         val rect = area.rect
         val textWidth = labelTextPaint.measureText(area.label)
         val textHeight = labelTextPaint.textSize
@@ -360,8 +380,8 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
 
     private fun hitTarget(x: Float, y: Float): ActiveTarget {
         hitPoint(x, y).takeIf { it >= 0 }?.let { return ActiveTarget.Point(it) }
-        hitCorner(x, y)?.let { return ActiveTarget.Corner(it) }
-        if (area.rect.contains(x, y)) return ActiveTarget.Area
+        hitCorner(x, y)?.let { return it }
+        hitArea(x, y).takeIf { it >= 0 }?.let { return ActiveTarget.Area(it) }
         return ActiveTarget.None
     }
 
@@ -376,36 +396,49 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
         return -1
     }
 
-    private fun hitCorner(x: Float, y: Float): Corner? {
-        val rect = area.rect
+    private fun hitCorner(x: Float, y: Float): ActiveTarget.Corner? {
         val hitRadius = handleRadius * 2f
-        return when {
-            abs(x - rect.left) <= hitRadius && abs(y - rect.top) <= hitRadius -> Corner.TopLeft
-            abs(x - rect.right) <= hitRadius && abs(y - rect.top) <= hitRadius -> Corner.TopRight
-            abs(x - rect.left) <= hitRadius && abs(y - rect.bottom) <= hitRadius -> Corner.BottomLeft
-            abs(x - rect.right) <= hitRadius && abs(y - rect.bottom) <= hitRadius -> Corner.BottomRight
-            else -> null
+        for (index in areas.indices.reversed()) {
+            val rect = areas[index].rect
+            when {
+                abs(x - rect.left) <= hitRadius && abs(y - rect.top) <= hitRadius ->
+                    return ActiveTarget.Corner(index, Corner.TopLeft)
+                abs(x - rect.right) <= hitRadius && abs(y - rect.top) <= hitRadius ->
+                    return ActiveTarget.Corner(index, Corner.TopRight)
+                abs(x - rect.left) <= hitRadius && abs(y - rect.bottom) <= hitRadius ->
+                    return ActiveTarget.Corner(index, Corner.BottomLeft)
+                abs(x - rect.right) <= hitRadius && abs(y - rect.bottom) <= hitRadius ->
+                    return ActiveTarget.Corner(index, Corner.BottomRight)
+            }
         }
+        return null
+    }
+
+    private fun hitArea(x: Float, y: Float): Int {
+        for (index in areas.indices.reversed()) {
+            if (areas[index].rect.contains(x, y)) return index
+        }
+        return -1
     }
 
     private fun moveActiveTarget(dx: Float, dy: Float) {
         when (val target = activeTarget) {
-            ActiveTarget.Area -> moveArea(dx, dy)
-            is ActiveTarget.Corner -> resizeArea(target.corner, dx, dy)
+            is ActiveTarget.Area -> moveArea(target.index, dx, dy)
+            is ActiveTarget.Corner -> resizeArea(target.areaIndex, target.corner, dx, dy)
             is ActiveTarget.Point -> movePoint(target.index, dx, dy)
             ActiveTarget.None -> Unit
         }
     }
 
-    private fun moveArea(dx: Float, dy: Float) {
-        val rect = area.rect
+    private fun moveArea(index: Int, dx: Float, dy: Float) {
+        val rect = areas.getOrNull(index)?.rect ?: return
         val clampedDx = dx.coerceIn(-rect.left, width.toFloat() - rect.right)
         val clampedDy = dy.coerceIn(-rect.top, height.toFloat() - rect.bottom)
         rect.offset(clampedDx, clampedDy)
     }
 
-    private fun resizeArea(corner: Corner, dx: Float, dy: Float) {
-        val rect = area.rect
+    private fun resizeArea(index: Int, corner: Corner, dx: Float, dy: Float) {
+        val rect = areas.getOrNull(index)?.rect ?: return
         val resized = PvzCalibrationAreaResizePolicy.resize(
             left = rect.left,
             top = rect.top,
@@ -448,8 +481,8 @@ class PvzEndlessSupplyCalibrationView @JvmOverloads constructor(
 
     private sealed class ActiveTarget {
         data object None : ActiveTarget()
-        data object Area : ActiveTarget()
-        data class Corner(val corner: PvzEndlessSupplyCalibrationView.Corner) : ActiveTarget()
+        data class Area(val index: Int) : ActiveTarget()
+        data class Corner(val areaIndex: Int, val corner: PvzEndlessSupplyCalibrationView.Corner) : ActiveTarget()
         data class Point(val index: Int) : ActiveTarget()
     }
 

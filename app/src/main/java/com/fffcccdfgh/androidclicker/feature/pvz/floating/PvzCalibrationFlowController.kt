@@ -996,9 +996,9 @@ class PvzCalibrationFlowController(
 
         val params = createFullScreenPickerParams()
 
-        view.setCalibration(endlessSupplyCalibrationArea(), endlessSupplyCalibrationPoints())
-        view.onSave = { area, points ->
-            saveEndlessSupplyCalibration(area, points)
+        view.setCalibration(endlessSupplyCalibrationAreas(), endlessSupplyCalibrationPoints())
+        view.onSaveAreas = { areas, points ->
+            saveEndlessSupplyCalibration(areas, points)
             hideCalibrationPickerOverlay(revealOverlays = true)
             refreshCalibrationPanelStatuses()
             Toast.makeText(service, R.string.pvz_endless_supply_calibration_saved, Toast.LENGTH_SHORT).show()
@@ -1016,27 +1016,82 @@ class PvzCalibrationFlowController(
         }
     }
 
-    private fun endlessSupplyCalibrationArea(): PvzCalibrationArea {
-        val saved = PvzCalibrationStorage.getEndlessSupplyTextArea(service)
+    private fun endlessSupplyCalibrationAreas(): List<PvzCalibrationArea> {
         val screen = currentProgramScreenSize()
-        val rect = if (saved != null) {
-            Rect(
-                storedPercentXToEdgePx(saved.left),
-                storedPercentYToEdgePx(saved.top),
-                storedPercentXToEdgePx(saved.right),
-                storedPercentYToEdgePx(saved.bottom)
-            )
-        } else {
-            Rect(
-                (screen.width * 0.38f).toInt(),
-                (screen.height * 0.22f).toInt(),
-                (screen.width * 0.62f).toInt(),
-                (screen.height * 0.34f).toInt()
+        val savedAreas = buildMap {
+            PvzCalibrationStorage.getEndlessSupplyTextArea(service)?.let {
+                put(PvzCalibrationStorage.ENDLESS_SUPPLY_TEXT_AREA, it)
+            }
+            putAll(PvzCalibrationStorage.getEndlessSupplyAbilityAreas(service))
+        }
+        return endlessSupplyAreaSpecs().map { spec ->
+            val saved = savedAreas[spec.key]
+            val rect = if (saved != null) {
+                Rect(
+                    storedPercentXToEdgePx(saved.left),
+                    storedPercentYToEdgePx(saved.top),
+                    storedPercentXToEdgePx(saved.right),
+                    storedPercentYToEdgePx(saved.bottom)
+                )
+            } else {
+                Rect(
+                    (screen.width * spec.defaultLeftFraction).toInt(),
+                    (screen.height * spec.defaultTopFraction).toInt(),
+                    (screen.width * spec.defaultRightFraction).toInt(),
+                    (screen.height * spec.defaultBottomFraction).toInt()
+                )
+            }
+            PvzCalibrationArea(
+                label = spec.label,
+                rect = android.graphics.RectF(rect),
+                key = spec.key
             )
         }
-        return PvzCalibrationArea(
-            label = service.getString(R.string.pvz_endless_supply_text_area),
-            rect = android.graphics.RectF(rect)
+    }
+
+    private data class EndlessSupplyAreaSpec(
+        val key: String,
+        val label: String,
+        val defaultLeftFraction: Float,
+        val defaultTopFraction: Float,
+        val defaultRightFraction: Float,
+        val defaultBottomFraction: Float
+    )
+
+    private fun endlessSupplyAreaSpecs(): List<EndlessSupplyAreaSpec> {
+        return listOf(
+            EndlessSupplyAreaSpec(
+                key = PvzCalibrationStorage.ENDLESS_SUPPLY_TEXT_AREA,
+                label = service.getString(R.string.pvz_endless_supply_text_area),
+                defaultLeftFraction = 0.38f,
+                defaultTopFraction = 0.22f,
+                defaultRightFraction = 0.62f,
+                defaultBottomFraction = 0.34f
+            ),
+            EndlessSupplyAreaSpec(
+                key = PvzCalibrationStorage.ENDLESS_SUPPLY_ABILITY_1_AREA,
+                label = service.getString(R.string.pvz_endless_supply_ability_1_area),
+                defaultLeftFraction = 0.22f,
+                defaultTopFraction = 0.42f,
+                defaultRightFraction = 0.38f,
+                defaultBottomFraction = 0.54f
+            ),
+            EndlessSupplyAreaSpec(
+                key = PvzCalibrationStorage.ENDLESS_SUPPLY_ABILITY_2_AREA,
+                label = service.getString(R.string.pvz_endless_supply_ability_2_area),
+                defaultLeftFraction = 0.42f,
+                defaultTopFraction = 0.42f,
+                defaultRightFraction = 0.58f,
+                defaultBottomFraction = 0.54f
+            ),
+            EndlessSupplyAreaSpec(
+                key = PvzCalibrationStorage.ENDLESS_SUPPLY_ABILITY_3_AREA,
+                label = service.getString(R.string.pvz_endless_supply_ability_3_area),
+                defaultLeftFraction = 0.62f,
+                defaultTopFraction = 0.42f,
+                defaultRightFraction = 0.78f,
+                defaultBottomFraction = 0.54f
+            )
         )
     }
 
@@ -1073,7 +1128,6 @@ class PvzCalibrationFlowController(
     private fun endlessSupplyPointSpecs(): List<EndlessSupplyPointSpec> {
         val screen = currentProgramScreenSize()
         val labels = listOf(
-            PvzCalibrationStorage.ENDLESS_SUPPLY_ABILITY to service.getString(R.string.pvz_endless_supply_ability),
             PvzCalibrationStorage.ENDLESS_SUPPLY_BLUE_CONFIRM to service.getString(R.string.pvz_endless_supply_blue_confirm),
             PvzCalibrationStorage.ENDLESS_SUPPLY_GREEN_CONFIRM to service.getString(R.string.pvz_endless_supply_green_confirm),
             PvzCalibrationStorage.ENDLESS_SUPPLY_FINAL_CONFIRM to service.getString(R.string.pvz_endless_supply_final_confirm),
@@ -1094,10 +1148,21 @@ class PvzCalibrationFlowController(
     }
 
     private fun saveEndlessSupplyCalibration(
-        area: PvzCalibrationArea,
+        areas: List<PvzCalibrationArea>,
         points: List<PvzCalibrationPoint>
     ) {
-        val rect = area.rect
+        val areasByKey = areas.associateBy { it.key }
+        val textArea = areasByKey[PvzCalibrationStorage.ENDLESS_SUPPLY_TEXT_AREA] ?: return
+        val abilityAreas = PvzCalibrationStorage.ENDLESS_SUPPLY_ABILITY_AREA_KEYS.mapNotNull { key ->
+            val rect = areasByKey[key]?.rect ?: return@mapNotNull null
+            key to PvzCalibrationStorage.Area(
+                left = pixelXToStoredPercent(rect.left.toInt()),
+                top = pixelYToStoredPercent(rect.top.toInt()),
+                right = pixelXToStoredPercent(rect.right.toInt()),
+                bottom = pixelYToStoredPercent(rect.bottom.toInt())
+            )
+        }.toMap()
+        val rect = textArea.rect
         PvzCalibrationStorage.saveEndlessSupply(
             service,
             textArea = PvzCalibrationStorage.Area(
@@ -1106,6 +1171,7 @@ class PvzCalibrationFlowController(
                 right = pixelXToStoredPercent(rect.right.toInt()),
                 bottom = pixelYToStoredPercent(rect.bottom.toInt())
             ),
+            abilityAreas = abilityAreas,
             points = points.map { point ->
                 PvzCalibrationStorage.NamedPoint(
                     key = point.key,

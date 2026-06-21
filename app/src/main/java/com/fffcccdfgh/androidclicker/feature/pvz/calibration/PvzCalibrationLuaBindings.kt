@@ -141,6 +141,28 @@ object PvzCalibrationLuaBindings : ProgramLuaGlobalRegistrar {
             )
         }
 
+        val endlessSupplyAbilityAreas = PvzCalibrationStorage.getEndlessSupplyAbilityAreas(service)
+        if (endlessSupplyAbilityAreas.isNotEmpty()) {
+            val abilityAreasTable = LuaTable()
+            val abilityCentersTable = LuaTable()
+            PvzCalibrationStorage.ENDLESS_SUPPLY_ABILITY_AREA_KEYS.zip(
+                PvzCalibrationStorage.ENDLESS_SUPPLY_ABILITY_CENTER_KEYS
+            ).forEach { (areaKey, centerKey) ->
+                val area = endlessSupplyAbilityAreas[areaKey] ?: return@forEach
+                val areaTable = areaTable(area)
+                val centerTable = pointTable(
+                    x = (area.left + area.right) / 2,
+                    y = (area.top + area.bottom) / 2
+                )
+                globals.rawset(LuaValue.valueOf(areaKey), areaTable)
+                abilityAreasTable.rawset(LuaValue.valueOf(areaKey), areaTable)
+                globals.rawset(LuaValue.valueOf(centerKey), centerTable)
+                abilityCentersTable.rawset(LuaValue.valueOf(centerKey), centerTable)
+            }
+            globals.rawset(LuaValue.valueOf("endless_supply_ability_areas"), abilityAreasTable)
+            globals.rawset(LuaValue.valueOf("endless_supply_ability_centers"), abilityCentersTable)
+        }
+
         val endlessSupplyPoints = PvzCalibrationStorage.getEndlessSupplyPoints(service)
         if (endlessSupplyPoints.isNotEmpty()) {
             val endlessSupplyTable = LuaTable()

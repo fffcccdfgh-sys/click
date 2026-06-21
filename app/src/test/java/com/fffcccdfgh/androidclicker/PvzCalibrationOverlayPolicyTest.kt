@@ -55,4 +55,39 @@ class PvzCalibrationOverlayPolicyTest {
         assertEquals(200f, resized.right, 0.001f)
         assertEquals(160f, resized.bottom, 0.001f)
     }
+
+    @Test
+    fun endlessSupplyAbilityAreasExposeSeparateCenterPointsWithoutLegacyAbilityPoint() {
+        assertEquals("endless_supply_text_area", PvzCalibrationStorage.ENDLESS_SUPPLY_TEXT_AREA)
+
+        assertEquals(
+            listOf(
+                "endless_supply_ability_1_area",
+                "endless_supply_ability_2_area",
+                "endless_supply_ability_3_area"
+            ),
+            PvzCalibrationStorage.ENDLESS_SUPPLY_ABILITY_AREA_KEYS
+        )
+
+        assertEquals(
+            listOf(
+                "endless_supply_ability_1",
+                "endless_supply_ability_2",
+                "endless_supply_ability_3"
+            ),
+            PvzCalibrationStorage.ENDLESS_SUPPLY_ABILITY_CENTER_KEYS
+        )
+
+        assertFalse(
+            PvzCalibrationStorage.ENDLESS_SUPPLY_POINT_KEYS.any {
+                it in PvzCalibrationStorage.ENDLESS_SUPPLY_ABILITY_AREA_KEYS
+            }
+        )
+        assertFalse(PvzCalibrationStorage.ENDLESS_SUPPLY_POINT_KEYS.contains("endless_supply_ability"))
+        assertFalse(
+            PvzCalibrationStorage.ENDLESS_SUPPLY_POINT_KEYS.any {
+                it in PvzCalibrationStorage.ENDLESS_SUPPLY_ABILITY_CENTER_KEYS
+            }
+        )
+    }
 }

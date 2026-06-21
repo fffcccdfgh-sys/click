@@ -196,12 +196,21 @@ end
 | Lua 变量 | 中文意思 | 类型 |
 |---|---|---|
 | `endless_supply_points` | 无尽补给相关点位表 | 表 |
-| `endless_supply_text_area` | 无尽补给识别框 | 区域 |
-| `endless_supply_ability` | 能力 | 点 |
+| `endless_supply_text_area` | 补给界面 | 区域 |
+| `endless_supply_ability_areas` | 能力1/能力2/能力3区域表 | 表 |
+| `endless_supply_ability_centers` | 能力1/能力2/能力3中心点表 | 表 |
+| `endless_supply_ability_1_area` | 能力1 | 区域 |
+| `endless_supply_ability_1` | 能力1中心点 | 点 |
+| `endless_supply_ability_2_area` | 能力2 | 区域 |
+| `endless_supply_ability_2` | 能力2中心点 | 点 |
+| `endless_supply_ability_3_area` | 能力3 | 区域 |
+| `endless_supply_ability_3` | 能力3中心点 | 点 |
 | `endless_supply_blue_confirm` | 蓝色确定 | 点 |
 | `endless_supply_green_confirm` | 绿色确定 | 点 |
 | `endless_supply_final_confirm` | 最后确定 | 点 |
 | `endless_supply_continue_challenge` | 继续挑战 | 点 |
+
+注意：旧的 `endless_supply_ability` 点位已经删除，不要再生成或使用这个变量。`endless_supply_ability_1_area`、`endless_supply_ability_2_area`、`endless_supply_ability_3_area` 是能力识别框；`endless_supply_ability_1`、`endless_supply_ability_2`、`endless_supply_ability_3` 是对应识别框的中心点。
 
 ## 手机权限授权记录
 
@@ -503,6 +512,56 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0push_all_pvz2.ps1" -Mo
 pause
 ```
 
+### 一键推送脚本故障记录
+
+如果电脑同时连接了真机和模拟器，不能直接执行 `adb shell` 或 `adb push`。否则 ADB 会报：
+
+```text
+more than one device/emulator
+```
+
+推送脚本必须先从 `adb devices` 里选出目标设备，然后所有 ADB 命令都带上 `-s <设备序列号>`。如果只有一台真机和一个模拟器，默认选择真机；如果有多台真机，让用户选择。
+
+脚本还必须检查每一条 ADB 命令的退出码。不要只在最后打印“完成”，否则可能出现实际推送失败、脚本却显示成功的情况。
+
+每次推送批量脚本前，先重建手机端 batch 目录，避免旧 Lua 或旧 manifest 残留：
+
+```powershell
+& $adb @adbTarget shell "rm -rf '$RemoteBatchDir' && mkdir -p '$RemoteBatchDir'"
+if ($LASTEXITCODE -ne 0) {
+    throw "adb shell failed."
+}
+```
+
+旧的分目录一键脚本也要遵守同样规则，例如：
+
+```text
+E:\pvz2\冰河\冰河无尽\一键下载.bat
+E:\pvz2\冰河\冰河无尽\push_batch.ps1
+```
+
+`push_batch.ps1` 里不要裸调用 `adb shell`、`adb push`。统一封装成带设备参数和失败检查的调用：
+
+```powershell
+$adbTarget = @("-s", $targetDevice)
+
+function Invoke-AdbChecked([string[]]$AdbArgs) {
+    & $adb @adbTarget @AdbArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "ADB command failed: adb $($adbTarget -join ' ') $($AdbArgs -join ' ')"
+    }
+}
+```
+
+如果 `.ps1` 使用中文提示语，文件必须保存为 UTF-8 with BOM；否则 Windows PowerShell 5 可能把中文字符串解析坏。为了更稳，推送脚本里的提示语可以直接使用英文或 ASCII。
+
+推送后可以用下面命令确认手机端目录真的有新 batch：
+
+```powershell
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" -s <设备序列号> shell ls -l /sdcard/Android/data/com.fffcccdfgh.androidclicker/files/sync/batch
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" -s <设备序列号> shell cat /sdcard/Android/data/com.fffcccdfgh.androidclicker/files/sync/batch/pvz2_batch.json
+```
+
 ## 给脚本 AI 的生成要求
 
 1. 生成 Lua 脚本时，优先使用本文档里的校准变量。
@@ -511,3 +570,7 @@ pause
 4. 批量推送时，`batchId` 每次必须变化。
 5. 用户只想添加或覆盖脚本时，用 `mode = "merge"`。
 6. 用户想删除手机旧脚本并只保留本批次脚本时，用 `mode = "replace_all"`。
+7. 所有 `adb shell`、`adb push` 都必须带 `-s <设备序列号>`，不能裸调用 `adb`。
+8. 每条 ADB 命令执行后都必须检查 `$LASTEXITCODE`，失败就 `throw`，不能继续显示完成。
+9. 推送前必须重建 `/sdcard/Android/data/com.fffcccdfgh.androidclicker/files/sync/batch`。
+10. 电脑同时连接真机和模拟器时，优先选择真机；如果无法唯一判断，让用户选择设备。

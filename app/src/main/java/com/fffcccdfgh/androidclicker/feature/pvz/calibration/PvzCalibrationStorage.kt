@@ -20,6 +20,22 @@ object PvzCalibrationStorage {
     const val OTHER = "other"
     const val ENDLESS_SUPPLY = "endless_supply"
     const val ENDLESS_SUPPLY_TEXT_AREA = "endless_supply_text_area"
+    const val ENDLESS_SUPPLY_ABILITY_1_AREA = "endless_supply_ability_1_area"
+    const val ENDLESS_SUPPLY_ABILITY_2_AREA = "endless_supply_ability_2_area"
+    const val ENDLESS_SUPPLY_ABILITY_3_AREA = "endless_supply_ability_3_area"
+    val ENDLESS_SUPPLY_ABILITY_AREA_KEYS = listOf(
+        ENDLESS_SUPPLY_ABILITY_1_AREA,
+        ENDLESS_SUPPLY_ABILITY_2_AREA,
+        ENDLESS_SUPPLY_ABILITY_3_AREA
+    )
+    const val ENDLESS_SUPPLY_ABILITY_1 = "endless_supply_ability_1"
+    const val ENDLESS_SUPPLY_ABILITY_2 = "endless_supply_ability_2"
+    const val ENDLESS_SUPPLY_ABILITY_3 = "endless_supply_ability_3"
+    val ENDLESS_SUPPLY_ABILITY_CENTER_KEYS = listOf(
+        ENDLESS_SUPPLY_ABILITY_1,
+        ENDLESS_SUPPLY_ABILITY_2,
+        ENDLESS_SUPPLY_ABILITY_3
+    )
     const val SUN_BUY_KEY = "sun_buy_key"
     const val SUN_AD = "sun_ad"
     const val SUN_10_DIAMOND = "sun_10_diamond"
@@ -92,13 +108,11 @@ object PvzCalibrationStorage {
         OTHER_NEXT_WAVE,
         OTHER_SWITCH_FORM
     )
-    const val ENDLESS_SUPPLY_ABILITY = "endless_supply_ability"
     const val ENDLESS_SUPPLY_BLUE_CONFIRM = "endless_supply_blue_confirm"
     const val ENDLESS_SUPPLY_GREEN_CONFIRM = "endless_supply_green_confirm"
     const val ENDLESS_SUPPLY_FINAL_CONFIRM = "endless_supply_final_confirm"
     const val ENDLESS_SUPPLY_CONTINUE_CHALLENGE = "endless_supply_continue_challenge"
     val ENDLESS_SUPPLY_POINT_KEYS = listOf(
-        ENDLESS_SUPPLY_ABILITY,
         ENDLESS_SUPPLY_BLUE_CONFIRM,
         ENDLESS_SUPPLY_GREEN_CONFIRM,
         ENDLESS_SUPPLY_FINAL_CONFIRM,
@@ -137,6 +151,7 @@ object PvzCalibrationStorage {
         }
         if (key == ENDLESS_SUPPLY) {
             return getEndlessSupplyTextArea(context) != null &&
+                getEndlessSupplyAbilityAreas(context).size == ENDLESS_SUPPLY_ABILITY_AREA_KEYS.size &&
                 getEndlessSupplyPoints(context).size == ENDLESS_SUPPLY_POINT_KEYS.size
         }
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -308,11 +323,23 @@ object PvzCalibrationStorage {
         return getNamedPoints(context, OTHER, OTHER_POINT_KEYS)
     }
 
-    fun saveEndlessSupply(context: Context, textArea: Area, points: List<NamedPoint>) {
+    fun saveEndlessSupply(
+        context: Context,
+        textArea: Area,
+        points: List<NamedPoint>,
+        abilityAreas: Map<String, Area> = emptyMap()
+    ) {
         if (textArea.right <= textArea.left || textArea.bottom <= textArea.top) return
         if (points.size != ENDLESS_SUPPLY_POINT_KEYS.size) return
         val pointsByKey = points.associateBy { it.key }
         if (ENDLESS_SUPPLY_POINT_KEYS.any { it !in pointsByKey }) return
+        if (ENDLESS_SUPPLY_ABILITY_AREA_KEYS.any { key ->
+                val area = abilityAreas[key]
+                area == null || area.right <= area.left || area.bottom <= area.top
+            }
+        ) {
+            return
+        }
 
         val editor = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
             .putBoolean(ENDLESS_SUPPLY, true)
@@ -321,6 +348,17 @@ object PvzCalibrationStorage {
             .putInt("${ENDLESS_SUPPLY_TEXT_AREA}_top", textArea.top)
             .putInt("${ENDLESS_SUPPLY_TEXT_AREA}_right", textArea.right)
             .putInt("${ENDLESS_SUPPLY_TEXT_AREA}_bottom", textArea.bottom)
+        ENDLESS_SUPPLY_ABILITY_AREA_KEYS.forEach { key ->
+            val area = abilityAreas[key]
+            if (area != null && area.right > area.left && area.bottom > area.top) {
+                editor
+                    .putBoolean(key, true)
+                    .putInt("${key}_left", area.left)
+                    .putInt("${key}_top", area.top)
+                    .putInt("${key}_right", area.right)
+                    .putInt("${key}_bottom", area.bottom)
+            }
+        }
         ENDLESS_SUPPLY_POINT_KEYS.forEach { key ->
             val point = pointsByKey.getValue(key)
             editor
@@ -332,6 +370,12 @@ object PvzCalibrationStorage {
 
     fun getEndlessSupplyTextArea(context: Context): Area? {
         return getArea(context, ENDLESS_SUPPLY_TEXT_AREA)
+    }
+
+    fun getEndlessSupplyAbilityAreas(context: Context): Map<String, Area> {
+        return ENDLESS_SUPPLY_ABILITY_AREA_KEYS.mapNotNull { key ->
+            getArea(context, key)?.let { area -> key to area }
+        }.toMap()
     }
 
     fun getEndlessSupplyPoints(context: Context): List<NamedPoint> {
