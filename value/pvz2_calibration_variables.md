@@ -210,7 +210,7 @@ end
 | `endless_supply_final_confirm` | 最后确定 | 点 |
 | `endless_supply_continue_challenge` | 继续挑战 | 点 |
 
-注意：旧的 `endless_supply_ability` 点位已经删除，不要再生成或使用这个变量。`endless_supply_ability_1_area`、`endless_supply_ability_2_area`、`endless_supply_ability_3_area` 是能力识别框；`endless_supply_ability_1`、`endless_supply_ability_2`、`endless_supply_ability_3` 是对应识别框的中心点。
+能力区域变量表示能力识别框；能力中心点变量表示对应识别框的中心点。
 
 ## 手机权限授权记录
 
@@ -533,7 +533,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 ```
 
-旧的分目录一键脚本也要遵守同样规则，例如：
+分目录一键脚本也要遵守同样规则，例如：
 
 ```text
 E:\pvz2\冰河\冰河无尽\一键下载.bat
