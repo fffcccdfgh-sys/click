@@ -97,11 +97,6 @@ object ProgramLuaAssist {
                 snippet = "if check_text(\"$textPlaceholder\", 0.00, 0.00, 100.00, 100.00) then\ntap(50.00, 50.00)\nend"
             ),
             ProgramLuaTemplate(
-                id = "ocr_text_tap",
-                title = "OCR\u6587\u5B57\u51FA\u73B0\u5C31\u70B9\u51FB",
-                snippet = "if ocr_text(\"$textPlaceholder\", 0.00, 0.00, 100.00, 100.00) then\ntap(50.00, 50.00)\nend"
-            ),
-            ProgramLuaTemplate(
                 id = "check_text_not_tap",
                 title = "\u6587\u5B57\u6CA1\u51FA\u73B0\u5C31\u70B9\u51FB",
                 snippet = "if check_text_not(\"$textPlaceholder\", 0.00, 0.00, 100.00, 100.00) then\ntap(50.00, 50.00)\nend"

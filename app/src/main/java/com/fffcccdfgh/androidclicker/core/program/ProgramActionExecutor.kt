@@ -121,34 +121,6 @@ object ProgramActionExecutor {
                         )
                     }
                 })
-                globals.rawset(LuaValue.valueOf("ocr_text"), object : VarArgFunction() {
-                    override fun invoke(args: Varargs): Varargs {
-                        val screen = currentScreenSize(service)
-                        return LuaValue.valueOf(
-                            ClickerBridge.ocrText(
-                                args.arg(1).tojstring(),
-                                ProgramCoordinateAdapter.xArgToEdgePx(args.arg(2), screen.width),
-                                ProgramCoordinateAdapter.yArgToEdgePx(args.arg(3), screen.height),
-                                ProgramCoordinateAdapter.xArgToEdgePx(args.arg(4), screen.width),
-                                ProgramCoordinateAdapter.yArgToEdgePx(args.arg(5), screen.height)
-                            )
-                        )
-                    }
-                })
-                globals.rawset(LuaValue.valueOf("ocr_text_not"), object : VarArgFunction() {
-                    override fun invoke(args: Varargs): Varargs {
-                        val screen = currentScreenSize(service)
-                        return LuaValue.valueOf(
-                            ClickerBridge.ocrTextNot(
-                                args.arg(1).tojstring(),
-                                ProgramCoordinateAdapter.xArgToEdgePx(args.arg(2), screen.width),
-                                ProgramCoordinateAdapter.yArgToEdgePx(args.arg(3), screen.height),
-                                ProgramCoordinateAdapter.xArgToEdgePx(args.arg(4), screen.width),
-                                ProgramCoordinateAdapter.yArgToEdgePx(args.arg(5), screen.height)
-                            )
-                        )
-                    }
-                })
                 globals.rawset(LuaValue.valueOf("parallel"), object : VarArgFunction() {
                     override fun invoke(args: Varargs): Varargs {
                         val n = args.narg()

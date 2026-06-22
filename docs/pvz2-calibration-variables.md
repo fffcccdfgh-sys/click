@@ -48,8 +48,6 @@ pvz2_沙滩无尽.lua -> 手机脚本名：沙滩无尽
 | `check_color_not("#RRGGBB", tolerance, x, y)` | 检测某点颜色是否不匹配，`tolerance` 是 0-100 容差百分比 |
 | `check_text("文字", left, top, right, bottom)` | 检测区域内是否出现文字，推荐新脚本使用 |
 | `check_text_not("文字", left, top, right, bottom)` | 检测区域内是否没有文字 |
-| `ocr_text("文字", left, top, right, bottom)` | 兼容旧脚本的 OCR 文字检测 |
-| `ocr_text_not("文字", left, top, right, bottom)` | 兼容旧脚本的 OCR 文字未出现检测 |
 | `parallel(function() ... end, function() ... end)` | 并行执行多个函数 |
 
 文字检测会截取当前屏幕区域；支持的 arm64 真机优先使用离线 PaddleOCR，设备不适合或引擎不可用时会回退到 ML Kit。

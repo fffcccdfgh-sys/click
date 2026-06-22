@@ -1,9 +1,6 @@
 package com.fffcccdfgh.androidclicker.core.execution
 
-import android.graphics.Rect
 import com.fffcccdfgh.androidclicker.core.accessibility.ClickAccessibilityService
-import com.fffcccdfgh.androidclicker.core.ocr.OcrHelper
-import com.fffcccdfgh.androidclicker.core.screencapture.ScreenCaptureManager
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -130,35 +127,6 @@ object ClickerBridge {
         }
     }
 
-    @JvmStatic
-    fun ocrText(text: String, left: Int, top: Int, right: Int, bottom: Int): Boolean {
-        checkStopped()
-        if (!ClickAccessibilityService.isRunning) return false
-        val service = ClickAccessibilityService.instance ?: return false
-        ScreenCaptureManager.refreshDisplayMetrics(service)
-        if (!ScreenCaptureManager.isReady) return false
-        return OcrHelper.detectText(
-            targetText = text,
-            area = Rect(left, top, right, bottom),
-            screenWidth = ScreenCaptureManager.getCaptureWidth(),
-            screenHeight = ScreenCaptureManager.getCaptureHeight()
-        )
-    }
-
-    @JvmStatic
-    fun ocrTextNot(text: String, left: Int, top: Int, right: Int, bottom: Int): Boolean {
-        checkStopped()
-        if (!ClickAccessibilityService.isRunning) return false
-        val service = ClickAccessibilityService.instance ?: return false
-        ScreenCaptureManager.refreshDisplayMetrics(service)
-        if (!ScreenCaptureManager.isReady) return false
-        return !OcrHelper.detectText(
-            targetText = text,
-            area = Rect(left, top, right, bottom),
-            screenWidth = ScreenCaptureManager.getCaptureWidth(),
-            screenHeight = ScreenCaptureManager.getCaptureHeight()
-        )
-    }
 }
 
 /** Thrown when execution is stopped by the user. */

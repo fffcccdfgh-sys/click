@@ -55,7 +55,6 @@ class ProgramLuaAssistTest {
                 "wait",
                 "loop_forever",
                 "check_text_tap",
-                "ocr_text_tap",
                 "check_text_not_tap",
                 "check_color_tap",
                 "parallel",

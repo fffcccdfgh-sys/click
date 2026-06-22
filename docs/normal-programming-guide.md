@@ -175,9 +175,7 @@ end
 
 注意：
 
-- 新脚本不要主动使用 `ocr_text` 或 `ocr_text_not`。
-- `ocr_text`、`ocr_text_not` 只作为旧脚本兼容方法存在。
-- AI 帮用户写普通脚本时，文字检测只推荐 `check_text` / `check_text_not`。
+- AI 帮用户写普通脚本时，文字检测统一使用 `check_text` / `check_text_not`。
 - 当前版本在支持的 arm64 真机上优先使用离线 PaddleOCR；如果设备不适合或引擎不可用，会回退到 ML Kit。识别输入是原始截图裁剪，没有灰度、黑白或反色滤镜。
 - 每次调用都会截取当时的游戏画面，因此可以检测动态变化的文字。
 - 第一次文字检测可能需要初始化 OCR；后续检测通常更快。
@@ -491,7 +489,6 @@ AI 帮用户写普通脚本时必须遵守：
 - 点击使用 `tap(x, y)` 或 `tap(x, y, durationMs)`。
 - 滑动使用 `swipe(sx, sy, ex, ey, durationMs)`，建议写第五个参数。
 - 文字检测只推荐 `check_text` 和 `check_text_not`。
-- 不主动使用 `ocr_text` 和 `ocr_text_not`，除非用户明确要求兼容旧脚本。
 - 颜色检测使用 `check_color` 和 `check_color_not`。
 - 所有长循环都必须包含 `wait(...)`。
 - 如果用户要同时做两个或更多动作，使用 `parallel(function() ... end, function() ... end)`。
