@@ -32,22 +32,27 @@ pvz2_沙滩无尽.lua -> 手机脚本名：沙滩无尽
 区域.bottom
 ```
 
+校准变量只有在对应校准项保存后才会注册到 Lua 里。比如没有完成“无尽补给相关”校准时，
+`endless_supply_...` 这一组变量不会存在。写脚本前应提醒用户先完成脚本会用到的校准项。
+
 ## 常用函数
 
 | 函数 | 含义 |
 |---|---|
-| `tap(x, y)` | 点击坐标 |
+| `tap(x, y)` | 点击坐标，默认按住 1ms |
 | `tap(x, y, durationMs)` | 按住点击，第三个参数是按住毫秒数 |
-| `swipe(x1, y1, x2, y2)` | 滑动 |
+| `swipe(x1, y1, x2, y2)` | 滑动，默认持续 300ms |
 | `swipe(x1, y1, x2, y2, durationMs)` | 指定时长滑动 |
 | `wait(ms)` | 等待毫秒 |
-| `check_color("#RRGGBB", tolerance, x, y)` | 检测某点颜色是否匹配 |
-| `check_color_not("#RRGGBB", tolerance, x, y)` | 检测某点颜色是否不匹配 |
-| `check_text("文字", left, top, right, bottom)` | 检测区域内是否出现文字 |
+| `check_color("#RRGGBB", tolerance, x, y)` | 检测某点颜色是否匹配，`tolerance` 是 0-100 容差百分比 |
+| `check_color_not("#RRGGBB", tolerance, x, y)` | 检测某点颜色是否不匹配，`tolerance` 是 0-100 容差百分比 |
+| `check_text("文字", left, top, right, bottom)` | 检测区域内是否出现文字，推荐新脚本使用 |
 | `check_text_not("文字", left, top, right, bottom)` | 检测区域内是否没有文字 |
-| `ocr_text("文字", left, top, right, bottom)` | OCR 检测区域内是否出现文字 |
-| `ocr_text_not("文字", left, top, right, bottom)` | OCR 检测区域内是否没有文字 |
+| `ocr_text("文字", left, top, right, bottom)` | 兼容旧脚本的 OCR 文字检测 |
+| `ocr_text_not("文字", left, top, right, bottom)` | 兼容旧脚本的 OCR 文字未出现检测 |
 | `parallel(function() ... end, function() ... end)` | 并行执行多个函数 |
+
+文字检测会截取当前屏幕区域；支持的 arm64 真机优先使用离线 PaddleOCR，设备不适合或引擎不可用时会回退到 ML Kit。
 
 示例：
 
@@ -60,7 +65,7 @@ if check_color("#FF0000", 10, final_wave_red.x, final_wave_red.y) then
     tap(other_next_wave.x, other_next_wave.y)
 end
 
-if ocr_text("最后一波", final_wave_text_area.left, final_wave_text_area.top, final_wave_text_area.right, final_wave_text_area.bottom) then
+if check_text("最后一波", final_wave_text_area.left, final_wave_text_area.top, final_wave_text_area.right, final_wave_text_area.bottom) then
     tap(other_next_wave.x, other_next_wave.y)
 end
 ```
@@ -482,6 +487,9 @@ Write-Host "Mode: $Mode"
 Write-Host "Scripts: $($scripts.Count)"
 
 & $adb @adbTarget shell "rm -rf '$RemoteBatchDir' && mkdir -p '$RemoteBatchDir'" | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    throw "adb shell failed."
+}
 & $adb @adbTarget push "$tempBatch\." $RemoteBatchDir | Out-Null
 
 if ($LASTEXITCODE -ne 0) {
@@ -526,7 +534,7 @@ pause
 more than one device/emulator
 ```
 
-推送脚本必须先从 `adb devices` 里选出目标设备，然后所有 ADB 命令都带上 `-s <设备序列号>`。如果只有一台真机和一个模拟器，默认选择真机；如果有多台真机，让用户选择。
+推送脚本必须先从 `adb devices` 里选出目标设备，然后所有 ADB 命令都带上 `-s <设备序列号>`。如果检测到多台设备，就列出来让用户选择。
 
 脚本还必须检查每一条 ADB 命令的退出码。不要只在最后打印“完成”，否则可能出现实际推送失败、脚本却显示成功的情况。
 
@@ -579,4 +587,4 @@ function Invoke-AdbChecked([string[]]$AdbArgs) {
 7. 所有 `adb shell`、`adb push` 都必须带 `-s <设备序列号>`，不能裸调用 `adb`。
 8. 每条 ADB 命令执行后都必须检查 `$LASTEXITCODE`，失败就 `throw`，不能继续显示完成。
 9. 推送前必须重建 `/sdcard/Android/data/com.fffcccdfgh.androidclicker/files/sync/batch`。
-10. 电脑同时连接真机和模拟器时，优先选择真机；如果无法唯一判断，让用户选择设备。
+10. 电脑同时连接多个设备时，让用户选择目标设备。
