@@ -1,0 +1,91 @@
+name: Bug report
+description: Report a reproducible problem with Click.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Do not include private screenshots,
+        signing keys, passwords, tokens, account data, or scripts you do not
+        have permission to share.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+      placeholder: Describe the bug in one or two sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the shortest steps that reproduce the problem.
+      placeholder: |
+        1. Open ...
+        2. Tap ...
+        3. Run ...
+        4. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect Click to do?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened?
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: App version or commit
+      placeholder: "Example: 1.0, debug build, or commit SHA"
+  - type: input
+    id: android-device
+    attributes:
+      label: Android device
+      placeholder: "Example: Pixel 8, Xiaomi Pad, emulator"
+  - type: input
+    id: android-version
+    attributes:
+      label: Android version
+      placeholder: "Example: Android 14"
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - General clicker
+        - Floating window
+        - Accessibility gestures
+        - Screen capture
+        - OCR
+        - Lua scripting
+        - PVZ2 scripts/calibration
+        - Build/install
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste only non-sensitive logs. Redact package names, account names, paths, or screen content if needed.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I have removed secrets, private screenshots, and account data from this report.
+          required: true
+        - label: This report is about Click itself, not help bypassing another app or service.
+          required: true

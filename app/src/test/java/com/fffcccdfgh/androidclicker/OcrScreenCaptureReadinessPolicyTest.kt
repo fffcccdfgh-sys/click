@@ -1,5 +1,7 @@
 package com.fffcccdfgh.androidclicker
 
+import com.fffcccdfgh.androidclicker.core.execution.ActionStep
+import com.fffcccdfgh.androidclicker.core.ocr.OcrScreenCaptureReadinessPolicy
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

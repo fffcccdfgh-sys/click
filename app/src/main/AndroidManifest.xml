@@ -4,6 +4,8 @@
 
     <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE"
         tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
@@ -19,7 +21,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Click">
         <activity
-            android:name=".MainActivity"
+            android:name=".app.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -29,19 +31,19 @@
         </activity>
 
         <activity
-            android:name=".ScriptListActivity"
+            android:name=".feature.clicker.ScriptListActivity"
             android:exported="false" />
 
         <activity
-            android:name=".PvzGameScriptActivity"
+            android:name=".feature.pvz.PvzGameScriptActivity"
             android:exported="false" />
 
         <activity
-            android:name=".PvzScriptListActivity"
+            android:name=".feature.pvz.PvzScriptListActivity"
             android:exported="false" />
 
         <activity
-            android:name=".ScreenCapturePermissionActivity"
+            android:name=".core.screencapture.ScreenCapturePermissionActivity"
             android:exported="false"
             android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
@@ -57,12 +59,12 @@
         </provider>
 
         <service
-            android:name=".ScreenCaptureForegroundService"
+            android:name=".core.screencapture.ScreenCaptureForegroundService"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
         <service
-            android:name=".ClickAccessibilityService"
+            android:name=".core.accessibility.ClickAccessibilityService"
             android:exported="true"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
@@ -74,7 +76,7 @@
         </service>
 
         <service
-            android:name=".FloatingControlService"
+            android:name=".feature.clicker.floating.FloatingControlService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <property
@@ -83,7 +85,7 @@
         </service>
 
         <service
-            android:name=".RunFloatingControlService"
+            android:name=".feature.clicker.floating.RunFloatingControlService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <property
@@ -92,7 +94,7 @@
         </service>
 
         <service
-            android:name=".PvzFloatingControlService"
+            android:name=".feature.pvz.floating.PvzFloatingControlService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <property

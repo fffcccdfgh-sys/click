@@ -1,5 +1,9 @@
 package com.fffcccdfgh.androidclicker
 
+import com.fffcccdfgh.androidclicker.core.screencapture.ScreenCaptureForegroundService
+import com.fffcccdfgh.androidclicker.feature.clicker.floating.FloatingControlService
+import com.fffcccdfgh.androidclicker.feature.clicker.floating.RunFloatingControlService
+import com.fffcccdfgh.androidclicker.feature.pvz.floating.PvzFloatingControlService
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 import org.junit.Assert.assertFalse
@@ -28,14 +32,14 @@ class AndroidManifestForegroundServiceTypeTest {
         }
 
         assertTrue(
-            serviceTypesByName.getValue(".ScreenCaptureForegroundService")
+            serviceTypesByName.getValue(".core.screencapture.ScreenCaptureForegroundService")
                 .split('|')
                 .contains("mediaProjection")
         )
         listOf(
-            ".FloatingControlService",
-            ".RunFloatingControlService",
-            ".PvzFloatingControlService"
+            ".feature.clicker.floating.FloatingControlService",
+            ".feature.clicker.floating.RunFloatingControlService",
+            ".feature.pvz.floating.PvzFloatingControlService"
         ).forEach { serviceName ->
             assertFalse(
                 "$serviceName must not request mediaProjection foreground service type",

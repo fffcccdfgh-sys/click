@@ -1,10 +1,25 @@
 package com.fffcccdfgh.androidclicker
 
+import com.fffcccdfgh.androidclicker.core.ocr.OcrAreaMapper
+import com.fffcccdfgh.androidclicker.core.ocr.OcrImageCropper
+import java.io.File
 import java.nio.ByteBuffer
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OcrImageCropperTest {
+    @Test
+    fun packedRgbaCropUsesRowBulkCopyFastPath() {
+        val source = file("app/src/main/java/com/fffcccdfgh/androidclicker/core/ocr/OcrImageCropper.kt")
+            .readText()
+        val packedFastPathFunction = source.substringAfter("private fun copyPackedRgbaRowsToBuffer")
+
+        assertTrue(packedFastPathFunction.contains("packed.put(row)"))
+        assertFalse(packedFastPathFunction.contains("for (x in 0 until area.width)"))
+    }
+
     @Test
     fun copiesRequestedAreaToPackedRgbaBuffer() {
         val sourceWidth = 4
@@ -43,45 +58,13 @@ class OcrImageCropperTest {
         )
     }
 
-    @Test
-    fun copiesOnlyRequestedAreaFromPaddedRgbaBuffer() {
-        val sourceWidth = 4
-        val sourceHeight = 3
-        val pixelStride = 4
-        val rowStride = 20
-        val buffer = ByteBuffer.allocate(rowStride * sourceHeight)
-
-        for (y in 0 until sourceHeight) {
-            for (x in 0 until sourceWidth) {
-                val offset = y * rowStride + x * pixelStride
-                buffer.put(offset, (10 + x).toByte())
-                buffer.put(offset + 1, (20 + y).toByte())
-                buffer.put(offset + 2, (30 + x + y).toByte())
-                buffer.put(offset + 3, 0xFF.toByte())
-            }
+    private fun file(path: String): File {
+        val cwd = File(System.getProperty("user.dir") ?: ".")
+        val root = if (File(cwd, "settings.gradle.kts").exists()) {
+            cwd
+        } else {
+            cwd.parentFile!!
         }
-
-        val pixels = OcrImageCropper.copyRgbaCropToArgbPixels(
-            buffer = buffer,
-            rowStride = rowStride,
-            pixelStride = pixelStride,
-            area = OcrAreaMapper.Area(left = 1, top = 1, right = 4, bottom = 3)
-        )
-
-        assertArrayEquals(
-            intArrayOf(
-                argb(11, 21, 32),
-                argb(12, 21, 33),
-                argb(13, 21, 34),
-                argb(11, 22, 33),
-                argb(12, 22, 34),
-                argb(13, 22, 35)
-            ),
-            pixels
-        )
-    }
-
-    private fun argb(red: Int, green: Int, blue: Int): Int {
-        return (0xFF shl 24) or (red shl 16) or (green shl 8) or blue
+        return File(root, path)
     }
 }

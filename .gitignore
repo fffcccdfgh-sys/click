@@ -19,6 +19,14 @@ docs/superpowers/
 key/
 /key
 *.apk
+*.aab
+*.idsig
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.log
 app/release/
 output/imagegen/
 .codegraph/

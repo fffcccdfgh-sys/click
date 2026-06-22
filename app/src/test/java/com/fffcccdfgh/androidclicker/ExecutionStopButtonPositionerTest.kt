@@ -1,5 +1,11 @@
 package com.fffcccdfgh.androidclicker
 
+import com.fffcccdfgh.androidclicker.core.execution.ExecutionOverlayWindowPolicy
+import com.fffcccdfgh.androidclicker.core.execution.ExecutionStopButtonPositionPrefs
+import com.fffcccdfgh.androidclicker.core.execution.ExecutionStopButtonPositioner
+import com.fffcccdfgh.androidclicker.core.execution.ExecutionStopButtonTouchState
+import com.fffcccdfgh.androidclicker.core.execution.StopButtonTouchDecision
+import com.fffcccdfgh.androidclicker.core.execution.StopButtonTouchMode
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

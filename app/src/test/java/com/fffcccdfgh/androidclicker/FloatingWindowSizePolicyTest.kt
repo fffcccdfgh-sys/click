@@ -1,5 +1,7 @@
 package com.fffcccdfgh.androidclicker
 
+import com.fffcccdfgh.androidclicker.core.overlay.FloatingWindowSize
+import com.fffcccdfgh.androidclicker.core.overlay.FloatingWindowSizePolicy
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

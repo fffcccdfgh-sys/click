@@ -1,0 +1,57 @@
+name: Feature request
+description: Suggest a practical improvement for Click.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please keep requests focused on legitimate local automation use. Do not
+        request behavior that steals data, bypasses access controls, or clearly
+        violates another app or service.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem would this feature solve?
+      placeholder: Describe the workflow that is currently hard or impossible.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should Click do?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - General clicker
+        - Floating window
+        - Accessibility gestures
+        - Screen capture
+        - OCR
+        - Lua scripting
+        - PVZ2 scripts/calibration
+        - Build/install
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or different designs have you considered?
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: This feature does not require uploading private screen content or user data.
+          required: true
+        - label: This feature is not intended to bypass another app's access controls.
+          required: true

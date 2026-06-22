@@ -1,0 +1,299 @@
+package com.fffcccdfgh.androidclicker.core.ocr
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Rect
+import android.os.SystemClock
+import android.util.Log
+import com.fffcccdfgh.androidclicker.core.screencapture.ScreenCaptureManager
+import java.util.concurrent.atomic.AtomicBoolean
+
+/**
+ * Optical Character Recognition helper using PaddleOCR on supported arm64 devices with ML Kit fallback.
+ */
+object OcrHelper {
+    private const val TAG = "OcrHelper"
+    private const val WARM_UP_BITMAP_SIZE = 32
+
+    private val warmUpStarted = AtomicBoolean(false)
+    private var lastPaddleUnavailableReason: String? = null
+    private var lastMlKitUnavailableReason: String? = null
+
+    var debugContext: Context? = null
+        set(value) {
+            field = value?.applicationContext
+        }
+
+    /**
+     * Run OCR on the current screen and search for [targetText] within [area].
+     * Returns true if the text is found (case-sensitive partial match).
+     */
+    fun detectText(
+        targetText: String,
+        area: Rect?,
+        screenWidth: Int,
+        screenHeight: Int
+    ): Boolean {
+        if (targetText.isEmpty()) return true
+        Log.d(
+            TAG,
+            "detectText start: targetLength=${targetText.length} area=${area?.toShortString() ?: "full"} " +
+                "screen=${screenWidth}x${screenHeight}"
+        )
+        val bitmap = captureAreaBitmap(
+            area = area,
+            screenWidth = screenWidth,
+            screenHeight = screenHeight
+        ) ?: run {
+            Log.d(TAG, "detectText skipped: capture returned null")
+            return false
+        }
+        try {
+            val recognizedText = processBitmapText(bitmap)
+            val exactMatch = recognizedText.contains(targetText)
+            val looseMatch = OcrTextMatcher.matches(
+                recognizedText = recognizedText,
+                targetText = targetText
+            )
+            Log.d(
+                TAG,
+                "detectText bitmap=${bitmap.width}x${bitmap.height} " +
+                    "recognizedLength=${recognizedText.length} exactMatch=$exactMatch looseMatch=$looseMatch"
+            )
+            if (looseMatch) {
+                Log.d(TAG, "detectText result: matched=true")
+                return true
+            }
+            Log.d(TAG, "detectText result: matched=false")
+            saveDebugCrop(bitmap, recognizedText)
+            return false
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    fun recognizeText(
+        area: Rect?,
+        screenWidth: Int,
+        screenHeight: Int,
+        captureTimeoutMs: Long = OcrTimingPolicy.DEFAULT_CAPTURE_TIMEOUT_MS
+    ): String {
+        Log.d(
+            TAG,
+            "recognizeText start: area=${area?.toShortString() ?: "full"} " +
+                "screen=${screenWidth}x${screenHeight} timeout=${captureTimeoutMs}ms"
+        )
+        val bitmap = captureAreaBitmap(
+            area = area,
+            screenWidth = screenWidth,
+            screenHeight = screenHeight,
+            timeoutMs = captureTimeoutMs
+        ) ?: return ""
+        return try {
+            val text = recognizeTextFromBitmap(bitmap)
+            Log.d(
+                TAG,
+                "recognizeText result: bitmap=${bitmap.width}x${bitmap.height} " +
+                    "recognizedLength=${text.length}"
+            )
+            text
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    fun captureAreaBitmap(
+        area: Rect?,
+        screenWidth: Int,
+        screenHeight: Int,
+        timeoutMs: Long = OcrTimingPolicy.DEFAULT_CAPTURE_TIMEOUT_MS
+    ): Bitmap? {
+        if (!ScreenCaptureManager.isReady) {
+            Log.d(TAG, "OCR skipped: screen capture is not ready")
+            return null
+        }
+
+        val image = ScreenCaptureManager.captureFrameSync(timeoutMs) ?: run {
+            Log.d(TAG, "OCR skipped: failed to capture a frame")
+            return null
+        }
+        return try {
+            // Log resolution mismatch between capture and requested screen dimensions
+            if (image.width != screenWidth || image.height != screenHeight) {
+                Log.w(
+                    TAG,
+                    "captureAreaBitmap resolution mismatch: " +
+                        "capture=${image.width}x${image.height} vs requested=${screenWidth}x${screenHeight}"
+                )
+            } else {
+                Log.d(
+                    TAG,
+                    "captureAreaBitmap resolution: capture=${image.width}x${image.height} matches requested"
+                )
+            }
+
+            val captureArea = mapCaptureArea(
+                area = area,
+                screenWidth = screenWidth,
+                screenHeight = screenHeight,
+                captureWidth = image.width,
+                captureHeight = image.height
+            ) ?: run {
+                Log.d(
+                    TAG,
+                    "captureAreaBitmap skipped: invalid mapped area. requested=${area?.toShortString() ?: "full"} " +
+                        "screen=${screenWidth}x${screenHeight} capture=${image.width}x${image.height}"
+                )
+                return null
+            }
+
+            Log.d(
+                TAG,
+                "captureAreaBitmap mapped: requested=${area?.toShortString() ?: "full"} " +
+                    "screen=${screenWidth}x${screenHeight} capture=${image.width}x${image.height} " +
+                    "mapped=[${captureArea.left},${captureArea.top}][${captureArea.right},${captureArea.bottom}]"
+            )
+
+            val paddedCaptureArea = if (area == null) {
+                captureArea
+            } else {
+                OcrCaptureAreaPaddingPolicy.expandForTextDetection(
+                    area = captureArea,
+                    captureWidth = image.width,
+                    captureHeight = image.height
+                )
+            }
+            if (paddedCaptureArea != captureArea) {
+                Log.d(
+                    TAG,
+                    "captureAreaBitmap padded: " +
+                        "mapped=[${captureArea.left},${captureArea.top}][${captureArea.right},${captureArea.bottom}] " +
+                        "padded=[${paddedCaptureArea.left},${paddedCaptureArea.top}]" +
+                        "[${paddedCaptureArea.right},${paddedCaptureArea.bottom}]"
+                )
+            }
+
+            val resultBitmap = if (
+                paddedCaptureArea.left == 0 &&
+                paddedCaptureArea.top == 0 &&
+                paddedCaptureArea.right == image.width &&
+                paddedCaptureArea.bottom == image.height
+            ) {
+                ScreenCaptureManager.imageToBitmap(image)
+            } else {
+                OcrImageCropper.cropImageAreaToBitmap(image, paddedCaptureArea)
+            }
+            if (resultBitmap != null) {
+                Log.d(TAG, "OCR crop bitmap: ${resultBitmap.width}x${resultBitmap.height} pixels")
+            }
+            resultBitmap
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to crop OCR bitmap", e)
+            null
+        } finally {
+            image.close()
+        }
+    }
+
+    fun recognizeTextFromBitmap(bitmap: Bitmap): String = processBitmapText(bitmap)
+
+    fun warmUpAsync() {
+        if (!warmUpStarted.compareAndSet(false, true)) return
+        Thread {
+            val startedAt = SystemClock.uptimeMillis()
+            val bitmap = Bitmap.createBitmap(
+                WARM_UP_BITMAP_SIZE,
+                WARM_UP_BITMAP_SIZE,
+                Bitmap.Config.ARGB_8888
+            )
+            try {
+                processBitmapText(bitmap)
+                Log.d(TAG, "OCR warm-up finished in ${SystemClock.uptimeMillis() - startedAt}ms")
+            } catch (e: Exception) {
+                Log.w(TAG, "OCR warm-up failed", e)
+            } finally {
+                bitmap.recycle()
+            }
+        }.start()
+    }
+
+    private fun processBitmapText(bitmap: Bitmap): String {
+        if (OcrEngineSelectionPolicy.preferPaddle()) {
+            when (val paddleResult = PaddleOcrHelper.recognizeTextFromBitmap(debugContext, bitmap)) {
+                is PaddleOcrHelper.Result.Success -> {
+                    Log.d(
+                        TAG,
+                        "OCR result engine=PaddleOCR bitmap=${bitmap.width}x${bitmap.height} " +
+                            "recognizedLength=${paddleResult.text.length} elapsed=${paddleResult.elapsedMs}ms"
+                    )
+                    return paddleResult.text
+                }
+                is PaddleOcrHelper.Result.Unavailable -> {
+                    if (lastPaddleUnavailableReason != paddleResult.reason) {
+                        lastPaddleUnavailableReason = paddleResult.reason
+                        Log.w(TAG, "OCR fallback: PaddleOCR ${paddleResult.reason}; using ML Kit")
+                    }
+                }
+            }
+        }
+
+        return when (val result = MlKitOcrHelper.recognizeTextFromBitmap(debugContext, bitmap)) {
+            is MlKitOcrHelper.Result.Success -> {
+                Log.d(
+                    TAG,
+                    "OCR result engine=ML Kit bitmap=${bitmap.width}x${bitmap.height} " +
+                        "recognizedLength=${result.text.length} elapsed=${result.elapsedMs}ms"
+                )
+                result.text
+            }
+            is MlKitOcrHelper.Result.Unavailable -> {
+                if (lastMlKitUnavailableReason != result.reason) {
+                    lastMlKitUnavailableReason = result.reason
+                    Log.w(TAG, "OCR unavailable: ML Kit ${result.reason}")
+                }
+                ""
+            }
+        }
+    }
+
+    private fun saveDebugCrop(bitmap: Bitmap, recognizedText: String) {
+        if (
+            !OcrDebugImagePolicy.shouldSavePrefillFailureCrop(
+                recognizedText = recognizedText,
+                captureFailure = false
+            )
+        ) {
+            Log.d(TAG, "OCR debug save skipped: debug image saving is disabled")
+            return
+        }
+        val ctx = debugContext
+        if (ctx == null) {
+            Log.d(TAG, "OCR debug save skipped: debugContext not set")
+            return
+        }
+        OcrDebugImageSaver.savePrefillFailureCrop(ctx, bitmap)
+    }
+
+    private fun mapCaptureArea(
+        area: Rect?,
+        screenWidth: Int,
+        screenHeight: Int,
+        captureWidth: Int,
+        captureHeight: Int
+    ): OcrAreaMapper.Area? {
+        if (area == null) {
+            return OcrAreaMapper.Area(0, 0, captureWidth, captureHeight)
+        }
+        return OcrAreaMapper.mapScreenAreaToCaptureAreaAllowingRotation(
+            left = area.left,
+            top = area.top,
+            right = area.right,
+            bottom = area.bottom,
+            screenWidth = screenWidth,
+            screenHeight = screenHeight,
+            captureWidth = captureWidth,
+            captureHeight = captureHeight
+        )
+    }
+
+}

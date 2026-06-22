@@ -1,5 +1,6 @@
 package com.fffcccdfgh.androidclicker
 
+import com.fffcccdfgh.androidclicker.core.ocr.OcrDebugImagePolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -7,8 +8,8 @@ import org.junit.Test
 
 class OcrDebugImagePolicyTest {
     @Test
-    fun savesPrefillCropOnlyForFailures() {
-        assertTrue(
+    fun doesNotSavePrefillCropByDefault() {
+        assertFalse(
             OcrDebugImagePolicy.shouldSavePrefillFailureCrop(
                 recognizedText = "",
                 captureFailure = false
@@ -17,15 +18,35 @@ class OcrDebugImagePolicyTest {
 
         assertFalse(
             OcrDebugImagePolicy.shouldSavePrefillFailureCrop(
+                recognizedText = "",
+                captureFailure = true
+            )
+        )
+    }
+
+    @Test
+    fun savesPrefillCropOnlyForFailuresWhenDebugImagesEnabled() {
+        assertTrue(
+            OcrDebugImagePolicy.shouldSavePrefillFailureCrop(
+                recognizedText = "",
+                captureFailure = false,
+                debugImagesEnabled = true
+            )
+        )
+
+        assertFalse(
+            OcrDebugImagePolicy.shouldSavePrefillFailureCrop(
                 recognizedText = "ready",
-                captureFailure = false
+                captureFailure = false,
+                debugImagesEnabled = true
             )
         )
 
         assertTrue(
             OcrDebugImagePolicy.shouldSavePrefillFailureCrop(
                 recognizedText = "",
-                captureFailure = true
+                captureFailure = true,
+                debugImagesEnabled = true
             )
         )
     }

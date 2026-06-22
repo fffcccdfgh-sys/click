@@ -1,5 +1,9 @@
 package com.fffcccdfgh.androidclicker
 
+import com.fffcccdfgh.androidclicker.core.execution.ActionStep
+import com.fffcccdfgh.androidclicker.core.program.ProgramCoordinateAdapter
+import com.fffcccdfgh.androidclicker.core.program.ProgramScreenSizePolicy
+import com.fffcccdfgh.androidclicker.core.program.ProgramScreenSize
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -48,5 +52,45 @@ class ProgramCoordinateAdapterTest {
         assertEquals("0.00", ProgramCoordinateAdapter.formatStoredPercentArg(0))
         assertEquals("12.34", ProgramCoordinateAdapter.formatStoredPercentArg(1234))
         assertEquals("100.00", ProgramCoordinateAdapter.formatStoredPercentArg(10000))
+    }
+
+    @Test
+    fun programScreenSizePrefersCaptureDimensionsWhenReady() {
+        val size = ProgramScreenSizePolicy.choose(
+            captureWidth = 3200,
+            captureHeight = 1440,
+            displayWidth = 1440,
+            displayHeight = 3200,
+            fallbackWidth = 1080,
+            fallbackHeight = 2400
+        )
+
+        assertEquals(ProgramScreenSize(width = 3200, height = 1440), size)
+    }
+
+    @Test
+    fun programScreenSizeFallsBackToDisplayThenResources() {
+        assertEquals(
+            ProgramScreenSize(width = 1440, height = 3200),
+            ProgramScreenSizePolicy.choose(
+                captureWidth = 0,
+                captureHeight = 0,
+                displayWidth = 1440,
+                displayHeight = 3200,
+                fallbackWidth = 1080,
+                fallbackHeight = 2400
+            )
+        )
+        assertEquals(
+            ProgramScreenSize(width = 1080, height = 2400),
+            ProgramScreenSizePolicy.choose(
+                captureWidth = 0,
+                captureHeight = 0,
+                displayWidth = 0,
+                displayHeight = 0,
+                fallbackWidth = 1080,
+                fallbackHeight = 2400
+            )
+        )
     }
 }

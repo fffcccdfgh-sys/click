@@ -57,7 +57,7 @@
                 android:orientation="vertical" />
         </ScrollView>
 
-        <com.fffcccdfgh.androidclicker.ProgramTemplateMenuScrollBar
+        <com.fffcccdfgh.androidclicker.core.program.ProgramTemplateMenuScrollBar
             android:id="@+id/actionListScrollBar"
             android:layout_width="8dp"
             android:layout_height="match_parent"

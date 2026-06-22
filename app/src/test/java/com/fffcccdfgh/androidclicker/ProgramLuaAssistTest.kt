@@ -1,5 +1,7 @@
 package com.fffcccdfgh.androidclicker
 
+import com.fffcccdfgh.androidclicker.core.program.ProgramCoordinateAdapter
+import com.fffcccdfgh.androidclicker.core.program.ProgramLuaAssist
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.luaj.vm2.LuaValue
