@@ -52,9 +52,7 @@ Use this checklist before making the repository public or publishing an APK.
   major dependencies.
 - `PRIVACY.md` explains local screen capture, OCR, scripts, storage, and debug
   images.
-- `SECURITY.md` explains high-risk areas and secret handling.
-- `CONTRIBUTING.md`, `SUPPORT.md`, `CODE_OF_CONDUCT.md`, and GitHub templates
-  are present.
+- GitHub issue templates are present.
 
 ## Manual Smoke Test
 

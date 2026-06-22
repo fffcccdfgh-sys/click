@@ -98,7 +98,6 @@ Because the app uses powerful Android capabilities, review the privacy notes
 before installing or distributing builds:
 
 - [Privacy notes](PRIVACY.md)
-- [Security policy](SECURITY.md)
 
 ## Third-Party Software
 
@@ -106,11 +105,9 @@ This repository includes third-party source, headers, models, and native
 libraries. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution
 and license notes.
 
-## Support And Contributing
+## Issues And Maintenance
 
-- For help and issue guidance, see [SUPPORT.md](SUPPORT.md).
-- For contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
-- For project behavior expectations, see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+- Use GitHub issues for bug reports and feature requests.
 - Maintainers can use [docs/release-checklist.md](docs/release-checklist.md)
   before making the repository public or publishing an APK.
 
