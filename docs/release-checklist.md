@@ -49,6 +49,8 @@ Use this checklist before making the repository public or publishing an APK.
 - `NOTICE` is present.
 - `THIRD_PARTY_NOTICES.md` lists bundled native libraries, model files, and
   major dependencies.
+- `docs/pvz2-calibration-guide.md` explains the PVZ2 calibration flow and links
+  the optional example screenshot pack.
 - `PRIVACY.md` explains local screen capture, OCR, scripts, storage, and debug
   images.
 - GitHub issue templates are present.

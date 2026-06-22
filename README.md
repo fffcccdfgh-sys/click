@@ -29,6 +29,8 @@ apps and services you automate.
 - `app/src/main/assets/paddleocr/` - Bundled PaddleOCR model assets.
 - `app/src/main/jniLibs/` - Runtime native libraries for `arm64-v8a`.
 - `docs/normal-programming-guide.md` - General Lua scripting guide.
+- `docs/pvz2-calibration-guide.md` - PVZ2 calibration walkthrough and optional
+  screenshot examples.
 - `docs/pvz2-calibration-variables.md` - PVZ2 calibration variable reference.
 
 The repository intentionally keeps the native libraries and OCR models checked
@@ -84,6 +86,7 @@ not be committed. Forks should create their own signing key.
 For script syntax, see:
 
 - [General scripting guide](docs/normal-programming-guide.md)
+- [PVZ2 calibration guide](docs/pvz2-calibration-guide.md)
 - [PVZ2 calibration variables](docs/pvz2-calibration-variables.md)
 
 Only run scripts you trust. Imported Lua scripts can automate touches and may
