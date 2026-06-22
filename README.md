@@ -1,122 +1,103 @@
 # Click
 
-Click is an Android automation tool for recording, editing, importing, and
-running tap/swipe scripts. It is built for local use on Android devices and
-combines accessibility gestures, floating controls, screen capture, OCR, color
-matching, and Lua scripting.
+Click 是一款 Android 自动化工具，用于录制、编辑、导入并运行点击/滑动脚本。它面向 Android 设备本地使用，结合了无障碍手势、悬浮控制、屏幕捕获、OCR、颜色匹配和 Lua 脚本能力。
 
-The app UI and scripting documentation are currently Chinese-first.
+当前 App 界面和脚本文档以中文为主。
 
-## Features
+## 功能
 
-- Floating control panel for creating and running tap, swipe, wait, and program
-  actions.
-- Lua script import/export with percentage-based screen coordinates.
-- Conditional execution with OCR text matching and color matching.
-- On-device OCR using bundled PaddleOCR assets on `arm64-v8a`, with ML Kit
-  fallback where available.
-- Screen-capture based OCR and color detection.
-- PVZ2-specific script list, calibration flow, and USB script sync helpers.
+- 悬浮控制面板：创建并运行点击、滑动、等待和编程动作。
+- Lua 脚本导入/导出，支持按屏幕百分比记录坐标。
+- 条件执行，支持 OCR 文本匹配和颜色匹配。
+- 内置 PaddleOCR 资源，在 `arm64-v8a` 设备上进行本地 OCR；可用时也支持 ML Kit 作为备用 OCR。
+- 基于屏幕捕获的 OCR 和颜色检测。
+- PVZ2 专用脚本列表、校准流程和 USB 脚本同步辅助功能。
 
-This project is not affiliated with Plants vs. Zombies 2, PopCap, EA, or any
-other game publisher. Use automation responsibly and follow the rules of the
-apps and services you automate.
+本项目与 Plants vs. Zombies 2、PopCap、EA 或其他游戏发行方没有关联。请负责任地使用自动化，并遵守被自动化应用或服务的规则。
 
-## Repository Contents
+## 仓库内容
 
-- `app/src/main/java/` - Android app source code.
-- `app/src/main/cpp/` - Native PaddleOCR bridge and vendored native headers.
-- `app/src/main/assets/paddleocr/` - Bundled PaddleOCR model assets.
-- `app/src/main/jniLibs/` - Runtime native libraries for `arm64-v8a`.
-- `docs/normal-programming-guide.md` - General Lua scripting guide.
-- `docs/pvz2-calibration-guide.md` - PVZ2 calibration walkthrough and optional
-  screenshot examples.
-- `docs/pvz2-calibration-variables.md` - PVZ2 calibration variable reference.
+- `app/src/main/java/` - Android App 源码。
+- `app/src/main/cpp/` - 原生 PaddleOCR 桥接代码和随仓库提供的 native 头文件。
+- `app/src/main/assets/paddleocr/` - 内置 PaddleOCR 模型资源。
+- `app/src/main/jniLibs/` - `arm64-v8a` 运行时 native 库。
+- `docs/normal-programming-guide.md` - 普通 Lua 脚本说明。
+- `docs/pvz2-calibration-guide.md` - PVZ2 校准教程和可选示例截图包。
+- `docs/pvz2-calibration-variables.md` - PVZ2 校准变量参考。
 
-The repository intentionally keeps the native libraries and OCR models checked
-in so a fresh clone is easier to build and run.
+仓库有意保留 native 库和 OCR 模型文件，这样新克隆项目后更容易直接构建和运行。
 
-## Requirements
+## 环境要求
 
-- Android Studio with a recent Android Gradle Plugin toolchain.
-- JDK 17 or newer.
-- Android SDK for compile SDK 36.
-- CMake 3.22.1.
-- An Android device or emulator running Android 8.0+ (`minSdk 26`).
-- `arm64-v8a` device support for the bundled native OCR path.
+- Android Studio，以及较新的 Android Gradle Plugin 工具链。
+- JDK 17 或更新版本。
+- Android SDK，compile SDK 36。
+- CMake 3.22.1。
+- Android 8.0+ 设备或模拟器，`minSdk 26`。
+- 支持 `arm64-v8a` 的设备，用于内置 native OCR 路径。
 
-Gradle Wrapper is included. Use the wrapper instead of a system Gradle install.
+项目已包含 Gradle Wrapper，请优先使用仓库里的 wrapper，而不是系统全局 Gradle。
 
-## Build
+## 构建
 
-Clone the repository, open it in Android Studio, let Android Studio create your
-local `local.properties`, then build from the IDE or terminal:
+克隆仓库后，用 Android Studio 打开项目，让 Android Studio 生成本地 `local.properties`，然后从 IDE 或终端构建：
 
 ```powershell
 .\gradlew.bat assembleDebug
 ```
 
-On macOS or Linux:
+macOS 或 Linux：
 
 ```sh
 ./gradlew assembleDebug
 ```
 
-Run unit tests:
+运行单元测试：
 
 ```powershell
 .\gradlew.bat test
 ```
 
-Release signing is maintainer-local. The release keystore file `key` and
-password values in `local.properties` are intentionally ignored by Git and must
-not be committed. Forks should create their own signing key.
+发布签名由维护者在本地管理。release keystore 文件 `key` 和 `local.properties` 里的密码值会被 Git 忽略，不能提交到仓库。Fork 项目后请创建自己的签名密钥。
 
-## Basic Use
+## 基本使用
 
-1. Install a debug or release APK on an Android device.
-2. Open the app and grant the requested capabilities:
-   - Accessibility service, used to dispatch gestures.
-   - Floating window permission, used for the control panels.
-   - Screen capture permission, used for OCR and color detection.
-3. Start the floating control panel.
-4. Record actions or import a Lua script.
-5. Run the script and stop it from the floating control or notification.
+1. 在 Android 设备上安装 debug 或 release APK。
+2. 打开 App，并授予需要的能力：
+   - 无障碍服务：用于发送点击和滑动手势。
+   - 悬浮窗权限：用于显示控制面板。
+   - 屏幕捕获权限：用于 OCR 和颜色检测。
+3. 启动悬浮控制面板。
+4. 录制动作，或导入 Lua 脚本。
+5. 运行脚本，并通过悬浮控制或通知停止脚本。
 
-For script syntax, see:
+脚本语法见：
 
-- [General scripting guide](docs/normal-programming-guide.md)
-- [PVZ2 calibration guide](docs/pvz2-calibration-guide.md)
-- [PVZ2 calibration variables](docs/pvz2-calibration-variables.md)
+- [普通脚本说明](docs/normal-programming-guide.md)
+- [PVZ2 校准教程](docs/pvz2-calibration-guide.md)
+- [PVZ2 校准变量](docs/pvz2-calibration-variables.md)
 
-Only run scripts you trust. Imported Lua scripts can automate touches and may
-run with a broad Lua runtime inside the app process.
+只运行你信任的脚本。导入的 Lua 脚本可以自动执行触摸操作，并且会在 App 进程内使用较完整的 Lua 运行环境。
 
-## Permissions And Privacy
+## 权限和隐私
 
-Click does not request the Android internet permission. Screen frames, OCR
-results, scripts, and calibration data are processed locally on the device.
+Click 不申请 Android 网络权限。屏幕画面、OCR 结果、脚本和校准数据都在设备本地处理。
 
-Because the app uses powerful Android capabilities, review the privacy notes
-before installing or distributing builds:
+因为 App 会使用较强的 Android 能力，安装或分发构建前建议阅读隐私说明：
 
-- [Privacy notes](PRIVACY.md)
+- [隐私说明](PRIVACY.md)
 
-## Third-Party Software
+## 第三方软件
 
-This repository includes third-party source, headers, models, and native
-libraries. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution
-and license notes.
+本仓库包含第三方源码、头文件、模型和 native 库。归属和许可证说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-## Issues And Maintenance
+## 问题和维护
 
-- Use GitHub issues for bug reports and feature requests.
-- Maintainers can use [docs/release-checklist.md](docs/release-checklist.md)
-  before making the repository public or publishing an APK.
+- Bug 反馈和功能建议请使用 GitHub Issues。
+- 维护者在公开仓库或发布 APK 前，可以参考 [docs/release-checklist.md](docs/release-checklist.md)。
 
-## License
+## 许可证
 
-Project code is licensed under the Apache License 2.0. Third-party components
-remain under their own licenses.
+项目自有代码使用 Apache License 2.0。第三方组件仍然遵循各自的许可证。
 
 Copyright 2026 fffcccdfgh-sys.
