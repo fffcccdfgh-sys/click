@@ -4,6 +4,7 @@ project(androidclicker_paddleocr)
 
 set(PaddleLite_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/PaddleLite")
 set(OpenCV_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/OpenCV/sdk/native")
+set(OpenCV_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}")
 
 include_directories(${PaddleLite_DIR}/cxx/include)
 include_directories(${OpenCV_DIR}/include)
@@ -38,7 +39,7 @@ set_target_properties(
     opencv_java4
     PROPERTIES
     IMPORTED_LOCATION
-    ${OpenCV_DIR}/libs/${ANDROID_ABI}/libopencv_java4.so)
+    ${OpenCV_LIB_DIR}/libopencv_java4.so)
 
 find_library(log-lib log)
 

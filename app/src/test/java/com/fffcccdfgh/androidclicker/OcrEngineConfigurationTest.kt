@@ -31,6 +31,19 @@ class OcrEngineConfigurationTest {
     }
 
     @Test
+    fun opencvSharedLibraryIsNotDuplicatedInThirdPartySdk() {
+        val cmake = file("app/src/main/cpp/CMakeLists.txt").readText()
+
+        assertFalse(
+            "OpenCV runtime library should live only in jniLibs",
+            file("app/src/main/cpp/third_party/OpenCV/sdk/native/libs/arm64-v8a/libopencv_java4.so").exists()
+        )
+        assertTrue(cmake.contains("OpenCV_LIB_DIR"))
+        assertTrue(cmake.contains("jniLibs"))
+        assertTrue(cmake.contains("\${OpenCV_LIB_DIR}/libopencv_java4.so"))
+    }
+
+    @Test
     fun screenCaptureServiceStillWarmsUpOcrAfterCaptureStarts() {
         val source = file(
             "app/src/main/java/com/fffcccdfgh/androidclicker/core/screencapture/ScreenCaptureForegroundService.kt"
