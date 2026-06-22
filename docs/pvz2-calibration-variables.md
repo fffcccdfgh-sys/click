@@ -13,7 +13,7 @@ pvz2_脚本名.lua
 App 导入脚本时会把文件名前缀 `pvz2_` 去掉，作为手机里的脚本名。例如：
 
 ```text
-pvz2_沙滩无尽.lua -> 手机脚本名：沙滩无尽
+pvz2_天空无尽.lua -> 手机脚本名：天空无尽
 ```
 
 脚本里优先使用校准变量，不要写死屏幕坐标。点位变量结构：
@@ -262,9 +262,9 @@ com.fffcccdfgh.androidclicker
 
 ```json
 {
-  "scriptName": "沙滩无尽",
+  "scriptName": "天空无尽",
   "updatedAt": "2026-06-14T12:00:00.0000000Z",
-  "sourcePath": "E:\\pvz2\\沙滩无尽\\pvz2_沙滩无尽.lua"
+  "sourcePath": "E:\\pvz2\\天空\\天空无尽\\pvz2_天空无尽.lua"
 }
 ```
 
@@ -298,12 +298,12 @@ com.fffcccdfgh.androidclicker
   "mode": "merge",
   "scripts": [
     {
-      "name": "沙滩无尽",
-      "path": "pvz2_沙滩无尽.lua"
+      "name": "天空无尽",
+      "path": "pvz2_天空无尽.lua"
     },
     {
-      "name": "前50关",
-      "path": "pvz2_前50关.lua"
+      "name": "天空前50关",
+      "path": "pvz2_天空前50关.lua"
     }
   ]
 }
@@ -346,23 +346,23 @@ com.fffcccdfgh.androidclicker
 ### 推荐电脑目录结构
 
 ```text
-E:\pvz2
-  沙滩无尽
-    pvz2_沙滩无尽.lua
-  前50关
-    pvz2_前50关.lua
+E:\pvz2\天空
+  天空无尽
+    pvz2_天空无尽.lua
+  天空前50关
+    pvz2_天空前50关.lua
   其他脚本
     pvz2_其他脚本.lua
 ```
 
-每个子文件夹代表一个脚本。脚本 AI 生成脚本时，建议把 Lua 文件放在对应脚本文件夹里。
+`天空` 是一个世界或分类目录，每个子文件夹代表一个脚本。脚本 AI 生成脚本时，建议把 Lua 文件放在对应脚本文件夹里。
 
 ### 推荐 PowerShell 批量推送脚本
 
 把下面内容保存为：
 
 ```text
-E:\pvz2\push_all_pvz2.ps1
+E:\pvz2\天空\push_all_pvz2.ps1
 ```
 
 `.ps1` 文件建议使用 UTF-8 with BOM 保存，避免 Windows PowerShell 5 读取中文路径或中文字符串出错。
@@ -375,7 +375,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$Root = "E:\pvz2"
+$Root = "E:\pvz2\天空"
 $PackageName = "com.fffcccdfgh.androidclicker"
 $RemoteSyncDir = "/sdcard/Android/data/$PackageName/files/sync"
 $RemoteBatchDir = "$RemoteSyncDir/batch"
@@ -503,7 +503,7 @@ Write-Host "Open PVZ2 script list in the app and confirm the sync dialog."
 把下面内容保存为：
 
 ```text
-E:\pvz2\推送全部-添加或覆盖.bat
+E:\pvz2\天空\推送全部-添加或覆盖.bat
 ```
 
 ```bat
@@ -515,7 +515,7 @@ pause
 把下面内容保存为：
 
 ```text
-E:\pvz2\推送全部-替换手机全部.bat
+E:\pvz2\天空\推送全部-替换手机全部.bat
 ```
 
 ```bat
@@ -548,8 +548,8 @@ if ($LASTEXITCODE -ne 0) {
 分目录一键脚本也要遵守同样规则，例如：
 
 ```text
-E:\pvz2\冰河\冰河无尽\一键下载.bat
-E:\pvz2\冰河\冰河无尽\push_batch.ps1
+E:\pvz2\天空\天空无尽\一键下载.bat
+E:\pvz2\天空\天空无尽\push_batch.ps1
 ```
 
 `push_batch.ps1` 里不要裸调用 `adb shell`、`adb push`。统一封装成带设备参数和失败检查的调用：
