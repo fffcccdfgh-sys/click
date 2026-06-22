@@ -65,7 +65,7 @@ object OcrHelper {
                 return true
             }
             Log.d(TAG, "detectText result: matched=false")
-            saveDebugCrop(bitmap)
+            saveDebugCrop(bitmap, recognizedText)
             return false
         } finally {
             bitmap.recycle()
@@ -256,7 +256,16 @@ object OcrHelper {
         }
     }
 
-    private fun saveDebugCrop(bitmap: Bitmap) {
+    private fun saveDebugCrop(bitmap: Bitmap, recognizedText: String) {
+        if (
+            !OcrDebugImagePolicy.shouldSavePrefillFailureCrop(
+                recognizedText = recognizedText,
+                captureFailure = false
+            )
+        ) {
+            Log.d(TAG, "OCR debug save skipped: debug image saving is disabled")
+            return
+        }
         val ctx = debugContext
         if (ctx == null) {
             Log.d(TAG, "OCR debug save skipped: debugContext not set")

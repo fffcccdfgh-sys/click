@@ -212,15 +212,21 @@ end
 
 能力区域变量表示能力识别框；能力中心点变量表示对应识别框的中心点。
 
-## 手机权限授权记录
+## 可选 ADB 授权
 
-已执行授权命令：
+如果是在自己的开发或测试设备上调试，可以通过 ADB 授权
+`WRITE_SECURE_SETTINGS`，让 App 在具备权限时尝试恢复无障碍服务状态：
 
 ```shell
 adb shell pm grant com.fffcccdfgh.androidclicker android.permission.WRITE_SECURE_SETTINGS
 ```
 
-前提是 App 的 `AndroidManifest.xml` 已声明 `android.permission.WRITE_SECURE_SETTINGS`。执行一次后，只要不卸载 App，一般会保留这个授权；App 启动时可以自动把自己的无障碍服务重新写回系统设置。
+前提是 App 的 `AndroidManifest.xml` 已声明
+`android.permission.WRITE_SECURE_SETTINGS`。执行一次后，只要不卸载 App，一般会
+保留这个授权；App 启动时可以自动把自己的无障碍服务重新写回系统设置。
+
+普通用户手动使用 App 时，不一定需要这条命令。不要在不了解风险的设备上授予
+这个权限。
 
 ## 一键把脚本下载到手机
 

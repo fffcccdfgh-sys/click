@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issue
+    url: https://github.com/fffcccdfgh-sys/click/security
+    about: Please do not post sensitive vulnerability details in a public issue.
+  - name: Privacy and permissions notes
+    url: https://github.com/fffcccdfgh-sys/click/blob/main/PRIVACY.md
+    about: Read how Click uses accessibility, floating windows, screen capture, and local storage.

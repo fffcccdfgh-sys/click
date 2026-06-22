@@ -3,9 +3,10 @@ package com.fffcccdfgh.androidclicker.core.ocr
 object OcrDebugImagePolicy {
     fun shouldSavePrefillFailureCrop(
         recognizedText: String,
-        captureFailure: Boolean
+        captureFailure: Boolean,
+        debugImagesEnabled: Boolean = OcrDebugConfig.SAVE_DEBUG_IMAGES
     ): Boolean {
-        return captureFailure || recognizedText.isBlank()
+        return debugImagesEnabled && (captureFailure || recognizedText.isBlank())
     }
 
     fun cropFileName(
