@@ -46,30 +46,61 @@ class ScreenCaptureForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startScreenCaptureForeground()
-
-        if (intent?.action == ACTION_START_CAPTURE) {
-            val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
-            val resultData = getResultData(intent)
-            if (resultCode == Activity.RESULT_OK && resultData != null) {
-                try {
-                    ScreenCaptureManager.initialize(this, resultCode, resultData)
-                    Log.d(TAG, "Screen capture initialized")
-                } catch (e: SecurityException) {
-                    Log.e(TAG, "Failed to initialize screen capture", e)
-                    Toast.makeText(this, R.string.screen_capture_not_supported, Toast.LENGTH_SHORT).show()
-                    stopSelf()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Unexpected screen capture initialization failure", e)
-                    Toast.makeText(this, R.string.screen_capture_not_supported, Toast.LENGTH_SHORT).show()
-                    stopSelf()
-                }
-            } else {
-                stopSelf()
-            }
+        if (intent?.action != ACTION_START_CAPTURE) {
+            Log.d(TAG, "Ignoring service start without capture permission data")
+            stopSelf(startId)
+            return START_NOT_STICKY
         }
 
-        return START_STICKY
+        val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
+        val resultData = getResultData(intent)
+        if (resultCode != Activity.RESULT_OK || resultData == null) {
+            Log.d(TAG, "Stopping service: missing screen capture permission data")
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+
+        if (!startScreenCaptureForegroundSafely()) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+
+        try {
+            ScreenCaptureManager.initialize(this, resultCode, resultData)
+            Log.d(TAG, "Screen capture initialized")
+            OcrHelper.debugContext = this
+            OcrHelper.warmUpAsync()
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Failed to initialize screen capture", e)
+            Toast.makeText(this, R.string.screen_capture_not_supported, Toast.LENGTH_SHORT).show()
+            stopSelf(startId)
+        } catch (e: Exception) {
+            Log.e(TAG, "Unexpected screen capture initialization failure", e)
+            Toast.makeText(this, R.string.screen_capture_not_supported, Toast.LENGTH_SHORT).show()
+            stopSelf(startId)
+        }
+
+        return START_NOT_STICKY
+    }
+
+    private fun startScreenCaptureForegroundSafely(): Boolean {
+        return try {
+            startScreenCaptureForeground()
+            true
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Failed to start screen capture foreground service", e)
+            Toast.makeText(this, R.string.screen_capture_not_supported, Toast.LENGTH_SHORT).show()
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "Unexpected foreground service start failure", e)
+            Toast.makeText(this, R.string.screen_capture_not_supported, Toast.LENGTH_SHORT).show()
+            false
+        }
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        stopSelf()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

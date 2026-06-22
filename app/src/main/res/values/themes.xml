@@ -6,4 +6,50 @@
     </style>
 
     <style name="Theme.Click" parent="Base.Theme.Click" />
+
+    <style name="FloatingControlPillBase">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">38dp</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:minWidth">72dp</item>
+        <item name="android:paddingStart">18dp</item>
+        <item name="android:paddingEnd">18dp</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="FloatingControlPrimaryPill" parent="FloatingControlPillBase">
+        <item name="android:background">@drawable/floating_pill_primary</item>
+        <item name="android:minWidth">86dp</item>
+        <item name="android:textColor">#FFFFFF</item>
+    </style>
+
+    <style name="FloatingControlSecondaryPill" parent="FloatingControlPillBase">
+        <item name="android:background">@drawable/floating_pill_secondary</item>
+        <item name="android:textColor">#E5E7EB</item>
+    </style>
+
+    <style name="FloatingControlSuccessPill" parent="FloatingControlPillBase">
+        <item name="android:background">@drawable/floating_pill_success</item>
+        <item name="android:textColor">#FFFFFF</item>
+    </style>
+
+    <style name="FloatingControlDangerPill" parent="FloatingControlPillBase">
+        <item name="android:background">@drawable/floating_pill_danger</item>
+        <item name="android:textColor">#FDA4AF</item>
+    </style>
+
+    <style name="FloatingControlWarningPill" parent="FloatingControlPillBase">
+        <item name="android:background">@drawable/floating_pill_warning</item>
+        <item name="android:textColor">#FDE68A</item>
+    </style>
+
+    <style name="FloatingControlMenuPill" parent="FloatingControlSecondaryPill">
+        <item name="android:layout_width">72dp</item>
+        <item name="android:layout_height">46dp</item>
+        <item name="android:minWidth">72dp</item>
+        <item name="android:paddingStart">0dp</item>
+        <item name="android:paddingEnd">0dp</item>
+    </style>
 </resources>

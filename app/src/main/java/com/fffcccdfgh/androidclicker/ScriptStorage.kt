@@ -64,6 +64,10 @@ object ScriptStorage {
         return root.toString(2)
     }
 
+    fun exportScriptToLua(script: SavedScript): String {
+        return LuaScriptCodec.exportScript(script)
+    }
+
     fun importScriptFromJson(context: Context, json: String): String {
         val root = org.json.JSONObject(json)
         val actionsJson = root.getJSONArray("actions")
@@ -79,6 +83,28 @@ object ScriptStorage {
             name
         } else {
             saveAutoNamedScript(context, actions, loopCount, loopGapMs)
+        }
+    }
+
+    fun importScriptFromText(context: Context, text: String, fallbackName: String? = null): String {
+        val trimmed = text.trimStart()
+        return if (trimmed.startsWith("{")) {
+            importScriptFromJson(context, text)
+        } else {
+            val fallback = fallbackName
+                ?.substringBeforeLast('.')
+                ?.removePrefix("脚本_")
+                ?.takeIf { it.isNotBlank() }
+                ?: nextAutoName(context)
+            val imported = LuaScriptCodec.importScript(text, fallback)
+            saveNamedScript(
+                context,
+                imported.name,
+                imported.actions,
+                imported.loopCount,
+                imported.loopGapMs
+            )
+            imported.name
         }
     }
 

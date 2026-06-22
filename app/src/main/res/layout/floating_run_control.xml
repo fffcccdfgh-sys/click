@@ -4,55 +4,33 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:background="@drawable/floating_control_bg"
-    android:orientation="horizontal"
+    android:elevation="4dp"
     android:gravity="center_vertical"
-    android:padding="8dp"
-    android:elevation="4dp">
+    android:orientation="horizontal"
+    android:padding="10dp">
 
     <TextView
         android:id="@+id/runDragHandle"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
+        android:layout_width="76dp"
+        android:layout_height="40dp"
         android:gravity="center_vertical"
-        android:paddingStart="8dp"
-        android:paddingEnd="12dp"
+        android:maxLines="1"
+        android:paddingStart="4dp"
+        android:paddingEnd="10dp"
         android:text="@string/run_label"
         android:textColor="@android:color/white"
-        android:textSize="14sp" />
-
-    <View
-        android:layout_width="1dp"
-        android:layout_height="24dp"
-        android:background="#33FFFFFF" />
+        android:textSize="16sp"
+        android:textStyle="bold" />
 
     <TextView
         android:id="@+id/runStartButton"
-        android:layout_width="44dp"
-        android:layout_height="36dp"
-        android:background="@android:color/transparent"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center"
-        android:text="@string/start_action"
-        android:textColor="@android:color/white"
-        android:textSize="13sp" />
-
-    <View
-        android:layout_width="1dp"
-        android:layout_height="24dp"
-        android:background="#33FFFFFF" />
+        style="@style/FloatingControlPrimaryPill"
+        android:text="@string/start_action" />
 
     <TextView
         android:id="@+id/runCloseButton"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:background="@android:color/transparent"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center"
-        android:text="✕"
-        android:textColor="@android:color/white"
-        android:textSize="14sp" />
+        style="@style/FloatingControlDangerPill"
+        android:layout_marginStart="8dp"
+        android:text="@string/close_button" />
 
 </LinearLayout>

@@ -14,3 +14,15 @@
 .externalNativeBuild
 .cxx
 local.properties
+.claude/
+docs/superpowers/
+key/
+/key
+*.apk
+app/release/
+output/imagegen/
+.codegraph/
+.kotlin/
+output/
+window.xml
+game/

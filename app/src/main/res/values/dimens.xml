@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="main_content_max_width">420dp</dimen>
+    <dimen name="main_page_padding_horizontal">20dp</dimen>
+    <dimen name="main_page_padding_top">32dp</dimen>
+    <dimen name="main_page_padding_bottom">28dp</dimen>
+    <dimen name="main_start_area_height">166dp</dimen>
+    <dimen name="main_start_button_size">144dp</dimen>
+    <dimen name="main_game_button_size">76dp</dimen>
+    <dimen name="main_script_button_size">90dp</dimen>
+    <dimen name="main_card_padding">20dp</dimen>
+    <dimen name="main_card_gap">22dp</dimen>
+    <dimen name="main_permission_row_gap">20dp</dimen>
+    <dimen name="main_permission_status_width">72dp</dimen>
+    <dimen name="main_permission_status_height">42dp</dimen>
+    <dimen name="pvz_content_max_width">420dp</dimen>
+    <dimen name="pvz_run_area_height">166dp</dimen>
+    <dimen name="pvz_run_button_size">144dp</dimen>
+    <dimen name="pvz_calibration_row_height">64dp</dimen>
+    <dimen name="pvz_calibration_button_width">72dp</dimen>
+    <dimen name="pvz_calibration_button_height">42dp</dimen>
+    <dimen name="pvz_script_open_button_size">86dp</dimen>
+</resources>

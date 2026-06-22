@@ -30,29 +30,80 @@ class AreaSelectionView @JvmOverloads constructor(
     private var lastTouchX = 0f
     private var lastTouchY = 0f
     private var dragMoveDistance = 0f
+    private var buttonsHiddenForCurrentDrag = false
 
     private val idleHandler = Handler(Looper.getMainLooper())
-    private val showButtonsRunnable = Runnable { onInteractionFinished?.invoke() }
+    private val showButtonsRunnable = Runnable { finishInteraction() }
 
     private val fillPaint = Paint().apply {
-        color = Color.parseColor("#334CAF50")
+        color = Color.parseColor("#3360A5FA")
         style = Paint.Style.FILL
         isAntiAlias = true
     }
     private val strokePaint = Paint().apply {
-        color = Color.parseColor("#FF4CAF50")
+        color = Color.parseColor("#FF60A5FA")
         style = Paint.Style.STROKE
-        strokeWidth = 3f
+        strokeWidth = 2.5f * resources.displayMetrics.density
+        isAntiAlias = true
+    }
+    private val innerStrokePaint = Paint().apply {
+        color = Color.parseColor("#CCDBEAFE")
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * resources.displayMetrics.density
+        isAntiAlias = true
+    }
+    private val divisionLinePaint = Paint().apply {
+        color = Color.parseColor("#E5FFFFFF")
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f * resources.displayMetrics.density
+        pathEffect = android.graphics.DashPathEffect(
+            floatArrayOf(
+                8f * resources.displayMetrics.density,
+                6f * resources.displayMetrics.density
+            ),
+            0f
+        )
         isAntiAlias = true
     }
     private val handlePaint = Paint().apply {
-        color = Color.parseColor("#FF4CAF50")
+        color = Color.parseColor("#FFBFDBFE")
         style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    private val handleStrokePaint = Paint().apply {
+        color = Color.parseColor("#FF1D4ED8")
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f * resources.displayMetrics.density
         isAntiAlias = true
     }
 
     var onInteractionStarted: (() -> Unit)? = null
     var onInteractionFinished: (() -> Unit)? = null
+    var divisionCount: Int = 0
+        set(value) {
+            field = value.coerceAtLeast(0)
+            invalidate()
+        }
+    var divisionOrientation: DivisionOrientation = DivisionOrientation.VERTICAL
+        set(value) {
+            field = value
+            invalidate()
+        }
+    var divisionRows: Int = 0
+        set(value) {
+            field = value.coerceAtLeast(0)
+            invalidate()
+        }
+    var divisionColumns: Int = 0
+        set(value) {
+            field = value.coerceAtLeast(0)
+            invalidate()
+        }
+
+    enum class DivisionOrientation {
+        VERTICAL,
+        HORIZONTAL
+    }
 
     private enum class TouchMode {
         NONE, MOVE,
@@ -113,8 +164,8 @@ class AreaSelectionView @JvmOverloads constructor(
                 lastTouchX = x
                 lastTouchY = y
                 dragMoveDistance = 0f
+                buttonsHiddenForCurrentDrag = false
                 idleHandler.removeCallbacks(showButtonsRunnable)
-                onInteractionStarted?.invoke()
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
@@ -122,6 +173,16 @@ class AreaSelectionView @JvmOverloads constructor(
                 val dx = x - lastTouchX
                 val dy = y - lastTouchY
                 dragMoveDistance += Math.abs(dx) + Math.abs(dy)
+                if (!buttonsHiddenForCurrentDrag &&
+                    PickerActionButtonsVisibilityPolicy.shouldHideWhileChanging(
+                        dragMoveDistance,
+                        touchSlop.toFloat()
+                    )
+                ) {
+                    buttonsHiddenForCurrentDrag = true
+                    onInteractionStarted?.invoke()
+                    invalidate()
+                }
                 applyMove(dx, dy)
                 lastTouchX = x
                 lastTouchY = y
@@ -130,8 +191,16 @@ class AreaSelectionView @JvmOverloads constructor(
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 touchMode = TouchMode.NONE
-                if (dragMoveDistance >= touchSlop) {
-                    idleHandler.postDelayed(showButtonsRunnable, IDLE_SHOW_BUTTONS_MS)
+                when (
+                    PickerActionButtonsVisibilityPolicy.showTimingAfterTouchEnd(
+                        dragMoveDistance,
+                        touchSlop.toFloat()
+                    )
+                ) {
+                    PickerActionButtonsVisibilityPolicy.ShowTiming.NOW -> finishInteraction()
+                    PickerActionButtonsVisibilityPolicy.ShowTiming.AFTER_IDLE_DELAY -> {
+                        idleHandler.postDelayed(showButtonsRunnable, IDLE_SHOW_BUTTONS_MS)
+                    }
                 }
                 return true
             }
@@ -206,15 +275,77 @@ class AreaSelectionView @JvmOverloads constructor(
         super.onDraw(canvas)
         if (!hasInitialRect) return
 
-        canvas.drawRect(rect, fillPaint)
-        canvas.drawRect(rect, strokePaint)
+        val corner = 10f * resources.displayMetrics.density
+        canvas.drawRoundRect(rect, corner, corner, fillPaint)
+        canvas.drawRoundRect(rect, corner, corner, strokePaint)
+        val inset = 4f * resources.displayMetrics.density
+        canvas.drawRoundRect(
+            rect.left + inset,
+            rect.top + inset,
+            rect.right - inset,
+            rect.bottom - inset,
+            corner,
+            corner,
+            innerStrokePaint
+        )
+        drawDivisionLines(canvas)
 
         // Corner handles
         val r = edgeHitSize / 3
-        canvas.drawCircle(rect.left, rect.top, r, handlePaint)
-        canvas.drawCircle(rect.right, rect.top, r, handlePaint)
-        canvas.drawCircle(rect.left, rect.bottom, r, handlePaint)
-        canvas.drawCircle(rect.right, rect.bottom, r, handlePaint)
+        drawHandle(canvas, rect.left, rect.top, r)
+        drawHandle(canvas, rect.right, rect.top, r)
+        drawHandle(canvas, rect.left, rect.bottom, r)
+        drawHandle(canvas, rect.right, rect.bottom, r)
+    }
+
+    private fun drawHandle(canvas: Canvas, cx: Float, cy: Float, radius: Float) {
+        canvas.drawCircle(cx, cy, radius, handlePaint)
+        canvas.drawCircle(cx, cy, radius, handleStrokePaint)
+    }
+
+    private fun finishInteraction() {
+        buttonsHiddenForCurrentDrag = false
+        onInteractionFinished?.invoke()
+        invalidate()
+    }
+
+    private fun drawDivisionLines(canvas: Canvas) {
+        if (buttonsHiddenForCurrentDrag || touchMode != TouchMode.NONE) return
+        if (divisionRows > 1 || divisionColumns > 1) {
+            drawGridDivisionLines(canvas)
+            return
+        }
+        if (divisionCount <= 1) return
+        if (divisionOrientation == DivisionOrientation.HORIZONTAL) {
+            val step = rect.height() / divisionCount.toFloat()
+            for (index in 1 until divisionCount) {
+                val y = rect.top + step * index
+                canvas.drawLine(rect.left, y, rect.right, y, divisionLinePaint)
+            }
+        } else {
+            val step = rect.width() / divisionCount.toFloat()
+            for (index in 1 until divisionCount) {
+                val x = rect.left + step * index
+                canvas.drawLine(x, rect.top, x, rect.bottom, divisionLinePaint)
+            }
+        }
+    }
+
+    private fun drawGridDivisionLines(canvas: Canvas) {
+        if (divisionRows > 1) {
+            val rowHeight = rect.height() / divisionRows.toFloat()
+            for (row in 1 until divisionRows) {
+                val y = rect.top + rowHeight * row
+                canvas.drawLine(rect.left, y, rect.right, y, divisionLinePaint)
+            }
+        }
+        if (divisionColumns > 1) {
+            val columnWidth = rect.width() / divisionColumns.toFloat()
+            for (column in 1 until divisionColumns) {
+                val x = rect.left + columnWidth * column
+                canvas.drawLine(x, rect.top, x, rect.bottom, divisionLinePaint)
+            }
+        }
     }
 
     companion object {

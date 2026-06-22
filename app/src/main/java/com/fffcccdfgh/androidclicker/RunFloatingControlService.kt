@@ -42,6 +42,8 @@ class RunFloatingControlService : Service() {
     private var windowManager: WindowManager? = null
     private var foregroundStarted = false
     private var activeScriptName: String? = null
+    private var runWindowsTouchThrough = false
+    private var executionStopButton: ExecutionStopButtonOverlay? = null
     private var windowYOffset = 400
 
     override fun onCreate() {
@@ -93,6 +95,8 @@ class RunFloatingControlService : Service() {
         super.onDestroy()
         Log.d(stopDebugTag, "RunFloatingControlService.onDestroy")
         stopActiveExecution()
+        hideExecutionStopButton()
+        setAllRunWindowsTouchThrough(false)
         for (entry in windows.values.toList()) {
             removeWindowView(entry)
         }
@@ -170,12 +174,13 @@ class RunFloatingControlService : Service() {
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             type,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            runWindowFlags(),
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = 100
             this.y = y
+            alpha = ExecutionOverlayWindowPolicy.NORMAL_ALPHA
         }
 
         val titleView = view.findViewById<TextView>(R.id.runDragHandle)
@@ -295,6 +300,8 @@ class RunFloatingControlService : Service() {
         if (ActionSequenceExecutor.isRunning) {
             ActionSequenceExecutor.stop()
         }
+        hideExecutionStopButton()
+        setAllRunWindowsTouchThrough(false)
         activeScriptName = null
     }
 
@@ -303,10 +310,58 @@ class RunFloatingControlService : Service() {
     private fun zoneKey(entry: WindowEntry) = "run_${entry.scriptName}"
 
     private fun getControlZoneRect(entry: WindowEntry): Rect? {
+        if (runWindowsTouchThrough) return null
         val view = entry.view ?: return null
         val params = entry.params ?: return null
         if (view.width <= 0 || view.height <= 0) return null
         return Rect(params.x, params.y, params.x + view.width, params.y + view.height)
+    }
+
+    private fun showExecutionStopButton() {
+        val wm = windowManager ?: return
+        if (executionStopButton == null) {
+            executionStopButton = ExecutionStopButtonOverlay(
+                context = this,
+                windowManager = wm,
+                zoneKey = "run_execution_stop_button",
+                onStop = { stopActiveExecution() }
+            )
+        }
+        executionStopButton?.show()
+    }
+
+    private fun hideExecutionStopButton() {
+        executionStopButton?.hide()
+    }
+
+    private fun runWindowFlags(): Int {
+        return if (runWindowsTouchThrough) {
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        } else {
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        }
+    }
+
+    private fun setAllRunWindowsTouchThrough(enabled: Boolean) {
+        runWindowsTouchThrough = enabled
+        for (entry in windows.values) {
+            setRunWindowTouchThrough(entry)
+        }
+    }
+
+    private fun setRunWindowTouchThrough(entry: WindowEntry) {
+        val params = entry.params ?: return
+        params.flags = runWindowFlags()
+        params.alpha = if (runWindowsTouchThrough) {
+            ExecutionOverlayWindowPolicy.TOUCH_THROUGH_ALPHA
+        } else {
+            ExecutionOverlayWindowPolicy.NORMAL_ALPHA
+        }
+        val view = entry.view ?: return
+        if (view.isAttachedToWindow) {
+            windowManager?.updateViewLayout(view, params)
+        }
     }
 
     // ── execution ────────────────────────────────────────────────────
@@ -322,17 +377,23 @@ class RunFloatingControlService : Service() {
         ActionSequenceExecutor.onStarted = {
             Log.d(stopDebugTag, "RunFloatingControlService.onStarted script=${entry.scriptName}")
             activeScriptName = entry.scriptName
+            setAllRunWindowsTouchThrough(true)
+            showExecutionStopButton()
             updateWindowButton(entry, true)
             updateAllOtherButtons(entry.scriptName)
         }
         ActionSequenceExecutor.onFinished = {
             Log.d(stopDebugTag, "RunFloatingControlService.onFinished script=${entry.scriptName}")
+            hideExecutionStopButton()
+            setAllRunWindowsTouchThrough(false)
             activeScriptName = null
             updateWindowButton(entry, false)
             updateAllOtherButtons(null)
         }
         ActionSequenceExecutor.onStopped = {
             Log.d(stopDebugTag, "RunFloatingControlService.onStopped script=${entry.scriptName}")
+            hideExecutionStopButton()
+            setAllRunWindowsTouchThrough(false)
             activeScriptName = null
             updateWindowButton(entry, false)
             updateAllOtherButtons(null)
@@ -340,10 +401,6 @@ class RunFloatingControlService : Service() {
 
         val density = resources.displayMetrics.density
         val paddingPx = ControlZoneChecker.dpToPx(density)
-        if (ControlZoneChecker.doesAnyActionOverlap(entry.scriptActions, paddingPx)) {
-            Toast.makeText(this, R.string.action_overlaps_control_zone, Toast.LENGTH_SHORT).show()
-            return
-        }
 
         ActionSequenceExecutor.execute(
             this,
@@ -362,10 +419,12 @@ class RunFloatingControlService : Service() {
         val btn = view.findViewById<TextView>(R.id.runStartButton)
         if (running) {
             btn.text = getString(R.string.stop_action)
-            btn.setTextColor(0xFFFF8888.toInt())
+            btn.setTextColor(Color.WHITE)
+            btn.background = getDrawable(R.drawable.floating_pill_danger)
         } else {
             btn.text = getString(R.string.start_action)
             btn.setTextColor(Color.WHITE)
+            btn.background = getDrawable(R.drawable.floating_pill_primary)
         }
     }
 

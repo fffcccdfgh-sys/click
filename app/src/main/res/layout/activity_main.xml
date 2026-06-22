@@ -1,99 +1,338 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#F5F7FA"
+    android:fillViewport="true"
     tools:context=".MainActivity">
 
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="wrap_content"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/status_disabled"
-        android:textSize="18sp"
-        app:layout_constraintBottom_toTopOf="@+id/overlayStatusText"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_chainStyle="packed" />
+        android:paddingStart="@dimen/main_page_padding_horizontal"
+        android:paddingTop="@dimen/main_page_padding_top"
+        android:paddingEnd="@dimen/main_page_padding_horizontal"
+        android:paddingBottom="@dimen/main_page_padding_bottom">
 
-    <TextView
-        android:id="@+id/overlayStatusText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/overlay_status_denied"
-        android:textSize="16sp"
-        android:layout_marginTop="8dp"
-        app:layout_constraintBottom_toTopOf="@+id/screenCaptureStatusText"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/statusText" />
+        <LinearLayout
+            android:id="@+id/mainContent"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.5"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintWidth_max="@dimen/main_content_max_width">
 
-    <TextView
-        android:id="@+id/screenCaptureStatusText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/screen_capture_status_denied"
-        android:textSize="16sp"
-        android:layout_marginTop="8dp"
-        app:layout_constraintBottom_toTopOf="@+id/openSettingsButton"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/overlayStatusText" />
+            <TextView
+                android:id="@+id/appTitleText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/main_app_title"
+                android:textColor="#0F172A"
+                android:textSize="40sp"
+                android:textStyle="bold" />
 
-    <Button
-        android:id="@+id/openSettingsButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/open_accessibility_settings"
-        app:layout_constraintBottom_toTopOf="@+id/openOverlaySettingsButton"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/screenCaptureStatusText" />
+            <TextView
+                android:id="@+id/appSubtitleText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/main_subtitle"
+                android:textColor="#64748B"
+                android:textSize="17sp" />
 
-    <Button
-        android:id="@+id/openOverlaySettingsButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/open_overlay_settings"
-        android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@+id/grantScreenCaptureButton"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/openSettingsButton" />
+            <FrameLayout
+                android:id="@+id/mainStartArea"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/main_start_area_height"
+                android:layout_marginTop="24dp">
 
-    <Button
-        android:id="@+id/grantScreenCaptureButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/grant_screen_capture"
-        app:layout_constraintBottom_toTopOf="@+id/toggleFloatingButton"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/openOverlaySettingsButton" />
+                <TextView
+                    android:id="@+id/toggleFloatingButton"
+                    android:layout_width="@dimen/main_start_button_size"
+                    android:layout_height="@dimen/main_start_button_size"
+                    android:layout_gravity="center"
+                    android:background="@drawable/main_start_circle_bg"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:padding="0dp"
+                    android:text="@string/start_floating_control"
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
 
-    <Button
-        android:id="@+id/toggleFloatingButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/start_floating_control"
-        android:enabled="false"
-        app:layout_constraintBottom_toTopOf="@+id/myScriptsButton"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/grantScreenCaptureButton" />
+            <LinearLayout
+                android:id="@+id/gameScriptsCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/main_card_gap"
+                android:background="@drawable/main_card_bg"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="@dimen/main_card_padding">
 
-    <Button
-        android:id="@+id/myScriptsButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/my_scripts"
-        android:layout_marginTop="12dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/toggleFloatingButton" />
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="游戏脚本"
+                        android:textColor="#111827"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="植物大战僵尸2专用"
+                        android:textColor="#64748B"
+                        android:textSize="15sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/gameScriptsButton"
+                    android:layout_width="@dimen/main_game_button_size"
+                    android:layout_height="@dimen/main_game_button_size"
+                    android:layout_marginStart="18dp"
+                    android:background="@drawable/main_game_open_circle_bg"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:padding="0dp"
+                    android:text="进入"
+                    android:textColor="#FFFFFF"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/permissionsCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/main_card_gap"
+                android:background="@drawable/main_card_bg"
+                android:orientation="vertical"
+                android:padding="@dimen/main_card_padding">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/main_permissions_title"
+                    android:textColor="#111827"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/main_permission_row_gap"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:background="@drawable/main_permission_number_bg"
+                        android:gravity="center"
+                        android:text="1"
+                        android:textColor="#4F46E5"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:text="@string/main_accessibility_title"
+                        android:textColor="#111827"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/openSettingsButton"
+                        android:layout_width="@dimen/main_permission_status_width"
+                        android:layout_height="@dimen/main_permission_status_height"
+                        android:background="@drawable/main_permission_action_bg"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:padding="0dp"
+                        android:text="@string/main_permission_open"
+                        android:textColor="#2563EB"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/main_permission_row_gap"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:background="@drawable/main_permission_number_bg"
+                        android:gravity="center"
+                        android:text="2"
+                        android:textColor="#4F46E5"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:text="@string/main_overlay_title"
+                        android:textColor="#111827"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/openOverlaySettingsButton"
+                        android:layout_width="@dimen/main_permission_status_width"
+                        android:layout_height="@dimen/main_permission_status_height"
+                        android:background="@drawable/main_permission_action_bg"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:padding="0dp"
+                        android:text="@string/main_permission_open"
+                        android:textColor="#2563EB"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/main_permission_row_gap"
+                    android:layout_marginBottom="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:background="@drawable/main_permission_number_bg"
+                        android:gravity="center"
+                        android:text="3"
+                        android:textColor="#4F46E5"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/screenCaptureStatusText"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:text="@string/main_screen_capture_title"
+                        android:textColor="#111827"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/grantScreenCaptureButton"
+                        android:layout_width="@dimen/main_permission_status_width"
+                        android:layout_height="@dimen/main_permission_status_height"
+                        android:background="@drawable/main_permission_action_bg"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:padding="0dp"
+                        android:text="@string/main_permission_open"
+                        android:textColor="#2563EB"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/scriptsCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/main_card_gap"
+                android:background="@drawable/main_card_bg"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="@dimen/main_card_padding">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/my_scripts"
+                        android:textColor="#111827"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/main_scripts_subtitle"
+                        android:textColor="#64748B"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="22dp"
+                        android:text="@string/main_scripts_list_title"
+                        android:textColor="#111827"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/main_scripts_actions"
+                        android:textColor="#64748B"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/myScriptsButton"
+                    android:layout_width="@dimen/main_script_button_size"
+                    android:layout_height="@dimen/main_script_button_size"
+                    android:layout_marginStart="18dp"
+                    android:background="@drawable/main_script_open_circle_bg"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:padding="0dp"
+                    android:text="@string/main_open"
+                    android:textColor="#FFFFFF"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/deviceResolutionText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_marginTop="14dp"
+                android:text="@string/main_device_resolution_unknown"
+                android:textColor="#2563EB"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/pvzUsbSyncPanelRoot"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/floating_panel_bg"
+    android:elevation="4dp"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+    <LinearLayout
+        android:id="@+id/pvzUsbSyncPanelHeader"
+        android:layout_width="260dp"
+        android:layout_height="34dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/pvzUsbSyncPanelTitle"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:gravity="center_vertical"
+            android:maxLines="1"
+            android:paddingStart="4dp"
+            android:paddingEnd="12dp"
+            android:text="@string/pvz_usb_sync_title"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/pvzUsbSyncPanelMessage"
+        android:layout_width="260dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:lineSpacingExtra="2dp"
+        android:text="@string/pvz_usb_sync_message"
+        android:textColor="#E5E7EB"
+        android:textSize="13sp" />
+
+    <LinearLayout
+        android:layout_width="260dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/pvzUsbSyncOverwriteButton"
+            style="@style/FloatingControlSuccessPill"
+            android:text="@string/overwrite" />
+
+        <TextView
+            android:id="@+id/pvzUsbSyncCancelButton"
+            style="@style/FloatingControlDangerPill"
+            android:layout_marginStart="8dp"
+            android:text="@string/cancel" />
+    </LinearLayout>
+</LinearLayout>

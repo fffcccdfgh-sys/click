@@ -25,4 +25,24 @@ class ActionStepTest {
 
         assertFalse(action.toJson().has("stepGapMs"))
     }
+
+    @Test
+    fun legacyTextConditionOcrFilterIsIgnoredWhenSavedAgain() {
+        val action = ActionStep.fromJson(
+            JSONObject(
+                """
+                {
+                  "type": "tap",
+                  "x": 10,
+                  "y": 20,
+                  "conditionType": "text_contains",
+                  "conditionText": "ready",
+                  "conditionOcrFilter": "threshold_invert"
+                }
+                """.trimIndent()
+            )
+        )
+
+        assertFalse(action.toJson().has("conditionOcrFilter"))
+    }
 }

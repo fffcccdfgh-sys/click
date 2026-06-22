@@ -54,10 +54,10 @@ class ClickAccessibilityService : AccessibilityService() {
             conditionColorX = cmd.conditionColorX,
             conditionColorY = cmd.conditionColorY
         )
-        return checkCondition(action)
+        return checkCondition(ProgramCoordinateAdapter.storedActionToRuntimePx(action, currentScreenSize()))
     }
 
-    private fun checkTextCondition(action: ActionStep, invert: Boolean): Boolean {
+    private suspend fun checkTextCondition(action: ActionStep, invert: Boolean): Boolean {
         val conditionText = action.conditionText
         if (conditionText.isNullOrEmpty()) return true
 
@@ -72,8 +72,45 @@ class ClickAccessibilityService : AccessibilityService() {
             null
         }
 
-        val found = findConditionText(conditionText, areaRect)
+        val foundByOcr = detectConditionTextWithOcr(conditionText, areaRect)
+        val found = TextConditionDetector.containsText(
+            targetText = conditionText,
+            ocrLookup = { foundByOcr }
+        )
         return if (invert) !found else found
+    }
+
+    private suspend fun detectConditionTextWithOcr(
+        text: String,
+        area: Rect?
+    ): Boolean {
+        ScreenCaptureManager.refreshDisplayMetrics(this)
+        val display = ScreenCaptureDisplayReader.current(this)
+        val screenWidth = ScreenCaptureManager.getCaptureWidth()
+            .takeIf { it > 0 }
+            ?: display.width
+        val screenHeight = ScreenCaptureManager.getCaptureHeight()
+            .takeIf { it > 0 }
+            ?: display.height
+        if (screenWidth <= 0 || screenHeight <= 0) {
+            Log.d(TAG, "detectConditionTextWithOcr skipped: invalid screen size")
+            return false
+        }
+        Log.d(
+            TAG,
+            "detectConditionTextWithOcr start: targetLength=${text.length} " +
+                "area=${area?.toShortString() ?: "full"} screen=${screenWidth}x${screenHeight}"
+        )
+        return withContext(Dispatchers.Default) {
+            val found = OcrHelper.detectText(
+                targetText = text,
+                area = area,
+                screenWidth = screenWidth,
+                screenHeight = screenHeight
+            )
+            Log.d(TAG, "detectConditionTextWithOcr result: found=$found")
+            found
+        }
     }
 
     private suspend fun checkColorCondition(action: ActionStep, invert: Boolean): Boolean {
@@ -91,22 +128,27 @@ class ClickAccessibilityService : AccessibilityService() {
             return false
         }
 
+        ScreenCaptureManager.refreshDisplayMetrics(this)
+        if (!ScreenCaptureManager.isReady) return false
+
         val image = withContext(Dispatchers.Default) {
             ScreenCaptureManager.captureFrameSync(2000L)
         } ?: return false
 
         return try {
-            val capW = ScreenCaptureManager.getCaptureWidth()
-            val capH = ScreenCaptureManager.getCaptureHeight()
-            val px = (colorX.toFloat() * capW / resources.displayMetrics.widthPixels).toInt()
-                .coerceIn(0, capW - 1)
-            val py = (colorY.toFloat() * capH / resources.displayMetrics.heightPixels).toInt()
-                .coerceIn(0, capH - 1)
+            val point = ScreenCapturePointMapper.mapScreenPointToCapturePoint(
+                screenX = colorX,
+                screenY = colorY,
+                screenWidth = ScreenCaptureManager.getCaptureWidth(),
+                screenHeight = ScreenCaptureManager.getCaptureHeight(),
+                captureWidth = image.width,
+                captureHeight = image.height
+            ) ?: return false
 
             val channelTolerance = Math.round(255f * tolerancePercent / 100f)
 
             val found = withContext(Dispatchers.Default) {
-                val pixel = ScreenCaptureManager.readPixel(image, px, py)
+                val pixel = ScreenCaptureManager.readPixel(image, point.x, point.y)
                 val r = Color.red(pixel)
                 val g = Color.green(pixel)
                 val b = Color.blue(pixel)
@@ -126,30 +168,6 @@ class ClickAccessibilityService : AccessibilityService() {
      * (≥ 25 % area ratio) with the given rect.
      * Joins them with a space for easy pre-filling into the condition editor.
      */
-    fun collectTextInArea(area: Rect): String {
-        val sb = StringBuilder()
-        for (window in windows) {
-            val root = window.root ?: continue
-            try {
-                if (root.packageName?.toString() == packageName) continue
-                collectTextInTree(root, area, sb)
-            } finally {
-                root.recycle()
-            }
-        }
-        if (sb.isEmpty()) {
-            val root = rootInActiveWindow ?: return ""
-            try {
-                if (root.packageName?.toString() != packageName) {
-                    collectTextInTree(root, area, sb)
-                }
-            } finally {
-                root.recycle()
-            }
-        }
-        return sb.toString().trim()
-    }
-
     private fun collectTextInTree(node: AccessibilityNodeInfo, area: Rect, sb: StringBuilder) {
         val nodeRect = Rect()
         node.getBoundsInScreen(nodeRect)
@@ -382,5 +400,16 @@ class ClickAccessibilityService : AccessibilityService() {
             .addStroke(stroke)
             .build()
         return dispatchGesture(gesture, callback, null)
+    }
+
+    private fun currentScreenSize(): ProgramScreenSize {
+        ScreenCaptureManager.refreshDisplayMetrics(this)
+        val captureWidth = ScreenCaptureManager.getCaptureWidth()
+        val captureHeight = ScreenCaptureManager.getCaptureHeight()
+        if (captureWidth > 0 && captureHeight > 0) {
+            return ProgramScreenSize(captureWidth, captureHeight)
+        }
+        val display = ScreenCaptureDisplayReader.current(this)
+        return ProgramScreenSize(display.width, display.height)
     }
 }

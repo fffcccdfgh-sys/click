@@ -1,0 +1,459 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/pvzGameScriptRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F7FA"
+    android:fillViewport="true"
+    tools:context=".PvzGameScriptActivity">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="@dimen/main_page_padding_horizontal"
+        android:paddingTop="@dimen/main_page_padding_top"
+        android:paddingEnd="@dimen/main_page_padding_horizontal"
+        android:paddingBottom="@dimen/main_page_padding_bottom">
+
+        <LinearLayout
+            android:id="@+id/pvzGameScriptContent"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.5"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintWidth_max="@dimen/pvz_content_max_width">
+
+            <TextView
+                android:id="@+id/pvzTitleText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="@string/pvz_script_title"
+                android:textColor="#0F172A"
+                android:textSize="30sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/pvzSubtitleText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:text="@string/pvz_script_subtitle"
+                android:textColor="#64748B"
+                android:textSize="15sp" />
+
+            <FrameLayout
+                android:id="@+id/pvzRunArea"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/pvz_run_area_height"
+                android:layout_marginTop="24dp">
+
+                <TextView
+                    android:id="@+id/pvzRunButton"
+                    android:layout_width="@dimen/pvz_run_button_size"
+                    android:layout_height="@dimen/pvz_run_button_size"
+                    android:layout_gravity="center"
+                    android:background="@drawable/main_start_circle_bg"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:padding="0dp"
+                    android:text="@string/run_action"
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:id="@+id/pvzCalibrationCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/main_card_gap"
+                android:background="@drawable/main_card_bg"
+                android:orientation="vertical"
+                android:padding="@dimen/main_card_padding">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/pvz_calibration_title"
+                    android:textColor="#111827"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/pvz_calibration_subtitle"
+                    android:textColor="#64748B"
+                    android:textSize="14sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/pvz_calibration_row_height"
+                    android:layout_marginTop="18dp"
+                    android:background="@drawable/pvz_calibration_row_bg"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="14dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/pvz_calibration_plant_slots"
+                        android:textColor="#111827"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/pvzPlantSlotsCalibrationStatus"
+                        android:layout_width="@dimen/pvz_calibration_button_width"
+                        android:layout_height="@dimen/pvz_calibration_button_height"
+                        android:background="@drawable/main_permission_action_bg"
+                        android:gravity="center"
+                        android:padding="0dp"
+                        android:text="@string/pvz_calibration_uncalibrated"
+                        android:textColor="#2563EB"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/pvz_calibration_row_height"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/pvz_calibration_row_bg"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="14dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/pvz_calibration_board"
+                        android:textColor="#111827"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/pvzBoardCalibrationStatus"
+                        android:layout_width="@dimen/pvz_calibration_button_width"
+                        android:layout_height="@dimen/pvz_calibration_button_height"
+                        android:background="@drawable/main_permission_action_bg"
+                        android:gravity="center"
+                        android:padding="0dp"
+                        android:text="@string/pvz_calibration_uncalibrated"
+                        android:textColor="#2563EB"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/pvz_calibration_row_height"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/pvz_calibration_row_bg"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="14dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/pvz_calibration_sun"
+                        android:textColor="#111827"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/pvzSunCalibrationStatus"
+                        android:layout_width="@dimen/pvz_calibration_button_width"
+                        android:layout_height="@dimen/pvz_calibration_button_height"
+                        android:background="@drawable/main_permission_action_bg"
+                        android:gravity="center"
+                        android:padding="0dp"
+                        android:text="@string/pvz_calibration_uncalibrated"
+                        android:textColor="#2563EB"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/pvz_calibration_row_height"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/pvz_calibration_row_bg"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="14dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/pvz_calibration_plant_food"
+                        android:textColor="#111827"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/pvzPlantFoodCalibrationStatus"
+                        android:layout_width="@dimen/pvz_calibration_button_width"
+                        android:layout_height="@dimen/pvz_calibration_button_height"
+                        android:background="@drawable/main_permission_action_bg"
+                        android:gravity="center"
+                        android:padding="0dp"
+                        android:text="@string/pvz_calibration_uncalibrated"
+                        android:textColor="#2563EB"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/pvz_calibration_row_height"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/pvz_calibration_row_bg"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="14dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/pvz_calibration_artifact"
+                        android:textColor="#111827"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/pvzArtifactCalibrationStatus"
+                        android:layout_width="@dimen/pvz_calibration_button_width"
+                        android:layout_height="@dimen/pvz_calibration_button_height"
+                        android:background="@drawable/main_permission_action_bg"
+                        android:gravity="center"
+                        android:padding="0dp"
+                        android:text="@string/pvz_calibration_uncalibrated"
+                        android:textColor="#2563EB"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/pvz_calibration_row_height"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/pvz_calibration_row_bg"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="14dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/pvz_calibration_cucumber"
+                        android:textColor="#111827"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/pvzCucumberCalibrationStatus"
+                        android:layout_width="@dimen/pvz_calibration_button_width"
+                        android:layout_height="@dimen/pvz_calibration_button_height"
+                        android:background="@drawable/main_permission_action_bg"
+                        android:gravity="center"
+                        android:padding="0dp"
+                        android:text="@string/pvz_calibration_uncalibrated"
+                        android:textColor="#2563EB"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/pvz_calibration_row_height"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/pvz_calibration_row_bg"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="14dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/pvz_calibration_recharge"
+                        android:textColor="#111827"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/pvzRechargeCalibrationStatus"
+                        android:layout_width="@dimen/pvz_calibration_button_width"
+                        android:layout_height="@dimen/pvz_calibration_button_height"
+                        android:background="@drawable/main_permission_action_bg"
+                        android:gravity="center"
+                        android:padding="0dp"
+                        android:text="@string/pvz_calibration_uncalibrated"
+                        android:textColor="#2563EB"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/pvz_calibration_row_height"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/pvz_calibration_row_bg"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="14dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/pvz_calibration_cards"
+                        android:textColor="#111827"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/pvzCardsCalibrationStatus"
+                        android:layout_width="@dimen/pvz_calibration_button_width"
+                        android:layout_height="@dimen/pvz_calibration_button_height"
+                        android:background="@drawable/main_permission_action_bg"
+                        android:gravity="center"
+                        android:padding="0dp"
+                        android:text="@string/pvz_calibration_uncalibrated"
+                        android:textColor="#2563EB"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/pvz_calibration_row_height"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/pvz_calibration_row_bg"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="14dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/pvz_calibration_other"
+                        android:textColor="#111827"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/pvzOtherCalibrationStatus"
+                        android:layout_width="@dimen/pvz_calibration_button_width"
+                        android:layout_height="@dimen/pvz_calibration_button_height"
+                        android:background="@drawable/main_permission_action_bg"
+                        android:gravity="center"
+                        android:padding="0dp"
+                        android:text="@string/pvz_calibration_uncalibrated"
+                        android:textColor="#2563EB"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/pvz_calibration_row_height"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/pvz_calibration_row_bg"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="14dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/pvz_calibration_endless_supply"
+                        android:textColor="#111827"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/pvzEndlessSupplyCalibrationStatus"
+                        android:layout_width="@dimen/pvz_calibration_button_width"
+                        android:layout_height="@dimen/pvz_calibration_button_height"
+                        android:background="@drawable/main_permission_action_bg"
+                        android:gravity="center"
+                        android:padding="0dp"
+                        android:text="@string/pvz_calibration_uncalibrated"
+                        android:textColor="#2563EB"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/pvzScriptFileCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/main_card_gap"
+                android:background="@drawable/main_card_bg"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="@dimen/main_card_padding">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/pvz_script_file_title"
+                        android:textColor="#111827"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/pvz_script_file_subtitle"
+                        android:textColor="#64748B"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/pvzOpenScriptButton"
+                    android:layout_width="@dimen/pvz_script_open_button_size"
+                    android:layout_height="@dimen/pvz_script_open_button_size"
+                    android:layout_marginStart="18dp"
+                    android:background="@drawable/main_script_open_circle_bg"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:padding="0dp"
+                    android:text="@string/main_open"
+                    android:textColor="#FFFFFF"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>

@@ -21,6 +21,8 @@ object ClickerBridge {
         checkStopped()
         if (!ClickAccessibilityService.isRunning) return
         val service = ClickAccessibilityService.instance ?: return
+        ExecutionTouchInterlock.waitIfPausedBlocking { stopped }
+        checkStopped()
         val action = ActionStep(type = ActionStep.TYPE_TAP, x = x, y = y, durationMs = durationMs)
         runBlocking { service.dispatchGestureAwait(action) }
         checkStopped()
@@ -31,6 +33,8 @@ object ClickerBridge {
         checkStopped()
         if (!ClickAccessibilityService.isRunning) return
         val service = ClickAccessibilityService.instance ?: return
+        ExecutionTouchInterlock.waitIfPausedBlocking { stopped }
+        checkStopped()
         val action = ActionStep(
             type = ActionStep.TYPE_SWIPE,
             startX = sx, startY = sy,
@@ -121,6 +125,36 @@ object ClickerBridge {
         return runBlocking {
             ClickAccessibilityService.instance?.checkCondition(action) ?: false
         }
+    }
+
+    @JvmStatic
+    fun ocrText(text: String, left: Int, top: Int, right: Int, bottom: Int): Boolean {
+        checkStopped()
+        if (!ClickAccessibilityService.isRunning) return false
+        val service = ClickAccessibilityService.instance ?: return false
+        ScreenCaptureManager.refreshDisplayMetrics(service)
+        if (!ScreenCaptureManager.isReady) return false
+        return OcrHelper.detectText(
+            targetText = text,
+            area = Rect(left, top, right, bottom),
+            screenWidth = ScreenCaptureManager.getCaptureWidth(),
+            screenHeight = ScreenCaptureManager.getCaptureHeight()
+        )
+    }
+
+    @JvmStatic
+    fun ocrTextNot(text: String, left: Int, top: Int, right: Int, bottom: Int): Boolean {
+        checkStopped()
+        if (!ClickAccessibilityService.isRunning) return false
+        val service = ClickAccessibilityService.instance ?: return false
+        ScreenCaptureManager.refreshDisplayMetrics(service)
+        if (!ScreenCaptureManager.isReady) return false
+        return !OcrHelper.detectText(
+            targetText = text,
+            area = Rect(left, top, right, bottom),
+            screenWidth = ScreenCaptureManager.getCaptureWidth(),
+            screenHeight = ScreenCaptureManager.getCaptureHeight()
+        )
     }
 }
 

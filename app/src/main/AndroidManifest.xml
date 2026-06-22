@@ -33,10 +33,28 @@
             android:exported="false" />
 
         <activity
+            android:name=".PvzGameScriptActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".PvzScriptListActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".ScreenCapturePermissionActivity"
             android:exported="false"
             android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <service
             android:name=".ScreenCaptureForegroundService"
@@ -58,7 +76,7 @@
         <service
             android:name=".FloatingControlService"
             android:exported="false"
-            android:foregroundServiceType="specialUse|mediaProjection">
+            android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="floating_overlay_window" />
@@ -67,10 +85,19 @@
         <service
             android:name=".RunFloatingControlService"
             android:exported="false"
-            android:foregroundServiceType="specialUse|mediaProjection">
+            android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="run_floating_overlay_window" />
+        </service>
+
+        <service
+            android:name=".PvzFloatingControlService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="pvz_floating_overlay_window" />
         </service>
     </application>
 
