@@ -47,7 +47,6 @@ Use this checklist before making the repository public or publishing an APK.
 - `README.md` explains the project, permissions, build steps, and script docs.
 - `LICENSE` is present.
 - `NOTICE` is present.
-- `CHANGELOG.md` has an `Unreleased` section.
 - `THIRD_PARTY_NOTICES.md` lists bundled native libraries, model files, and
   major dependencies.
 - `PRIVACY.md` explains local screen capture, OCR, scripts, storage, and debug
