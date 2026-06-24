@@ -26,11 +26,19 @@ import com.fffcccdfgh.androidclicker.core.execution.ActionStep
 import com.fffcccdfgh.androidclicker.core.execution.ControlZoneChecker
 import com.fffcccdfgh.androidclicker.core.execution.ExecutionOverlayWindowPolicy
 import com.fffcccdfgh.androidclicker.core.execution.ExecutionStopButtonOverlay
+import com.fffcccdfgh.androidclicker.core.program.ProgramLuaGlobalRegistrar
 import com.fffcccdfgh.androidclicker.core.screencapture.ScreenshotHider
 import java.util.LinkedHashMap
 
-class RunFloatingControlService : Service() {
+open class RunFloatingControlService : Service() {
     private val stopDebugTag = "ClickerStopDebug"
+    protected open val serviceDebugName = "RunFloatingControlService"
+    protected open val notificationChannelId = CHANNEL_ID
+    protected open val notificationId = NOTIFICATION_ID
+    protected open val stopExecutionAction = ACTION_STOP_EXECUTION
+    protected open val executionStopButtonZoneKey = "run_execution_stop_button"
+    protected open val windowZonePrefix = "run_"
+    protected open val extraLuaGlobalRegistrars: List<ProgramLuaGlobalRegistrar> = emptyList()
 
     private class WindowEntry(
         val scriptName: String,
@@ -59,8 +67,8 @@ class RunFloatingControlService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP_EXECUTION) {
-            Log.d(stopDebugTag, "RunFloatingControlService notification stop clicked")
+        if (intent?.action == stopExecutionAction) {
+            Log.d(stopDebugTag, "$serviceDebugName notification stop clicked")
             stopActiveExecution()
             return START_NOT_STICKY
         }
@@ -73,7 +81,7 @@ class RunFloatingControlService : Service() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
 
         if (!foregroundStarted) {
-            startForeground(NOTIFICATION_ID, buildNotification())
+            startForeground(notificationId, buildNotification())
             foregroundStarted = true
         }
 
@@ -100,7 +108,7 @@ class RunFloatingControlService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(stopDebugTag, "RunFloatingControlService.onDestroy")
+        Log.d(stopDebugTag, "$serviceDebugName.onDestroy")
         stopActiveExecution()
         hideExecutionStopButton()
         setAllRunWindowsTouchThrough(false)
@@ -114,7 +122,7 @@ class RunFloatingControlService : Service() {
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
-            CHANNEL_ID,
+            notificationChannelId,
             getString(R.string.run_notification_channel),
             NotificationManager.IMPORTANCE_LOW
         )
@@ -128,8 +136,8 @@ class RunFloatingControlService : Service() {
             this, 0, openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val stopIntent = Intent(this, RunFloatingControlService::class.java).apply {
-            action = ACTION_STOP_EXECUTION
+        val stopIntent = Intent(this, javaClass).apply {
+            action = stopExecutionAction
         }
         val pendingStop = PendingIntent.getService(
             this, 1, stopIntent,
@@ -139,7 +147,7 @@ class RunFloatingControlService : Service() {
         val count = windows.size
         val text = if (count <= 1) getString(R.string.run_notification_text)
                    else "$count 个运行窗口"
-        return Notification.Builder(this, CHANNEL_ID)
+        return Notification.Builder(this, notificationChannelId)
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_manage)
@@ -152,7 +160,7 @@ class RunFloatingControlService : Service() {
     private fun updateNotification() {
         if (!foregroundStarted) return
         val nm = getSystemService(NotificationManager::class.java)
-        nm.notify(NOTIFICATION_ID, buildNotification())
+        nm.notify(notificationId, buildNotification())
     }
 
     // ── window management ────────────────────────────────────────────
@@ -305,7 +313,7 @@ class RunFloatingControlService : Service() {
 
     // ── control zone ─────────────────────────────────────────────────
 
-    private fun zoneKey(entry: WindowEntry) = "run_${entry.scriptName}"
+    private fun zoneKey(entry: WindowEntry) = "$windowZonePrefix${entry.scriptName}"
 
     private fun getControlZoneRect(entry: WindowEntry): Rect? {
         if (runWindowsTouchThrough) return null
@@ -321,7 +329,7 @@ class RunFloatingControlService : Service() {
             executionStopButton = ExecutionStopButtonOverlay(
                 context = this,
                 windowManager = wm,
-                zoneKey = "run_execution_stop_button",
+                zoneKey = executionStopButtonZoneKey,
                 onStop = { stopActiveExecution() }
             )
         }
@@ -370,10 +378,10 @@ class RunFloatingControlService : Service() {
         ActionSequenceExecutor.loopGapMs = entry.loopGapMs
 
         Log.d(stopDebugTag,
-            "RunFloatingControlService.executeRunSequence script=${entry.scriptName} loopCount=${entry.loopCount} loopEnabled=${ActionSequenceExecutor.loopEnabled} loopGapMs=${ActionSequenceExecutor.loopGapMs}")
+            "$serviceDebugName.executeRunSequence script=${entry.scriptName} loopCount=${entry.loopCount} loopEnabled=${ActionSequenceExecutor.loopEnabled} loopGapMs=${ActionSequenceExecutor.loopGapMs}")
 
         ActionSequenceExecutor.onStarted = {
-            Log.d(stopDebugTag, "RunFloatingControlService.onStarted script=${entry.scriptName}")
+            Log.d(stopDebugTag, "$serviceDebugName.onStarted script=${entry.scriptName}")
             activeScriptName = entry.scriptName
             setAllRunWindowsTouchThrough(true)
             showExecutionStopButton()
@@ -381,7 +389,7 @@ class RunFloatingControlService : Service() {
             updateAllOtherButtons(entry.scriptName)
         }
         ActionSequenceExecutor.onFinished = {
-            Log.d(stopDebugTag, "RunFloatingControlService.onFinished script=${entry.scriptName}")
+            Log.d(stopDebugTag, "$serviceDebugName.onFinished script=${entry.scriptName}")
             hideExecutionStopButton()
             setAllRunWindowsTouchThrough(false)
             activeScriptName = null
@@ -389,7 +397,7 @@ class RunFloatingControlService : Service() {
             updateAllOtherButtons(null)
         }
         ActionSequenceExecutor.onStopped = {
-            Log.d(stopDebugTag, "RunFloatingControlService.onStopped script=${entry.scriptName}")
+            Log.d(stopDebugTag, "$serviceDebugName.onStopped script=${entry.scriptName}")
             hideExecutionStopButton()
             setAllRunWindowsTouchThrough(false)
             activeScriptName = null
@@ -408,7 +416,8 @@ class RunFloatingControlService : Service() {
             },
             onBlocked = {
                 Toast.makeText(this, R.string.action_overlaps_control_stopped, Toast.LENGTH_SHORT).show()
-            }
+            },
+            extraLuaGlobalRegistrars = extraLuaGlobalRegistrars
         )
     }
 

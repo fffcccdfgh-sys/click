@@ -101,6 +101,15 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="pvz_floating_overlay_window" />
         </service>
+
+        <service
+            android:name=".feature.pvz.floating.PvzRunFloatingControlService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="pvz_run_floating_overlay_window" />
+        </service>
     </application>
 
 </manifest>
