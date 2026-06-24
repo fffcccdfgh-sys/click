@@ -3540,10 +3540,12 @@ class FloatingControlService : Service() {
         floatingView?.let { hideSaveConfirmPanel(it) }
 
         val panel = LayoutInflater.from(this).inflate(R.layout.floating_loop_panel, null)
-        val params = loopPanelParams ?: createPanelParams(220, 88)
+        val params = loopPanelParams ?: createLoopSettingsPanelParams()
+        applyLoopSettingsWindowPolicy(params)
         loopPanelView = panel
         loopPanelParams = params
         bindPanelDrag(panel.findViewById(R.id.loopPanelDragHandle), panel, params)
+        bindLoopSettingsInputs(panel)
         panel.findViewById<View>(R.id.loopSettingsSave).setOnClickListener {
             saveLoopSettings()
         }
@@ -3556,6 +3558,40 @@ class FloatingControlService : Service() {
         )
         loadLoopSettings()
         enableOverlayFocusImpl()
+    }
+
+    private fun createLoopSettingsPanelParams(): WindowManager.LayoutParams {
+        val params = createPanelParams(220, 88)
+        applyLoopSettingsWindowPolicy(params)
+        return params
+    }
+
+    private fun applyLoopSettingsWindowPolicy(params: WindowManager.LayoutParams) {
+        params.flags = LoopSettingsWindowPolicy.FLAGS
+        params.softInputMode = LoopSettingsWindowPolicy.SOFT_INPUT_MODE
+    }
+
+    private fun bindLoopSettingsInputs(panel: View) {
+        val countInput = panel.findViewById<EditText>(R.id.loopCountInput)
+        val gapInput = panel.findViewById<EditText>(R.id.loopGapInput)
+        listOf(countInput, gapInput).forEach { input ->
+            input.isFocusable = true
+            input.isFocusableInTouchMode = true
+            input.setOnFocusChangeListener { view, hasFocus ->
+                if (hasFocus) showKeyboardForLoopInput(view)
+            }
+            input.setOnClickListener { view ->
+                view.requestFocus()
+                showKeyboardForLoopInput(view)
+            }
+        }
+    }
+
+    private fun showKeyboardForLoopInput(view: View) {
+        view.post {
+            val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+        }
     }
 
     private fun hideLoopSettingsPanel() {
