@@ -24,7 +24,6 @@ import androidx.core.view.WindowInsetsCompat
 import com.fffcccdfgh.androidclicker.R
 import com.fffcccdfgh.androidclicker.core.execution.ActionStep
 import com.fffcccdfgh.androidclicker.core.storage.ScriptStorage
-import com.fffcccdfgh.androidclicker.feature.clicker.floating.RunFloatingControlService
 import com.fffcccdfgh.androidclicker.feature.pvz.floating.PvzFloatingControlService
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -215,13 +214,8 @@ class PvzScriptListActivity : AppCompatActivity() {
     }
 
     private fun runScript(script: ScriptStorage.SavedScript) {
-        val intent = Intent(this, RunFloatingControlService::class.java).apply {
-            putExtra(RunFloatingControlService.EXTRA_SCRIPT_JSON, ActionStep.listToJson(script.actions))
-            putExtra(RunFloatingControlService.EXTRA_SCRIPT_NAME, script.name)
-            putExtra(RunFloatingControlService.EXTRA_LOOP_COUNT, script.loopCount)
-            putExtra(RunFloatingControlService.EXTRA_LOOP_GAP_MS, script.loopGapMs)
-        }
-        startForegroundService(intent)
+        loadScriptIntoPvzFloating(script)
+        startPvzFloating()
     }
 
     private fun editScript(script: ScriptStorage.SavedScript) {
@@ -239,7 +233,7 @@ class PvzScriptListActivity : AppCompatActivity() {
     }
 
     private fun startPvzFloating() {
-        val intent = Intent(this, PvzFloatingControlService::class.java)
+        val intent = Intent(this, PvzScriptLaunchPolicy.directRunServiceClass)
         startForegroundService(intent)
     }
 
