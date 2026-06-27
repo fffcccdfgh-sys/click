@@ -34,6 +34,21 @@ class ProgramEditorWindowPolicyTest {
     }
 
     @Test
+    fun editorOpensNewCodeAtStart() {
+        assertEquals(0, ProgramEditorWindowPolicy.openCursorPosition(null, codeLength = 8000))
+    }
+
+    @Test
+    fun editorRestoresAssistCursorWhenReturningFromPicker() {
+        assertEquals(42, ProgramEditorWindowPolicy.openCursorPosition(42, codeLength = 8000))
+    }
+
+    @Test
+    fun editorRestoredCursorIsClampedToCodeLength() {
+        assertEquals(7, ProgramEditorWindowPolicy.openCursorPosition(99, codeLength = 7))
+    }
+
+    @Test
     fun editorWindowUsesMoreHeightInLandscape() {
         val size = FloatingWindowSizePolicy.programEditorSize(
             screenWidthPx = 2560,

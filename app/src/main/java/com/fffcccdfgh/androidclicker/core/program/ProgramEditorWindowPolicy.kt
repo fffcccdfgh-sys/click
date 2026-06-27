@@ -13,4 +13,8 @@ object ProgramEditorWindowPolicy {
     const val SOFT_INPUT_MODE: Int =
         WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+
+    fun openCursorPosition(restoreCursor: Int?, codeLength: Int): Int {
+        return restoreCursor?.coerceIn(0, codeLength.coerceAtLeast(0)) ?: 0
+    }
 }

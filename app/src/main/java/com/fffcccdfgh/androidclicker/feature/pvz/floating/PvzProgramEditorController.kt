@@ -146,9 +146,14 @@ class PvzProgramEditorController(
         val restoreCursor = pendingProgramRestoreCursor
         pendingProgramRestoreCursor = null
         codeInput.setSelection(
-            restoreCursor?.coerceIn(0, codeInput.text?.length ?: 0)
-                ?: (codeInput.text?.length ?: 0)
+            ProgramEditorWindowPolicy.openCursorPosition(
+                restoreCursor,
+                codeInput.text?.length ?: 0
+            )
         )
+        if (restoreCursor == null) {
+            codeInput.post { codeInput.scrollTo(0, 0) }
+        }
         editor.findViewById<ProgramCodeScrollBar>(R.id.programCodeScrollBar).attachTo(codeInput)
         editor.findViewById<ProgramLineNumberView>(R.id.programLineNumbers).attachTo(codeInput)
         codeInput.isVerticalScrollBarEnabled = false

@@ -1910,7 +1910,12 @@ class FloatingControlService : Service() {
         val restoredDraft = pendingProgramDraftCode
         if (restoredDraft != null) {
             codeInput.setText(restoredDraft)
-            codeInput.setSelection(pendingProgramDraftCursor.coerceIn(0, restoredDraft.length))
+            codeInput.setSelection(
+                ProgramEditorWindowPolicy.openCursorPosition(
+                    pendingProgramDraftCursor,
+                    restoredDraft.length
+                )
+            )
             pendingProgramDraftCode = null
             pendingProgramDraftCursor = 0
         }
@@ -1940,6 +1945,13 @@ class FloatingControlService : Service() {
             if (settingsActionIndex < sequence.size) {
                 val action = sequence[settingsActionIndex]
                 codeInput.setText(action.code ?: "")
+                codeInput.setSelection(
+                    ProgramEditorWindowPolicy.openCursorPosition(
+                        restoreCursor = null,
+                        codeLength = codeInput.text?.length ?: 0
+                    )
+                )
+                codeInput.post { codeInput.scrollTo(0, 0) }
             }
         }
 
